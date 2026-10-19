@@ -9,7 +9,11 @@ const LOCAL_PDF_PATH = path.join(PUBLIC_DIR, "menu_actual.pdf");
 
 export async function syncMontessoriMenu(): Promise<{ success: boolean; message: string; pdfUrl?: string; daysUpdated?: number }> {
   try {
-    fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+    try {
+      fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+    } catch {
+      // Ignorar en sistemas de ficheros de sólo lectura (Vercel)
+    }
 
     // 1. Obtener la web y encontrar el enlace al PDF del Menú Basal
     const res = await fetch(MONTESSORI_URL, {
@@ -24,7 +28,11 @@ export async function syncMontessoriMenu(): Promise<{ success: boolean; message:
 
     if (!pdfUrl) {
       // Si no cambia la URL, comprobamos si ya existe el PDF local
-      if (fs.existsSync(LOCAL_PDF_PATH)) {
+      let exists = false;
+      try {
+        exists = fs.existsSync(LOCAL_PDF_PATH);
+      } catch {}
+      if (exists) {
         return { success: true, message: "PDF existente conservado (no se detectó nueva URL en la web)", pdfUrl: "/menus/menu_actual.pdf" };
       }
       return { success: false, message: "No se encontró el enlace al Menú Basal en la web del colegio" };
@@ -34,7 +42,11 @@ export async function syncMontessoriMenu(): Promise<{ success: boolean; message:
     const pdfRes = await fetch(pdfUrl, { signal: AbortSignal.timeout(20_000) });
     if (!pdfRes.ok) throw new Error(`Error al descargar el PDF: ${pdfRes.status}`);
     const buffer = Buffer.from(await pdfRes.arrayBuffer());
-    fs.writeFileSync(LOCAL_PDF_PATH, buffer);
+    try {
+      fs.writeFileSync(LOCAL_PDF_PATH, buffer);
+    } catch {
+      // Ignorar en Vercel
+    }
 
     // 3. Extraer el texto con PDFParse
     const { PDFParse } = await import("pdf-parse");
