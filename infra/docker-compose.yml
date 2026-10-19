@@ -1,0 +1,77 @@
+# Home Dashboard · Stack para el PC servidor (Windows 11 Pro + Docker Desktop/WSL2)
+#
+# Arranque:   docker compose --env-file ../.env up -d --build
+# LLM local:  LM Studio corre NATIVO en Windows (Vulkan sobre la Radeon 780M)
+#             y los contenedores lo alcanzan en http://host.docker.internal:1234/v1
+# Home Assistant OS: corre en una VM de Hyper-V (fase 3), no aquí.
+
+name: home-dashboard
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hogar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-hogar}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hogar}"]
+      interval: 10s
+      retries: 5
+
+  # Dashboard (Next.js) – accesible en la LAN y por Tailscale en :3000
+  web:
+    build: ../web
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-hogar}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hogar}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Worker: briefings programados (noche/mañana) + bot de Telegram (long polling,
+  # no necesita exponer nada a Internet)
+  worker:
+    build: ../web
+    restart: unless-stopped
+    command: ["npm", "run", "worker"]
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-hogar}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hogar}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+    depends_on:
+      db:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # n8n: conectores (Google Calendar, Gmail, iCloud CalDAV) que escriben en la API del dashboard
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    environment:
+      GENERIC_TIMEZONE: Europe/Madrid
+      TZ: Europe/Madrid
+      N8N_SECURE_COOKIE: "false"
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+
+  # ── Fase 2: documentos ──────────────────────────────────────────────
+  # paperless:
+  #   image: ghcr.io/paperless-ngx/paperless-ngx:latest
+  #   ...  (se añadirá en la fase 2)
+
+volumes:
+  db-data:
+  n8n-data:
