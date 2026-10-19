@@ -33,7 +33,9 @@ async function connect(): Promise<Db> {
     };
   }
   const { PGlite } = await import("@electric-sql/pglite");
-  const dir = path.join(process.cwd(), ".data", "pglite");
+  const isVercel = Boolean(process.env.VERCEL);
+  const baseDir = isVercel ? "/tmp" : process.cwd();
+  const dir = path.join(baseDir, ".data", "pglite");
   fs.mkdirSync(dir, { recursive: true });
   const pg = await PGlite.create(dir);
   return {
