@@ -106,8 +106,8 @@ export function DinnerCard({
         </div>
       )}
 
-      {/* Grid Bento de 2 Opciones */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>
+      {/* Grid Bento de 2 Opciones (1 columna en móvil, 2 en pantallas más anchas) */}
+      <div className="responsive-grid-2">
         {/* Opción Cecotec Mambo */}
         <div
           style={{

@@ -124,7 +124,7 @@ export function KidsModule({
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem", marginBottom: "1.2rem" }}>
+      <div className="responsive-grid-2" style={{ marginBottom: "1.2rem" }}>
         {/* Turnos de Cole hoy */}
         <div
           style={{

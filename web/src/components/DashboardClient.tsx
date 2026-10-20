@@ -311,8 +311,47 @@ export function DashboardClient({
       {/* Bento Grid Principal */}
       <main className="dashboard-grid">
         {/* Columna Principal Izquierda */}
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.35rem" }}>
-          {(activeTab === "resumen" || activeTab === "peques") && (
+        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem", minWidth: 0, width: "100%" }}>
+          {/* Sub-navegador Segmentado Móvil para Familia (Cole / Agenda / Tareas) - 100% ancho, 0 scroll lateral */}
+          {(activeTab === "peques" || activeTab === "agenda" || activeTab === "tareas") && (
+            <div className="family-subnav-segmented" role="tablist">
+              <button
+                type="button"
+                onClick={() => setActiveTab("peques")}
+                className={`family-subnav-btn ${activeTab === "peques" ? "active" : ""}`}
+                role="tab"
+                aria-selected={activeTab === "peques"}
+              >
+                <span>🚸</span>
+                <span>Cole & Salud</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("agenda")}
+                className={`family-subnav-btn ${activeTab === "agenda" ? "active" : ""}`}
+                role="tab"
+                aria-selected={activeTab === "agenda"}
+              >
+                <span>📅</span>
+                <span>Agenda</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("tareas")}
+                className={`family-subnav-btn ${activeTab === "tareas" ? "active" : ""}`}
+                role="tab"
+                aria-selected={activeTab === "tareas"}
+              >
+                <span>✅</span>
+                <span>Tareas</span>
+                {pendingTasksCount > 0 && (
+                  <span style={{ fontSize: "0.72rem", opacity: 0.85, fontWeight: 700 }}>({pendingTasksCount})</span>
+                )}
+              </button>
+            </div>
+          )}
+
+          {activeTab === "resumen" && (
             <BriefingCard
               initialContent={latestBriefing}
               todayWeather={todayWeather}
@@ -375,7 +414,10 @@ export function DashboardClient({
         </section>
 
         {/* Columna Secundaria Derecha (Widgets Bento en desktop) */}
-        <aside style={{ display: "flex", flexDirection: "column", gap: "1.35rem" }}>
+        <aside
+          className={activeTab !== "resumen" ? "hide-on-mobile" : ""}
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem", minWidth: 0, width: "100%" }}
+        >
           {activeTab === "resumen" && (
             <>
               <KidsModule

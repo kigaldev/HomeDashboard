@@ -152,7 +152,7 @@ TOTAL 16.50 €`;
           </div>
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "0.85rem" }}>
+            <div className="responsive-grid-2">
               {displayedPerishables.map((item) => {
                 const isUrgent = item.days_left <= 1;
                 const isModerate = item.days_left <= 3;
@@ -379,7 +379,7 @@ TOTAL 16.50 €`;
         )}
 
         {/* ── RESUMEN FINANCIERO ESTILO APPLE WALLET ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginTop: "0.5rem" }}>
+        <div className="responsive-grid-2" style={{ marginTop: "0.5rem" }}>
           {/* Tarjeta 1: Total Mes Actual */}
           <div style={{ padding: "1.1rem", background: "var(--apple-surface-secondary)", borderRadius: "var(--radius-lg)", border: "1px solid var(--apple-border)" }}>
             <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--apple-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
@@ -464,7 +464,7 @@ TOTAL 16.50 €`;
             ℹ️ Escanea tickets de al menos dos supermercados distintos para ver la comparativa de precios y el ahorro.
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.85rem" }}>
+          <div className="responsive-grid-2">
             {priceComparisons.map((item, idx) => (
               <div
                 key={idx}
@@ -553,7 +553,7 @@ TOTAL 16.50 €`;
             ℹ️ A medida que escaneéis los tickets semanales, el sistema calculará vuestra frecuencia exacta de compra.
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.85rem" }}>
+          <div className="responsive-grid-2">
             {habits.map((h, idx) => {
               const isOverdue = h.status === "overdue";
               const isSoon = h.status === "soon";
