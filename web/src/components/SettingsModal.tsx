@@ -93,12 +93,14 @@ export function SettingsModal({
         maxHeight: "90vh",
         display: isOpen ? "flex" : "none",
         flexDirection: "column",
-        padding: "1.5rem",
         overflowY: "auto",
         border: "1px solid var(--apple-border)",
         borderRadius: "var(--radius-xl)",
       }}
     >
+      {/* Tirador táctil iOS para móvil */}
+      <div className="sheet-handle" />
+
       {/* Header Apple Style */}
       <div
         style={{

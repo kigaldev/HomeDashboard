@@ -172,7 +172,7 @@ export function DashboardClient({
         </div>
       )}
 
-      {/* Segmented Control iOS Tabs */}
+      {/* Segmented Control iOS Tabs (Visible en desktop y como selector horizontal suave en mobile) */}
       <nav className="tab-nav" aria-label="Secciones del dashboard">
         <button
           onClick={() => setActiveTab("resumen")}
@@ -246,6 +246,65 @@ export function DashboardClient({
         >
           <span>📅</span>
           <span>Agenda</span>
+        </button>
+      </nav>
+
+      {/* Barra de Navegación Inferior Nativa iOS para Smartphone (UITabBar con Thumb Zone) */}
+      <nav className="mobile-bottom-bar" aria-label="Navegación móvil inferior">
+        <button
+          type="button"
+          onClick={() => setActiveTab("resumen")}
+          className={`mobile-tab-item ${activeTab === "resumen" ? "active" : ""}`}
+        >
+          <span className="mobile-tab-icon">🏠</span>
+          <span className="mobile-tab-label">Hoy</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("compra")}
+          className={`mobile-tab-item ${activeTab === "compra" ? "active" : ""}`}
+        >
+          <span className="mobile-tab-icon">🛒</span>
+          <span className="mobile-tab-label">Compra</span>
+        </button>
+
+        {/* Botón Central Apple Intelligence (Segundo Cerebro por Voz / Chat) */}
+        <button
+          type="button"
+          onClick={() => setIsAssistantOpen(true)}
+          className="mobile-tab-center-ai"
+          title="Hablar o escribir al Segundo Cerebro"
+          aria-label="Segundo Cerebro con Inteligencia Artificial"
+        >
+          <div className="mobile-tab-center-glow" />
+          <div className="mobile-tab-center-inner">
+            <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>✨</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("tickets")}
+          className={`mobile-tab-item ${activeTab === "tickets" ? "active" : ""}`}
+          style={{ position: "relative" }}
+        >
+          <span className="mobile-tab-icon">🧾</span>
+          <span className="mobile-tab-label">Tickets</span>
+          {urgentPerishablesCount > 0 && (
+            <span className="mobile-tab-badge">
+              {urgentPerishablesCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("peques")}
+          className={`mobile-tab-item ${activeTab === "peques" || activeTab === "agenda" || activeTab === "tareas" ? "active" : ""}`}
+        >
+          <span className="mobile-tab-icon">🧒</span>
+          <span className="mobile-tab-label">Familia</span>
         </button>
       </nav>
 

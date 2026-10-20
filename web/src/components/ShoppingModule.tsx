@@ -120,7 +120,7 @@ export function ShoppingModule({
         <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--apple-text-secondary)", marginBottom: "0.45rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
           Básicos a 1 toque
         </div>
-        <div style={{ display: "flex", gap: "0.4rem", overflowX: "auto", paddingBottom: "0.25rem", scrollbarWidth: "none" }}>
+        <div style={{ display: "flex", gap: "0.4rem", overflowX: "auto", paddingBottom: "0.25rem", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
           {staples.map((st) => (
             <button
               key={st.id}
@@ -152,6 +152,7 @@ export function ShoppingModule({
           marginBottom: "1rem",
           overflowX: "auto",
           scrollbarWidth: "none",
+          WebkitOverflowScrolling: "touch",
           padding: "2px",
         }}
       >

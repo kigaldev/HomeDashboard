@@ -26,139 +26,87 @@ export function Header({
 
   return (
     <header className="top-bar">
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.2rem" }}>
-          <span style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--apple-blue)" }}>
-            SEGUNDO CEREBRO FAMILIAR
-          </span>
-          <span style={{ fontSize: "0.65rem", color: "var(--apple-text-tertiary)" }}>•</span>
-          <span style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)", fontWeight: 500 }}>
-            Salamanca
-          </span>
-        </div>
-        <h1 className="greeting-title">
-          <span>{greeting}</span>
-          <span style={{ fontSize: "1.75rem", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))" }}>🏡</span>
-        </h1>
-        <p className="greeting-subtitle">{formattedDate}</p>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-        {/* Apple Weather Capsule */}
-        {wInfo && todayWeather && (
-          <div
-            title={`Mín: ${todayWeather.tMin}° / Máx: ${todayWeather.tMax}°. Ropa peques: ${outfit.join(" · ")}`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.55rem",
-              background: "var(--apple-surface)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              border: "1px solid var(--apple-border)",
-              padding: "0.35rem 0.85rem",
-              borderRadius: "var(--radius-full)",
-              boxShadow: "var(--shadow-sm)",
-              fontSize: "0.825rem",
-              fontWeight: 600,
-            }}
-          >
-            <span style={{ fontSize: "1.1rem" }}>{wInfo.icon}</span>
-            <span>{currentWeather?.temp ?? todayWeather.tMax}°</span>
-            <span style={{ color: "var(--apple-text-secondary)", fontWeight: 500, fontSize: "0.75rem" }}>
-              {todayWeather.tMin}° / {todayWeather.tMax}°
+      {/* Fila superior / barra de estado en móvil */}
+      <div className="top-bar-header">
+        <div className="top-bar-identity">
+          <div className="top-bar-status-pill">
+            <span className="status-dot-live" />
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--apple-blue)" }}>
+              SEGUNDO CEREBRO
             </span>
-            {todayWeather.rainProb >= 25 && (
-              <span style={{ color: "var(--apple-blue)", fontSize: "0.75rem", fontWeight: 600 }}>
-                🌧️ {todayWeather.rainProb}%
-              </span>
-            )}
+            <span style={{ fontSize: "0.65rem", color: "var(--apple-text-tertiary)" }}>•</span>
+            <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", fontWeight: 500 }}>
+              Salamanca
+            </span>
           </div>
-        )}
 
-        {/* Stack de avatares estilo Apple Family */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "0.25rem 0.6rem 0.25rem 0.4rem",
-            background: "var(--apple-surface)",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            border: "1px solid var(--apple-border)",
-            borderRadius: "var(--radius-full)",
-            boxShadow: "var(--shadow-sm)",
-            gap: "0.25rem",
-          }}
-        >
-          <div style={{ display: "flex", marginLeft: "0.2rem" }}>
-            {members.map((m, idx) => (
-              <span
-                key={m.id}
-                title={`${m.name} (${m.role === "adult" ? "Adulto" : "Peque"})${m.allergies ? ` · Alergias: ${m.allergies}` : ""}`}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "50%",
-                  background: `${m.color}22`,
-                  border: `2px solid ${m.color}`,
-                  marginLeft: idx === 0 ? 0 : "-6px",
-                  fontSize: "0.95rem",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
-                  transition: "transform 0.15s ease",
-                  cursor: "pointer",
-                }}
-              >
-                {m.emoji}
-              </span>
-            ))}
-          </div>
-          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--apple-text-secondary)", marginLeft: "0.35rem" }}>
-            Familia
-          </span>
+          <h1 className="greeting-title">
+            <span>{greeting}</span>
+            <span className="greeting-icon">🏡</span>
+          </h1>
+          <p className="greeting-subtitle">{formattedDate}</p>
         </div>
 
-        {/* Botón Apple Intelligence (Segundo Cerebro) */}
-        <div className="btn-apple-intelligence" onClick={onOpenAssistant} role="button" tabIndex={0}>
-          <div className="btn-apple-intelligence-inner">
-            <span
-              style={{
-                width: "8px",
-                height: "8px",
-                borderRadius: "50%",
-                background: "linear-gradient(135deg, #FF2D55, #AF52DE)",
-                boxShadow: "0 0 8px #AF52DE",
-                display: "inline-block",
-              }}
-            />
-            <span>Segundo Cerebro</span>
-            <span style={{ fontSize: "0.9rem" }}>✨</span>
-          </div>
-        </div>
+        {/* Acciones de la cabecera */}
+        <div className="top-bar-actions">
+          {/* Weather Capsule */}
+          {wInfo && todayWeather && (
+            <div
+              className="weather-capsule"
+              title={`Mín: ${todayWeather.tMin}° / Máx: ${todayWeather.tMax}°. Ropa: ${outfit.join(" · ")}`}
+            >
+              <span style={{ fontSize: "1.1rem" }}>{wInfo.icon}</span>
+              <span className="weather-temp">{currentWeather?.temp ?? todayWeather.tMax}°</span>
+              <span className="weather-range">
+                {todayWeather.tMin}°/{todayWeather.tMax}°
+              </span>
+              {todayWeather.rainProb >= 25 && (
+                <span className="weather-rain">
+                  🌧️ {todayWeather.rainProb}%
+                </span>
+              )}
+            </div>
+          )}
 
-        {/* Botón Ajustes */}
-        <button
-          onClick={onOpenSettings}
-          className="btn-ghost"
-          title="Ajustes de la casa"
-          style={{
-            width: "36px",
-            height: "36px",
-            borderRadius: "50%",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "var(--apple-surface)",
-            border: "1px solid var(--apple-border)",
-            padding: 0,
-            boxShadow: "var(--shadow-sm)",
-          }}
-        >
-          ⚙️
-        </button>
+          {/* Avatares familiares compactos */}
+          <div className="family-avatar-stack">
+            <div style={{ display: "flex", marginLeft: "0.15rem" }}>
+              {members.map((m, idx) => (
+                <span
+                  key={m.id}
+                  title={`${m.name} (${m.role === "adult" ? "Adulto" : "Peque"})`}
+                  className="family-avatar-item"
+                  style={{
+                    backgroundColor: `${m.color}22`,
+                    borderColor: m.color,
+                    marginLeft: idx === 0 ? 0 : "-7px",
+                  }}
+                >
+                  {m.emoji}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Botón Segundo Cerebro (Desktop & Tablet) */}
+          <div className="btn-apple-intelligence hide-on-mobile" onClick={onOpenAssistant} role="button" tabIndex={0}>
+            <div className="btn-apple-intelligence-inner">
+              <span className="ai-status-indicator" />
+              <span>Segundo Cerebro</span>
+              <span style={{ fontSize: "0.9rem" }}>✨</span>
+            </div>
+          </div>
+
+          {/* Botón Ajustes */}
+          <button
+            onClick={onOpenSettings}
+            className="btn-settings-header"
+            title="Ajustes del hogar"
+            aria-label="Ajustes del hogar"
+          >
+            ⚙️
+          </button>
+        </div>
       </div>
     </header>
   );

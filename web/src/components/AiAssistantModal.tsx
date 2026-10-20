@@ -158,15 +158,17 @@ export function AiAssistantModal({
       aria-labelledby="assistant-title"
       style={{
         maxWidth: "640px",
-        height: "640px",
+        height: "min(640px, 86vh)",
         display: isOpen ? "flex" : "none",
         flexDirection: "column",
-        padding: "1.5rem",
         border: "1px solid var(--apple-border)",
         borderRadius: "var(--radius-xl)",
         boxShadow: "0 24px 60px rgba(0, 0, 0, 0.4)",
       }}
     >
+      {/* Tirador para deslizar en smartphone */}
+      <div className="sheet-handle" />
+
       {/* Cabecera estilo Apple Intelligence Sheet */}
       <div
         style={{
