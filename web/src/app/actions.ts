@@ -28,7 +28,7 @@ import { askAssistant, runAgentInstruction, type AgentActionResult } from "@/lib
 import { generateSaturdayShoppingList } from "@/lib/weeklyShopping";
 import { syncMontessoriMenu } from "@/lib/schoolMenu";
 import { syncGoogleCalendars } from "@/lib/gcal";
-import { parseReceiptText, saveProcessedReceipt, type ParsedReceipt } from "@/lib/receipts";
+import { parseReceiptText, parseReceiptImage, saveProcessedReceipt, type ParsedReceipt } from "@/lib/receipts";
 import { markItemConsumed, ensureDemoReceipts } from "@/lib/repo";
 
 export async function addShoppingAction(formData: FormData) {
@@ -216,6 +216,13 @@ export async function runAgentInstructionAction(instruction: string, history: an
 export async function processReceiptAction(rawText: string): Promise<ParsedReceipt> {
   const parsed = await parseReceiptText(rawText);
   await saveProcessedReceipt(parsed, rawText);
+  revalidatePath("/");
+  return parsed;
+}
+
+export async function processReceiptImageAction(base64Image: string, mimeType: string = "image/jpeg"): Promise<ParsedReceipt> {
+  const parsed = await parseReceiptImage(base64Image, mimeType);
+  await saveProcessedReceipt(parsed, "[Ticket escaneado mediante Gemini Vision]");
   revalidatePath("/");
   return parsed;
 }

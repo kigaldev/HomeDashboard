@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import {
   processReceiptAction,
+  processReceiptImageAction,
   markPerishableConsumedAction,
   seedDemoReceiptsAction,
   quickAddStapleAction,
@@ -95,10 +96,25 @@ TOTAL 16.50 €`;
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setScanFeedback("📸 Escaneando imagen del ticket y extrayendo productos con OCR...");
-    setTimeout(() => {
-      handleSimulateDemo("Mercadona");
-    }, 1200);
+    setScanFeedback("📸 Analizando foto del ticket con Gemini Vision...");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      startTransition(async () => {
+        try {
+          const res = await processReceiptImageAction(base64, file.type || "image/jpeg");
+          if (res.items && res.items.length > 0) {
+            setScanFeedback(`✅ ¡Ticket procesado con éxito! ${res.storeName} · ${res.items.length} productos registrados (${res.totalAmount} €).`);
+            setShowScanner(false);
+          } else {
+            setScanFeedback("ℹ️ Foto enviada. Si no se aprecian bien los textos, puedes pegar el texto del ticket.");
+          }
+        } catch {
+          setScanFeedback("⚠️ Error al analizar la imagen. Puedes pegar el texto manualmente.");
+        }
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleConsume = (id: number) => {

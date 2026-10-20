@@ -1,5 +1,5 @@
 import "server-only";
-import { llm, parseJson } from "./llm";
+import { llm, geminiVision, parseJson } from "./llm";
 import { addDays, isoDate } from "./dates";
 import { findStoreId, recordReceipt, getStores } from "./repo";
 
@@ -178,6 +178,54 @@ function parseReceiptHeuristic(text: string): ParsedReceipt {
     date: today,
     totalAmount: Math.round(totalAmount * 100) / 100,
     items,
+  };
+}
+
+/**
+ * Parsea directamente una foto o imagen de ticket (Mercadona, Carrefour, Lidl)
+ * usando Gemini Vision.
+ */
+export async function parseReceiptImage(base64Image: string, mimeType: string = "image/jpeg"): Promise<ParsedReceipt> {
+  const prompt =
+    "Eres un analizador OCR visual experto de tickets de compra de supermercados españoles (Mercadona, Carrefour, Lidl). " +
+    "Analiza la foto del ticket y extrae en JSON:\n" +
+    "- 'storeName': ('Mercadona', 'Carrefour', 'Lidl' u 'Otros')\n" +
+    "- 'date': fecha en formato YYYY-MM-DD\n" +
+    "- 'totalAmount': importe total numérico\n" +
+    "- 'items': lista con 'name' (nombre limpio del producto), 'quantity' (opcional), 'unitPrice' (opcional numérico), " +
+    "'totalPrice' (numérico), 'category' ('Fruta y Verdura', 'Carnicería', 'Pescadería', 'Lácteos', 'Huevos', 'Panadería', 'Despensa', 'Bebé / Higiene', 'Limpieza'), " +
+    "'isPerishable' (boolean), 'expiryDays' (número de días estimados hasta caducidad, ej. 2 para pescado, 3 para pollo, 4 para fruta, 6 para leche).\n" +
+    "Devuelve ÚNICAMENTE el objeto JSON sin texto adicional ni formato markdown.";
+
+  const aiResp = await geminiVision(prompt, base64Image, mimeType, { json: true });
+  const parsedAi = parseJson<ParsedReceipt>(aiResp);
+
+  if (parsedAi && parsedAi.items && parsedAi.items.length > 0) {
+    const today = isoDate();
+    return {
+      storeName: parsedAi.storeName || "Mercadona",
+      date: parsedAi.date || today,
+      totalAmount: Number(parsedAi.totalAmount) || parsedAi.items.reduce((s, i) => s + (Number(i.totalPrice) || 0), 0),
+      items: parsedAi.items.map((i) => {
+        const perish = estimatePerishable(i.name, i.category || "");
+        return {
+          name: i.name,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice ? Number(i.unitPrice) : undefined,
+          totalPrice: Number(i.totalPrice) || 0,
+          category: i.category || "Despensa",
+          isPerishable: i.isPerishable ?? perish.isPerishable,
+          expiryDays: i.expiryDays ?? perish.expiryDays,
+        };
+      }),
+    };
+  }
+
+  return {
+    storeName: "Mercadona",
+    date: isoDate(),
+    totalAmount: 0,
+    items: [],
   };
 }
 
