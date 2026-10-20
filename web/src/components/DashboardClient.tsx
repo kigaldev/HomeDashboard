@@ -94,10 +94,11 @@ export function DashboardClient({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const urgentPerishablesCount = (perishables || []).filter((p) => p.days_left <= 3).length;
+  const pendingTasksCount = (tasks || []).filter((t) => !t.done).length;
 
   return (
     <div className="container">
-      {/* Header */}
+      {/* Header estilo Apple Status Island */}
       <Header
         members={members}
         weather={weather}
@@ -107,67 +108,102 @@ export function DashboardClient({
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      {/* Banner de alerta si hay frescos a punto de caducar */}
+      {/* Banner de alerta estilo Apple Notification Card */}
       {urgentPerishablesCount > 0 && activeTab !== "tickets" && (
         <div
           onClick={() => setActiveTab("tickets")}
           style={{
             cursor: "pointer",
-            padding: "0.65rem 1rem",
-            marginBottom: "1rem",
-            borderRadius: "var(--radius-md)",
-            background: "rgba(245, 158, 11, 0.12)",
-            border: "1px solid rgba(245, 158, 11, 0.4)",
+            padding: "0.85rem 1.25rem",
+            marginBottom: "1.25rem",
+            borderRadius: "var(--radius-lg)",
+            background: "var(--apple-surface)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            border: "1px solid var(--apple-border)",
+            borderLeft: "5px solid var(--apple-orange)",
+            boxShadow: "var(--shadow-sm)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             flexWrap: "wrap",
-            gap: "0.5rem",
+            gap: "0.75rem",
+            transition: "all 0.2s var(--ease-spring)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem" }}>
-            <span>⚠️</span>
-            <span>
-              <strong>Atención despensa:</strong> Hay <strong>{urgentPerishablesCount}</strong> alimentos frescos que caducan en los próximos 3 días (
-              {perishables.slice(0, 2).map((p) => p.name).join(", ")}
-              {urgentPerishablesCount > 2 ? "..." : ""}).
-            </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.875rem" }}>
+            <div
+              style={{
+                width: "32px",
+                height: "32px",
+                borderRadius: "10px",
+                background: "var(--apple-orange-subtle)",
+                color: "var(--apple-orange)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.1rem",
+                flexShrink: 0,
+              }}
+            >
+              ⏳
+            </div>
+            <div>
+              <p style={{ fontWeight: 600, color: "var(--apple-text)", margin: 0, letterSpacing: "-0.01em" }}>
+                Atención en despensa · {urgentPerishablesCount} {urgentPerishablesCount === 1 ? "alimento perecedero" : "alimentos perecederos"}
+              </p>
+              <p style={{ fontSize: "0.8rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.15rem" }}>
+                Consumir en los próximos 3 días: {perishables.slice(0, 3).map((p) => p.name).join(", ")}
+                {urgentPerishablesCount > 3 ? "..." : ""}
+              </p>
+            </div>
           </div>
-          <span className="badge badge-amber" style={{ fontSize: "0.75rem" }}>
-            Ver en Tickets &amp; Caducidades →
+          <span
+            className="badge badge-amber"
+            style={{
+              padding: "0.4rem 0.85rem",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              boxShadow: "0 2px 6px rgba(255, 149, 0, 0.2)",
+            }}
+          >
+            Ver Radar de Caducidades →
           </span>
         </div>
       )}
 
-      {/* Tabs de navegación rápida */}
+      {/* Segmented Control iOS Tabs */}
       <nav className="tab-nav" aria-label="Secciones del dashboard">
         <button
           onClick={() => setActiveTab("resumen")}
           className={`tab-btn ${activeTab === "resumen" ? "active" : ""}`}
         >
-          ✨ Resumen &amp; Cenas
+          <span>✨</span>
+          <span>Resumen</span>
         </button>
         <button
           onClick={() => setActiveTab("compra")}
           className={`tab-btn ${activeTab === "compra" ? "active" : ""}`}
         >
-          🛒 Compra &amp; Despensa
+          <span>🛒</span>
+          <span>Compra & Despensa</span>
         </button>
         <button
           onClick={() => setActiveTab("tickets")}
           className={`tab-btn ${activeTab === "tickets" ? "active" : ""}`}
           style={{ position: "relative" }}
         >
-          🧾 Tickets &amp; Gastos
+          <span>🧾</span>
+          <span>Tickets & Gastos</span>
           {urgentPerishablesCount > 0 && (
             <span
               style={{
-                marginLeft: "0.4rem",
-                padding: "0.1rem 0.35rem",
+                marginLeft: "0.25rem",
+                padding: "0.12rem 0.45rem",
                 borderRadius: "var(--radius-full)",
-                background: "#f59e0b",
-                color: "#1e1b4b",
-                fontSize: "0.68rem",
+                background: "var(--apple-orange)",
+                color: "#ffffff",
+                fontSize: "0.7rem",
                 fontWeight: 700,
               }}
             >
@@ -179,26 +215,44 @@ export function DashboardClient({
           onClick={() => setActiveTab("tareas")}
           className={`tab-btn ${activeTab === "tareas" ? "active" : ""}`}
         >
-          ✅ Tareas ({tasks.filter((t) => !t.done).length})
+          <span>✅</span>
+          <span>Tareas</span>
+          {pendingTasksCount > 0 && (
+            <span
+              style={{
+                marginLeft: "0.25rem",
+                padding: "0.12rem 0.45rem",
+                borderRadius: "var(--radius-full)",
+                background: "var(--apple-surface-tertiary)",
+                color: "var(--apple-text-secondary)",
+                fontSize: "0.7rem",
+                fontWeight: 700,
+              }}
+            >
+              {pendingTasksCount}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab("peques")}
           className={`tab-btn ${activeTab === "peques" ? "active" : ""}`}
         >
-          🧒 Peques (Cole &amp; Salud)
+          <span>🧒</span>
+          <span>Peques & Cole</span>
         </button>
         <button
           onClick={() => setActiveTab("agenda")}
           className={`tab-btn ${activeTab === "agenda" ? "active" : ""}`}
         >
-          📅 Agenda
+          <span>📅</span>
+          <span>Agenda</span>
         </button>
       </nav>
 
-      {/* Vista interactiva según tab */}
+      {/* Bento Grid Principal */}
       <main className="dashboard-grid">
         {/* Columna Principal Izquierda */}
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <section style={{ display: "flex", flexDirection: "column", gap: "1.35rem" }}>
           {(activeTab === "resumen" || activeTab === "peques") && (
             <BriefingCard
               initialContent={latestBriefing}
@@ -261,8 +315,8 @@ export function DashboardClient({
           )}
         </section>
 
-        {/* Columna Secundaria Derecha (Resumen lateral en desktop) */}
-        <aside style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        {/* Columna Secundaria Derecha (Widgets Bento en desktop) */}
+        <aside style={{ display: "flex", flexDirection: "column", gap: "1.35rem" }}>
           {activeTab === "resumen" && (
             <>
               <KidsModule

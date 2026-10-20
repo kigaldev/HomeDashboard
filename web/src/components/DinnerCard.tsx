@@ -35,120 +35,208 @@ export function DinnerCard({
   };
 
   return (
-    <div className="glass-card" style={{ padding: "1.25rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-        <h2 style={{ fontSize: "1.15rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.4rem", margin: 0 }}>
-          <span>🍲</span>
-          <span>Cena de Hoy</span>
-        </h2>
+    <div className="glass-card" style={{ padding: "1.35rem" }}>
+      {/* Header Apple Style */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+          <div
+            className="squircle-icon"
+            style={{
+              background: "var(--apple-green-subtle)",
+              color: "var(--apple-green)",
+            }}
+          >
+            🥗
+          </div>
+          <div>
+            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+              Cena de Hoy
+            </h2>
+            <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+              Criterio familiar: baja en hidratos simples · digestión ligera
+            </p>
+          </div>
+        </div>
+
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
           {schoolLunch && (
-            <span className="badge badge-amber" title={`Comida en el cole: ${schoolLunch}`} style={{ fontSize: "0.75rem" }}>
-              Cole: {schoolLunch.length > 28 ? schoolLunch.slice(0, 28) + "…" : schoolLunch}
-            </span>
+            <div
+              className="badge badge-amber"
+              title={`Comida del colegio: ${schoolLunch}`}
+              style={{ fontSize: "0.76rem", padding: "0.3rem 0.7rem", maxWidth: "230px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            >
+              <span>🏫 Cole:</span>
+              <span style={{ fontWeight: 500 }}>{schoolLunch}</span>
+            </div>
           )}
+
           <button
             onClick={handleRegenerate}
             disabled={isPending}
             className="btn-ghost"
             title="Sugerir otras opciones con IA"
-            style={{ fontSize: "0.8rem", padding: "0.25rem 0.5rem" }}
+            style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem", borderRadius: "var(--radius-full)" }}
           >
-            🔄 {isPending ? "Generando..." : "Nuevas ideas"}
+            <span>🔄</span>
+            <span>{isPending ? "Generando..." : "Nuevas ideas"}</span>
           </button>
         </div>
       </div>
 
+      {/* Recomendación oficial del cole (*) */}
       {schoolDinnerRec && (
         <div
           style={{
-            marginBottom: "0.9rem",
-            padding: "0.55rem 0.85rem",
-            borderRadius: "var(--radius-sm)",
-            background: "rgba(245, 158, 11, 0.12)",
-            border: "1px solid rgba(245, 158, 11, 0.35)",
-            fontSize: "0.82rem",
+            marginBottom: "1.1rem",
+            padding: "0.65rem 1rem",
+            borderRadius: "var(--radius-md)",
+            background: "var(--apple-orange-subtle)",
+            border: "1px solid rgba(255, 149, 0, 0.25)",
+            fontSize: "0.825rem",
             display: "flex",
             alignItems: "center",
-            gap: "0.5rem",
+            gap: "0.6rem",
           }}
         >
-          <span>⭐</span>
-          <span>
-            <strong>Recomendación oficial del cole (*):</strong> {schoolDinnerRec} —{" "}
-            <em>Opciones sugeridas a continuación para complementar la comida del mediodía.</em>
+          <span style={{ fontSize: "1.1rem" }}>⭐</span>
+          <span style={{ color: "var(--apple-text)", lineHeight: 1.45 }}>
+            <strong style={{ color: "var(--apple-orange)" }}>Pauta del colegio (*):</strong> {schoolDinnerRec} —{" "}
+            <em style={{ color: "var(--apple-text-secondary)" }}>Platos sugeridos abajo para equilibrar la jornada.</em>
           </span>
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem" }}>
+      {/* Grid Bento de 2 Opciones */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>
         {/* Opción Cecotec Mambo */}
         <div
           style={{
-            padding: "1rem",
-            borderRadius: "var(--radius-md)",
-            border: mambo?.chosen ? "2px solid var(--accent-amber)" : "1px solid var(--border-subtle)",
-            background: mambo?.chosen ? "var(--accent-amber-subtle)" : "var(--bg-surface)",
+            padding: "1.15rem",
+            borderRadius: "var(--radius-lg)",
+            background: mambo?.chosen ? "var(--apple-orange-subtle)" : "var(--apple-surface-secondary)",
+            border: mambo?.chosen ? "2px solid var(--apple-orange)" : "1px solid var(--apple-border)",
+            boxShadow: mambo?.chosen ? "0 4px 18px rgba(255, 149, 0, 0.2)" : "none",
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            position: "relative",
+            transition: "all 0.2s var(--ease-spring)",
           }}
         >
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
-              <span className="badge badge-amber" style={{ fontSize: "0.7rem" }}>🤖 Cecotec Mambo</span>
-              {mambo?.chosen && <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--accent-amber)" }}>✓ Elegida</span>}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <span
+                className="badge badge-amber"
+                style={{ fontSize: "0.72rem", padding: "0.2rem 0.55rem" }}
+              >
+                🤖 Cecotec Mambo
+              </span>
+              {mambo?.chosen && (
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    color: "var(--apple-orange)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                  }}
+                >
+                  ✓ Seleccionada
+                </span>
+              )}
             </div>
-            <h3 style={{ fontSize: "0.98rem", fontWeight: 600, marginBottom: "0.4rem" }}>
+            <h3 style={{ fontSize: "1.02rem", fontWeight: 700, letterSpacing: "-0.015em", marginBottom: "0.45rem", color: "var(--apple-text)" }}>
               {mambo?.title || "Crema de calabacín con quesitos"}
             </h3>
-            <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: 1.45, marginBottom: "0.75rem" }}>
+            <p style={{ fontSize: "0.83rem", color: "var(--apple-text-secondary)", lineHeight: 1.5, marginBottom: "1rem" }}>
               {mambo?.description || "Programar velocidad y temperatura según receta Mambo."}
             </p>
           </div>
+
           <button
             onClick={() => handleChoose("mambo")}
             disabled={isPending}
-            className={mambo?.chosen ? "btn-secondary" : "btn-primary"}
-            style={{ width: "100%", fontSize: "0.82rem", padding: "0.45rem", justifyContent: "center" }}
+            style={{
+              width: "100%",
+              padding: "0.55rem",
+              borderRadius: "var(--radius-md)",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              background: mambo?.chosen ? "var(--apple-surface-elevated)" : "var(--apple-orange)",
+              color: mambo?.chosen ? "var(--apple-orange)" : "#ffffff",
+              border: mambo?.chosen ? "1px solid var(--apple-orange)" : "none",
+              boxShadow: mambo?.chosen ? "none" : "0 3px 10px rgba(255, 149, 0, 0.3)",
+              cursor: "pointer",
+              transition: "all 0.15s var(--ease-spring)",
+            }}
           >
-            {mambo?.chosen ? "Cena Seleccionada" : "Elegir Mambo"}
+            {mambo?.chosen ? "Cena Elegida para Hoy" : "Elegir Robot Mambo"}
           </button>
         </div>
 
         {/* Opción Estándar */}
         <div
           style={{
-            padding: "1rem",
-            borderRadius: "var(--radius-md)",
-            border: estandar?.chosen ? "2px solid var(--accent-emerald)" : "1px solid var(--border-subtle)",
-            background: estandar?.chosen ? "var(--accent-emerald-subtle)" : "var(--bg-surface)",
+            padding: "1.15rem",
+            borderRadius: "var(--radius-lg)",
+            background: estandar?.chosen ? "var(--apple-green-subtle)" : "var(--apple-surface-secondary)",
+            border: estandar?.chosen ? "2px solid var(--apple-green)" : "1px solid var(--apple-border)",
+            boxShadow: estandar?.chosen ? "0 4px 18px rgba(52, 199, 89, 0.2)" : "none",
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            position: "relative",
+            transition: "all 0.2s var(--ease-spring)",
           }}
         >
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
-              <span className="badge badge-emerald" style={{ fontSize: "0.7rem" }}>🍳 Estándar (Sartén/Horno)</span>
-              {estandar?.chosen && <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--accent-emerald)" }}>✓ Elegida</span>}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <span
+                className="badge badge-emerald"
+                style={{ fontSize: "0.72rem", padding: "0.2rem 0.55rem" }}
+              >
+                🍳 Sartén / Plancha / Horno
+              </span>
+              {estandar?.chosen && (
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    color: "var(--apple-green)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                  }}
+                >
+                  ✓ Seleccionada
+                </span>
+              )}
             </div>
-            <h3 style={{ fontSize: "0.98rem", fontWeight: 600, marginBottom: "0.4rem" }}>
-              {estandar?.title || "Tortilla francesa con ensalada"}
+            <h3 style={{ fontSize: "1.02rem", fontWeight: 700, letterSpacing: "-0.015em", marginBottom: "0.45rem", color: "var(--apple-text)" }}>
+              {estandar?.title || "Merluza en papillote con verduras"}
             </h3>
-            <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: 1.45, marginBottom: "0.75rem" }}>
-              {estandar?.description || "Preparación rápida en sartén o plancha."}
+            <p style={{ fontSize: "0.83rem", color: "var(--apple-text-secondary)", lineHeight: 1.5, marginBottom: "1rem" }}>
+              {estandar?.description || "Preparación tradicional rápida y limpia."}
             </p>
           </div>
+
           <button
             onClick={() => handleChoose("estandar")}
             disabled={isPending}
-            className={estandar?.chosen ? "btn-secondary" : "btn-primary"}
-            style={{ width: "100%", fontSize: "0.82rem", padding: "0.45rem", justifyContent: "center", background: estandar?.chosen ? "" : "linear-gradient(135deg, #10b981, #059669)" }}
+            style={{
+              width: "100%",
+              padding: "0.55rem",
+              borderRadius: "var(--radius-md)",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              background: estandar?.chosen ? "var(--apple-surface-elevated)" : "var(--apple-green)",
+              color: estandar?.chosen ? "var(--apple-green)" : "#ffffff",
+              border: estandar?.chosen ? "1px solid var(--apple-green)" : "none",
+              boxShadow: estandar?.chosen ? "none" : "0 3px 10px rgba(52, 199, 89, 0.3)",
+              cursor: "pointer",
+              transition: "all 0.15s var(--ease-spring)",
+            }}
           >
-            {estandar?.chosen ? "Cena Seleccionada" : "Elegir Estándar"}
+            {estandar?.chosen ? "Cena Elegida para Hoy" : "Elegir Opción Estándar"}
           </button>
         </div>
       </div>

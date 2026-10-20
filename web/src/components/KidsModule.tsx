@@ -11,12 +11,12 @@ import {
 import type { Member, HealthItem, SchoolRun } from "@/lib/repo";
 
 export function KidsModule({
-  members,
+  members = [],
   today,
   schoolRun,
   schoolLunch,
   schoolDinnerRec,
-  healthUpcoming,
+  healthUpcoming = [],
 }: {
   members: Member[];
   today: string;
@@ -81,59 +81,112 @@ export function KidsModule({
   };
 
   return (
-    <div className="glass-card" style={{ padding: "1.25rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-        <h2 style={{ fontSize: "1.15rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          <span>🧒</span>
-          <span>Peques (Cole &amp; Salud)</span>
-        </h2>
-        <div style={{ display: "flex", gap: "0.3rem" }}>
+    <div className="glass-card" style={{ padding: "1.35rem" }}>
+      {/* Header Apple Style */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+          <div
+            className="squircle-icon"
+            style={{
+              background: "var(--apple-orange-subtle)",
+              color: "var(--apple-orange)",
+            }}
+          >
+            🧒
+          </div>
+          <div>
+            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+              Peques (Cole & Salud)
+            </h2>
+            <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+              Fabio y Bruno · Colegio Montessori Salamanca
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "0.4rem" }}>
           {childMembers.map((c) => (
-            <span key={c.id} className="badge badge-amber" style={{ fontSize: "0.75rem" }}>
-              {c.emoji} {c.name}
+            <span
+              key={c.id}
+              className="badge"
+              style={{
+                fontSize: "0.78rem",
+                padding: "0.25rem 0.65rem",
+                background: "var(--apple-surface-secondary)",
+                border: "1px solid var(--apple-border)",
+                color: "var(--apple-text)",
+              }}
+            >
+              <span>{c.emoji}</span>
+              <span style={{ fontWeight: 600 }}>{c.name}</span>
             </span>
           ))}
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem", marginBottom: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem", marginBottom: "1.2rem" }}>
         {/* Turnos de Cole hoy */}
-        <div style={{ padding: "0.9rem", background: "var(--bg-surface)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
-              🚸 Turnos de hoy
+        <div
+          style={{
+            padding: "1rem",
+            background: "var(--apple-surface-secondary)",
+            borderRadius: "var(--radius-lg)",
+            border: "1px solid var(--apple-border)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+            <span style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
+              🚸 Turnos de Cole Hoy
             </span>
-            <button onClick={handleSwapRun} disabled={isPending} className="btn-ghost" style={{ fontSize: "0.72rem", padding: "0.2rem 0.4rem" }}>
+            <button
+              onClick={handleSwapRun}
+              disabled={isPending}
+              className="btn-ghost"
+              style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", borderRadius: "var(--radius-full)" }}
+            >
               🔄 Cambiar
             </button>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-around", gap: "0.5rem", marginTop: "0.4rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-around", gap: "0.5rem", marginTop: "0.5rem" }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>Lleva por la mañana</div>
-              <span className="badge badge-blue" style={{ fontSize: "0.82rem" }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)", marginBottom: "0.25rem" }}>Lleva a la mañana</div>
+              <span
+                className="badge badge-blue"
+                style={{ fontSize: "0.82rem", padding: "0.3rem 0.65rem" }}
+              >
                 {dropoff ? `${dropoff.emoji} ${dropoff.name}` : "Por definir"}
               </span>
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>Recoge a la tarde</div>
-              <span className="badge badge-rose" style={{ fontSize: "0.82rem" }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)", marginBottom: "0.25rem" }}>Recoge a la tarde</div>
+              <span
+                className="badge badge-purple"
+                style={{ fontSize: "0.82rem", padding: "0.3rem 0.65rem" }}
+              >
                 {pickup ? `${pickup.emoji} ${pickup.name}` : "Por definir"}
               </span>
             </div>
           </div>
           {schoolRun?.note && (
-            <p style={{ fontSize: "0.75rem", color: "var(--accent-amber)", marginTop: "0.5rem", textAlign: "center" }}>
+            <p style={{ fontSize: "0.75rem", color: "var(--apple-orange)", marginTop: "0.6rem", textAlign: "center", fontWeight: 500 }}>
               ℹ️ {schoolRun.note}
             </p>
           )}
         </div>
 
         {/* Menú del cole hoy */}
-        <div style={{ padding: "0.9rem", background: "var(--bg-surface)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.4rem" }}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
-              🍽️ Comida Colegio Montessori
+        <div
+          style={{
+            padding: "1rem",
+            background: "var(--apple-surface-secondary)",
+            borderRadius: "var(--radius-lg)",
+            border: "1px solid var(--apple-border)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem", flexWrap: "wrap", gap: "0.4rem" }}>
+            <span style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
+              🍽️ Comedor Montessori
             </span>
             <div style={{ display: "flex", gap: "0.3rem" }}>
               <a
@@ -141,10 +194,10 @@ export function KidsModule({
                 target="_blank"
                 rel="noreferrer"
                 className="btn-ghost"
-                style={{ fontSize: "0.72rem", padding: "0.2rem 0.45rem", color: "var(--accent-blue)" }}
+                style={{ fontSize: "0.72rem", padding: "0.2rem 0.5rem", color: "var(--apple-blue)", fontWeight: 600 }}
                 title="Abrir el PDF oficial del Menú Basal del mes"
               >
-                📄 Ver PDF
+                📄 PDF
               </a>
               <button
                 onClick={() =>
@@ -157,9 +210,13 @@ export function KidsModule({
                 style={{ fontSize: "0.72rem", padding: "0.2rem 0.45rem" }}
                 title="Descargar y sincronizar el último menú de montessorisalamanca.es"
               >
-                🔄 Actualizar
+                🔄 Sync
               </button>
-              <button onClick={() => setIsEditingLunch(!isEditingLunch)} className="btn-ghost" style={{ fontSize: "0.72rem", padding: "0.2rem 0.4rem" }}>
+              <button
+                onClick={() => setIsEditingLunch(!isEditingLunch)}
+                className="btn-ghost"
+                style={{ fontSize: "0.72rem", padding: "0.2rem 0.4rem" }}
+              >
                 {isEditingLunch ? "Cerrar" : "✏️"}
               </button>
             </div>
@@ -173,21 +230,21 @@ export function KidsModule({
                 onChange={(e) => setLunchInput(e.target.value)}
                 placeholder="Ej. Puré de verduras + Merluza"
                 className="input-field"
-                style={{ fontSize: "0.82rem" }}
+                style={{ fontSize: "0.85rem" }}
               />
-              <button type="submit" disabled={isPending} className="btn-primary" style={{ padding: "0.3rem 0.6rem", fontSize: "0.78rem" }}>
+              <button type="submit" disabled={isPending} className="btn-primary" style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem" }}>
                 OK
               </button>
             </form>
           ) : (
             <div>
-              <p style={{ fontSize: "0.88rem", fontWeight: 500, lineHeight: 1.4, color: schoolLunch ? "var(--text-main)" : "var(--text-muted)", margin: 0 }}>
-                {schoolLunch || "Aún no has anotado el menú de hoy (haz clic en Editar)."}
+              <p style={{ fontSize: "0.9rem", fontWeight: 600, lineHeight: 1.45, color: schoolLunch ? "var(--apple-text)" : "var(--apple-text-secondary)", margin: 0 }}>
+                {schoolLunch || "Aún no anotado para hoy (haz clic en ✏️)."}
               </p>
               {schoolDinnerRec && (
-                <div style={{ marginTop: "0.45rem", fontSize: "0.78rem", color: "var(--accent-amber)", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                <div style={{ marginTop: "0.5rem", fontSize: "0.78rem", color: "var(--apple-orange)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
                   <span>⭐</span>
-                  <span><strong>Recomendación cena (*):</strong> {schoolDinnerRec}</span>
+                  <span><strong>Sugerencia noche (*):</strong> {schoolDinnerRec}</span>
                 </div>
               )}
             </div>
@@ -195,25 +252,41 @@ export function KidsModule({
         </div>
       </div>
 
-      {/* Cartilla de Salud & Medicación */}
+      {/* Cartilla de Salud & Medicación estilo Apple Health */}
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
-          <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-            🩺 Vacunas, Pediatra &amp; Medicación
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+          <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--apple-text)" }}>
+            🩺 Vacunas, Pediatra & Medicación
           </span>
-          <button onClick={() => setShowAddHealth(!showAddHealth)} className="btn-ghost" style={{ fontSize: "0.78rem" }}>
-            + Añadir registro
+          <button
+            onClick={() => setShowAddHealth(!showAddHealth)}
+            className="btn-ghost"
+            style={{ fontSize: "0.8rem", color: "var(--apple-blue)", fontWeight: 600 }}
+          >
+            {showAddHealth ? "Cerrar" : "+ Añadir registro"}
           </button>
         </div>
 
         {showAddHealth && (
-          <form onSubmit={handleAddHealth} style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", padding: "0.75rem", background: "var(--bg-surface)", borderRadius: "var(--radius-sm)", marginBottom: "0.75rem", border: "1px solid var(--border-subtle)" }}>
+          <form
+            onSubmit={handleAddHealth}
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+              padding: "1rem",
+              background: "var(--apple-surface-secondary)",
+              borderRadius: "var(--radius-lg)",
+              marginBottom: "1rem",
+              border: "1px solid var(--apple-border)",
+            }}
+          >
             <select
               value={healthChild}
               onChange={(e) => setHealthChild(e.target.value)}
               required
               className="input-field"
-              style={{ flex: "1 1 120px", fontSize: "0.82rem" }}
+              style={{ flex: "1 1 130px" }}
             >
               <option value="">¿Para qué peque?</option>
               {childMembers.map((c) => (
@@ -226,7 +299,7 @@ export function KidsModule({
               value={healthKind}
               onChange={(e) => setHealthKind(e.target.value)}
               className="input-field"
-              style={{ flex: "0 1 110px", fontSize: "0.82rem" }}
+              style={{ flex: "0 1 120px" }}
             >
               <option value="pediatra">Pediatra</option>
               <option value="vacuna">Vacuna</option>
@@ -240,24 +313,24 @@ export function KidsModule({
               onChange={(e) => setHealthTitle(e.target.value)}
               required
               className="input-field"
-              style={{ flex: "2 1 180px", fontSize: "0.82rem" }}
+              style={{ flex: "2 1 180px" }}
             />
             <input
               type="date"
               value={healthDate}
               onChange={(e) => setHealthDate(e.target.value)}
               className="input-field"
-              style={{ flex: "1 1 120px", fontSize: "0.82rem" }}
+              style={{ flex: "1 1 130px" }}
             />
-            <button type="submit" disabled={isPending} className="btn-primary" style={{ padding: "0.4rem 0.8rem", fontSize: "0.8rem" }}>
-              Guardar
+            <button type="submit" disabled={isPending} className="btn-primary" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem" }}>
+              Guardar en Cartilla
             </button>
           </form>
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
           {healthUpcoming.length === 0 ? (
-            <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", padding: "0.5rem 0" }}>
+            <p style={{ fontSize: "0.84rem", color: "var(--apple-text-secondary)", padding: "0.5rem 0" }}>
               Sin citas ni vacunas pendientes registradas.
             </p>
           ) : (
@@ -270,25 +343,27 @@ export function KidsModule({
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    padding: "0.45rem 0.75rem",
-                    background: "var(--bg-surface)",
-                    borderRadius: "var(--radius-sm)",
-                    border: "1px solid var(--border-subtle)",
+                    padding: "0.65rem 0.85rem",
+                    background: "var(--apple-surface-secondary)",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--apple-border)",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span style={{ fontSize: "0.85rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                    <span style={{ fontSize: "1.1rem" }}>
                       {item.kind === "vacuna" ? "💉" : item.kind === "pediatra" ? "🩺" : item.kind === "medicacion" ? "💊" : "📋"}
                     </span>
                     <div>
-                      <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>{item.title}</span>
-                      {child && (
-                        <span style={{ fontSize: "0.75rem", color: child.color, marginLeft: "0.4rem", fontWeight: 600 }}>
-                          ({child.name})
-                        </span>
-                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--apple-text)" }}>{item.title}</span>
+                        {child && (
+                          <span style={{ fontSize: "0.75rem", color: child.color, fontWeight: 700 }}>
+                            ({child.name})
+                          </span>
+                        )}
+                      </div>
                       {item.notes && (
-                        <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{item.notes}</p>
+                        <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>{item.notes}</p>
                       )}
                     </div>
                   </div>
@@ -302,7 +377,7 @@ export function KidsModule({
                     <button
                       onClick={() => startTransition(() => completeHealthAction(item.id))}
                       className="btn-ghost"
-                      style={{ fontSize: "0.75rem", padding: "0.2rem 0.45rem" }}
+                      style={{ fontSize: "0.78rem", padding: "0.25rem 0.5rem", borderRadius: "var(--radius-full)" }}
                       title="Marcar como completado"
                     >
                       ✓ Hecho

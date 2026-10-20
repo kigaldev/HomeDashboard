@@ -6,8 +6,8 @@ import type { CalEvent, Member } from "@/lib/repo";
 import { timeOf } from "@/lib/dates";
 
 export function CalendarModule({
-  events,
-  members,
+  events = [],
+  members = [],
   today,
 }: {
   events: CalEvent[];
@@ -44,13 +44,30 @@ export function CalendarModule({
   };
 
   return (
-    <div className="glass-card" style={{ padding: "1.25rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-        <h2 style={{ fontSize: "1.15rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          <span>📅</span>
-          <span>Agenda Familiar</span>
-        </h2>
-        <div style={{ display: "flex", gap: "0.4rem" }}>
+    <div className="glass-card" style={{ padding: "1.35rem" }}>
+      {/* Header Apple Style */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+          <div
+            className="squircle-icon"
+            style={{
+              background: "var(--apple-red-subtle)",
+              color: "var(--apple-red)",
+            }}
+          >
+            📅
+          </div>
+          <div>
+            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+              Agenda Familiar
+            </h2>
+            <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+              Próximos eventos y citas familiares
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "0.35rem" }}>
           <button
             onClick={() =>
               startTransition(async () => {
@@ -59,19 +76,35 @@ export function CalendarModule({
             }
             disabled={isPending}
             className="btn-ghost"
-            style={{ fontSize: "0.78rem" }}
-            title="Sincronizar eventos de las cuentas de Google Calendar de Kike y Lara"
+            style={{ fontSize: "0.78rem", borderRadius: "var(--radius-full)" }}
+            title="Sincronizar eventos de Google Calendar"
           >
-            🔄 Sincronizar Google
+            🔄 Sync Google
           </button>
-          <button onClick={() => setShowAdd(!showAdd)} className="btn-ghost" style={{ fontSize: "0.78rem" }}>
-            {showAdd ? "Cancelar" : "+ Nuevo evento"}
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className="btn-ghost"
+            style={{ fontSize: "0.8rem", color: "var(--apple-blue)", fontWeight: 600, borderRadius: "var(--radius-full)" }}
+          >
+            {showAdd ? "Cerrar" : "+ Evento"}
           </button>
         </div>
       </div>
 
       {showAdd && (
-        <form onSubmit={handleAdd} style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", padding: "0.75rem", background: "var(--bg-surface)", borderRadius: "var(--radius-sm)", marginBottom: "0.85rem", border: "1px solid var(--border-subtle)" }}>
+        <form
+          onSubmit={handleAdd}
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.5rem",
+            padding: "1rem",
+            background: "var(--apple-surface-secondary)",
+            borderRadius: "var(--radius-lg)",
+            marginBottom: "1rem",
+            border: "1px solid var(--apple-border)",
+          }}
+        >
           <input
             type="text"
             placeholder="Cita o evento (ej. Dentista, Cumpleaños)..."
@@ -79,7 +112,7 @@ export function CalendarModule({
             onChange={(e) => setTitle(e.target.value)}
             required
             className="input-field"
-            style={{ flex: "2 1 180px", fontSize: "0.82rem" }}
+            style={{ flex: "2 1 180px" }}
           />
           <input
             type="date"
@@ -87,20 +120,20 @@ export function CalendarModule({
             onChange={(e) => setDate(e.target.value)}
             required
             className="input-field"
-            style={{ flex: "1 1 120px", fontSize: "0.82rem" }}
+            style={{ flex: "1 1 130px" }}
           />
           <input
             type="time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
             className="input-field"
-            style={{ flex: "0 1 100px", fontSize: "0.82rem" }}
+            style={{ flex: "0 1 110px" }}
           />
           <select
             value={memberId}
             onChange={(e) => setMemberId(e.target.value)}
             className="input-field"
-            style={{ flex: "1 1 120px", fontSize: "0.82rem" }}
+            style={{ flex: "1 1 130px" }}
           >
             <option value="">Familia / Todos</option>
             {members.map((m) => (
@@ -109,20 +142,24 @@ export function CalendarModule({
               </option>
             ))}
           </select>
-          <button type="submit" disabled={isPending} className="btn-primary" style={{ padding: "0.4rem 0.8rem", fontSize: "0.8rem" }}>
-            Guardar
+          <button type="submit" disabled={isPending} className="btn-primary" style={{ padding: "0.5rem 1rem", fontSize: "0.85rem" }}>
+            Guardar en Agenda
           </button>
         </form>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: "280px", overflowY: "auto" }}>
+      {/* Lista de eventos estilo Apple Calendar */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", maxHeight: "300px", overflowY: "auto", paddingRight: "0.25rem" }}>
         {events.length === 0 ? (
-          <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", textAlign: "center", padding: "1.2rem 0" }}>
-            Sin eventos en los próximos días 🎉
-          </p>
+          <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--apple-text-secondary)" }}>
+            <span style={{ fontSize: "1.6rem", display: "block", marginBottom: "0.3rem" }}>✨</span>
+            <p style={{ fontSize: "0.88rem", fontWeight: 500, margin: 0 }}>Sin eventos en los próximos días</p>
+          </div>
         ) : (
           events.map((ev) => {
             const member = ev.member_id ? memberMap.get(ev.member_id) : null;
+            const accent = member?.color || "var(--apple-blue)";
+
             return (
               <div
                 key={ev.id}
@@ -130,52 +167,60 @@ export function CalendarModule({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  padding: "0.55rem 0.75rem",
-                  background: "var(--bg-surface)",
-                  borderRadius: "var(--radius-sm)",
-                  border: "1px solid var(--border-subtle)",
+                  padding: "0.65rem 0.85rem",
+                  background: "var(--apple-surface-secondary)",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--apple-border)",
+                  borderLeft: `4px solid ${accent}`,
+                  transition: "all 0.15s ease",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                  <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--accent-blue)", minWidth: "48px" }}>
-                    {ev.all_day ? "Día" : timeOf(ev.starts_at)}
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <span
+                    style={{
+                      fontSize: "0.78rem",
+                      fontWeight: 700,
+                      color: accent,
+                      minWidth: "48px",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {ev.all_day ? "Todo el día" : timeOf(ev.starts_at)}
                   </span>
                   <div>
-                    <span style={{ fontSize: "0.88rem", fontWeight: 500 }}>{ev.title}</span>
-                    {ev.location && (
-                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginLeft: "0.4rem" }}>
-                        📍 {ev.location}
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--apple-text)" }}>
+                        {ev.title}
                       </span>
+                      {member && (
+                        <span style={{ fontSize: "0.72rem", color: member.color, fontWeight: 700 }}>
+                          ({member.name})
+                        </span>
+                      )}
+                    </div>
+                    {ev.location && (
+                      <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+                        📍 {ev.location}
+                      </p>
                     )}
                   </div>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                  {member && (
-                    <span
-                      style={{
-                        fontSize: "0.72rem",
-                        padding: "0.15rem 0.45rem",
-                        borderRadius: "var(--radius-full)",
-                        background: `${member.color}22`,
-                        color: member.color,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {member.emoji} {member.name}
-                    </span>
-                  )}
-                  {ev.source === "manual" && (
-                    <button
-                      onClick={() => startTransition(() => deleteEventAction(ev.id))}
-                      className="btn-ghost"
-                      style={{ fontSize: "0.75rem", padding: "0.2rem 0.4rem", opacity: 0.6 }}
-                      title="Eliminar evento"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
+                <button
+                  onClick={() => startTransition(() => deleteEventAction(ev.id))}
+                  className="btn-ghost"
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    padding: 0,
+                    borderRadius: "50%",
+                    justifyContent: "center",
+                    color: "var(--apple-text-secondary)",
+                  }}
+                  title="Eliminar evento"
+                >
+                  ✕
+                </button>
               </div>
             );
           })

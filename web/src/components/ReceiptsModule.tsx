@@ -15,11 +15,16 @@ import type {
 } from "@/lib/repo";
 
 export function ReceiptsModule({
-  receipts,
-  perishables,
-  monthlyExpenses,
-  priceComparisons,
-  habits,
+  receipts = [],
+  perishables = [],
+  monthlyExpenses = {
+    current_month_total: 0,
+    last_month_total: 0,
+    by_store: [],
+    by_category: [],
+  },
+  priceComparisons = [],
+  habits = [],
 }: {
   receipts: Receipt[];
   perishables: PerishableAlert[];
@@ -90,8 +95,6 @@ TOTAL 16.50 €`;
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Simulación de OCR leyendo el archivo
     setScanFeedback("📸 Escaneando imagen del ticket y extrayendo productos con OCR...");
     setTimeout(() => {
       handleSimulateDemo("Mercadona");
@@ -111,54 +114,78 @@ TOTAL 16.50 €`;
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.35rem" }}>
       {/* ── ALERTA DE ALIMENTOS PERECEDEROS ── */}
-      <div className="glass-card" style={{ padding: "1.25rem", borderLeft: "4px solid var(--accent-amber)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-          <div>
-            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.45rem", margin: 0 }}>
-              <span>⏰</span>
-              <span>Alimentos Frescos por Caducar</span>
-            </h2>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-              Seguimiento inteligente tras escanear tickets • Evita tirar comida
+      <div className="glass-card" style={{ padding: "1.35rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+            <div
+              className="squircle-icon"
+              style={{
+                background: "var(--apple-orange-subtle)",
+                color: "var(--apple-orange)",
+              }}
+            >
+              ⏰
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                <h2 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+                  Radar de Caducidades & Frescos
+                </h2>
+                <span className="badge badge-amber" style={{ fontSize: "0.72rem", padding: "0.15rem 0.55rem" }}>
+                  {perishables.length} alimentos
+                </span>
+              </div>
+              <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+                Monitoreo automático tras escanear tickets · Evita el desperdicio
+              </p>
             </div>
           </div>
-          <span className="badge badge-amber" style={{ fontSize: "0.76rem" }}>
-            {perishables.length} pendientes
-          </span>
         </div>
 
         {perishables.length === 0 ? (
-          <div style={{ padding: "1rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem", background: "var(--bg-surface)", borderRadius: "var(--radius-md)" }}>
-            🎉 ¡Todo al día! No hay alimentos frescos cerca de caducar en la despensa.
+          <div style={{ padding: "2rem", textAlign: "center", color: "var(--apple-text-secondary)", background: "var(--apple-surface-secondary)", borderRadius: "var(--radius-lg)" }}>
+            <span style={{ fontSize: "1.8rem", display: "block", marginBottom: "0.3rem" }}>🎉</span>
+            <p style={{ fontWeight: 600, fontSize: "0.92rem", margin: 0, color: "var(--apple-text)" }}>¡Todo al día en la despensa!</p>
+            <p style={{ fontSize: "0.8rem", margin: 0, marginTop: "0.2rem" }}>No hay frescos próximos a caducar.</p>
           </div>
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0.75rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "0.85rem" }}>
               {displayedPerishables.map((item) => {
                 const isUrgent = item.days_left <= 1;
                 const isModerate = item.days_left <= 3;
-                const borderColor = isUrgent ? "#ef4444" : isModerate ? "#f59e0b" : "#10b981";
-                const bgColor = isUrgent ? "rgba(239, 68, 68, 0.08)" : isModerate ? "rgba(245, 158, 11, 0.08)" : "var(--bg-surface)";
+                const badgeColor = isUrgent ? "var(--apple-red)" : isModerate ? "var(--apple-orange)" : "var(--apple-green)";
+                const badgeBg = isUrgent ? "var(--apple-red-subtle)" : isModerate ? "var(--apple-orange-subtle)" : "var(--apple-green-subtle)";
 
                 return (
                   <div
                     key={item.id}
                     style={{
-                      padding: "0.85rem",
-                      borderRadius: "var(--radius-md)",
-                      border: `1px solid ${borderColor}`,
-                      background: bgColor,
+                      padding: "0.95rem",
+                      borderRadius: "var(--radius-lg)",
+                      border: "1px solid var(--apple-border)",
+                      background: "var(--apple-surface-secondary)",
                       display: "flex",
                       flexDirection: "column",
                       justifyContent: "space-between",
-                      gap: "0.5rem",
+                      gap: "0.75rem",
+                      transition: "transform 0.15s ease",
                     }}
                   >
                     <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
-                        <span className="badge" style={{ fontSize: "0.7rem", background: borderColor, color: "white" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                        <span
+                          style={{
+                            fontSize: "0.72rem",
+                            fontWeight: 700,
+                            padding: "0.2rem 0.55rem",
+                            borderRadius: "var(--radius-full)",
+                            background: badgeBg,
+                            color: badgeColor,
+                          }}
+                        >
                           {item.days_left < 0
                             ? "Caducó"
                             : item.days_left === 0
@@ -167,13 +194,15 @@ TOTAL 16.50 €`;
                             ? "Caduca MAÑANA"
                             : `${item.days_left} días restantes`}
                         </span>
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{item.store_name}</span>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--apple-text-secondary)" }}>
+                          {item.store_name}
+                        </span>
                       </div>
-                      <div style={{ fontWeight: 600, fontSize: "0.92rem", marginTop: "0.2rem" }}>
+                      <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--apple-text)", letterSpacing: "-0.01em" }}>
                         {item.name}
                       </div>
-                      <div style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>
-                        {item.category} • Costó {item.total_price.toFixed(2)} €
+                      <div style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
+                        {item.category} • {item.total_price.toFixed(2)} €
                       </div>
                     </div>
 
@@ -181,7 +210,12 @@ TOTAL 16.50 €`;
                       onClick={() => handleConsume(item.id)}
                       disabled={isPending}
                       className="btn-secondary"
-                      style={{ fontSize: "0.76rem", padding: "0.3rem 0.5rem", justifyContent: "center" }}
+                      style={{
+                        fontSize: "0.78rem",
+                        padding: "0.4rem 0.65rem",
+                        justifyContent: "center",
+                        borderRadius: "var(--radius-sm)",
+                      }}
                     >
                       ✓ Marcar como consumido
                     </button>
@@ -191,11 +225,11 @@ TOTAL 16.50 €`;
             </div>
 
             {perishables.length > 4 && (
-              <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
+              <div style={{ textAlign: "center", marginTop: "1rem" }}>
                 <button
                   onClick={() => setShowAllPerishables(!showAllPerishables)}
                   className="btn-ghost"
-                  style={{ fontSize: "0.78rem" }}
+                  style={{ fontSize: "0.82rem", borderRadius: "var(--radius-full)" }}
                 >
                   {showAllPerishables ? "▲ Mostrar solo más urgentes" : `▼ Ver todos los alimentos (${perishables.length})`}
                 </button>
@@ -205,22 +239,32 @@ TOTAL 16.50 €`;
         )}
       </div>
 
-      {/* ── ESCÁNER DE TICKETS & SUBIDA ── */}
-      <div className="glass-card" style={{ padding: "1.25rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-          <div>
-            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.45rem", margin: 0 }}>
-              <span>🧾</span>
-              <span>Escanear Ticket de Compra</span>
-            </h2>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-              Mercadona, Carrefour o Lidl • Auto-inventario, precios y fechas de caducidad
+      {/* ── ESCÁNER DE TICKETS & SUBIDA ESTILO APPLE WALLET ── */}
+      <div className="glass-card" style={{ padding: "1.35rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+            <div
+              className="squircle-icon"
+              style={{
+                background: "var(--apple-purple-subtle)",
+                color: "var(--apple-purple)",
+              }}
+            >
+              🧾
+            </div>
+            <div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+                Escanear Ticket de Compra
+              </h2>
+              <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+                Mercadona, Carrefour o Lidl · Auto-inventario, precios y fechas
+              </p>
             </div>
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             {receipts.length === 0 && (
               <button onClick={handleLoadSeed} disabled={isPending} className="btn-secondary" style={{ fontSize: "0.78rem" }}>
-                🧪 Cargar datos demo
+                🧪 Cargar demo
               </button>
             )}
             <button
@@ -236,12 +280,14 @@ TOTAL 16.50 €`;
         {scanFeedback && (
           <div
             style={{
-              padding: "0.75rem",
+              padding: "0.85rem 1rem",
               marginBottom: "1rem",
-              borderRadius: "var(--radius-sm)",
-              background: "rgba(59, 130, 246, 0.12)",
-              border: "1px solid var(--accent-blue)",
-              fontSize: "0.84rem",
+              borderRadius: "var(--radius-md)",
+              background: "var(--apple-blue-subtle)",
+              border: "1px solid rgba(0, 113, 227, 0.25)",
+              color: "var(--apple-text)",
+              fontSize: "0.85rem",
+              fontWeight: 500,
             }}
           >
             {scanFeedback}
@@ -252,9 +298,9 @@ TOTAL 16.50 €`;
           <div
             style={{
               padding: "1.25rem",
-              background: "var(--bg-surface)",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border-subtle)",
+              background: "var(--apple-surface-secondary)",
+              borderRadius: "var(--radius-lg)",
+              border: "1px solid var(--apple-border)",
               marginBottom: "1.25rem",
               display: "flex",
               flexDirection: "column",
@@ -267,21 +313,24 @@ TOTAL 16.50 €`;
                 style={{
                   flex: 1,
                   minWidth: "220px",
-                  padding: "1rem",
-                  border: "2px dashed var(--border-subtle)",
-                  borderRadius: "var(--radius-md)",
+                  padding: "1.25rem",
+                  border: "2px dashed var(--apple-border-strong)",
+                  borderRadius: "var(--radius-lg)",
                   textAlign: "center",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "0.5rem",
+                  gap: "0.45rem",
+                  background: "var(--apple-surface-elevated)",
                 }}
               >
-                <span style={{ fontSize: "2rem" }}>📸</span>
-                <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Foto del Ticket (Móvil / PC)</span>
-                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Extrae automáticamente todos los productos</span>
-                <label className="btn-secondary" style={{ cursor: "pointer", fontSize: "0.8rem", marginTop: "0.4rem" }}>
+                <span style={{ fontSize: "2.2rem" }}>📸</span>
+                <span style={{ fontSize: "0.92rem", fontWeight: 700 }}>Foto del Ticket</span>
+                <span style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)" }}>
+                  Extrae productos, precios y caducidades al instante
+                </span>
+                <label className="btn-primary" style={{ cursor: "pointer", fontSize: "0.8rem", marginTop: "0.5rem" }}>
                   <span>Elegir imagen o hacer foto</span>
                   <input type="file" accept="image/*,application/pdf" capture="environment" onChange={handleFileUpload} style={{ display: "none" }} />
                 </label>
@@ -296,7 +345,7 @@ TOTAL 16.50 €`;
                   placeholder="Ej: MERCADONA... LECHE ENTERA 5.76... HUEVOS 2.35..."
                   rows={4}
                   className="input-field"
-                  style={{ fontSize: "0.82rem", resize: "vertical" }}
+                  style={{ fontSize: "0.85rem", resize: "vertical" }}
                 />
                 <button
                   onClick={() => handleProcessText(rawInput)}
@@ -310,63 +359,75 @@ TOTAL 16.50 €`;
             </div>
 
             {/* Accesos rápidos de simulación */}
-            <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "0.75rem" }}>
-              <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginRight: "0.5rem" }}>
-                Probar rápidamente con tickets de ejemplo:
+            <div style={{ borderTop: "1px solid var(--apple-border)", paddingTop: "0.85rem" }}>
+              <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--apple-text-secondary)", marginRight: "0.6rem" }}>
+                Probar con tickets de muestra:
               </span>
-              <div style={{ display: "inline-flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "0.3rem" }}>
-                <button onClick={() => handleSimulateDemo("Mercadona")} disabled={isPending} className="btn-ghost" style={{ fontSize: "0.75rem", border: "1px solid var(--border-subtle)" }}>
-                  🟢 Ticket Mercadona
+              <div style={{ display: "inline-flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+                <button onClick={() => handleSimulateDemo("Mercadona")} disabled={isPending} className="btn-secondary" style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}>
+                  🟢 Mercadona (35,45 €)
                 </button>
-                <button onClick={() => handleSimulateDemo("Carrefour")} disabled={isPending} className="btn-ghost" style={{ fontSize: "0.75rem", border: "1px solid var(--border-subtle)" }}>
-                  🔵 Ticket Carrefour
+                <button onClick={() => handleSimulateDemo("Carrefour")} disabled={isPending} className="btn-secondary" style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}>
+                  🔵 Carrefour (33,05 €)
                 </button>
-                <button onClick={() => handleSimulateDemo("Lidl")} disabled={isPending} className="btn-ghost" style={{ fontSize: "0.75rem", border: "1px solid var(--border-subtle)" }}>
-                  🟡 Ticket Lidl
+                <button onClick={() => handleSimulateDemo("Lidl")} disabled={isPending} className="btn-secondary" style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem" }}>
+                  🟡 Lidl (16,50 €)
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── RESUMEN DE GASTOS MENSUALES ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginTop: "0.5rem" }}>
-          <div style={{ padding: "0.85rem", background: "var(--bg-surface)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Gasto Total en Super (Mes Actual)</div>
-            <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--accent-blue)", marginTop: "0.25rem" }}>
+        {/* ── RESUMEN FINANCIERO ESTILO APPLE WALLET ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginTop: "0.5rem" }}>
+          {/* Tarjeta 1: Total Mes Actual */}
+          <div style={{ padding: "1.1rem", background: "var(--apple-surface-secondary)", borderRadius: "var(--radius-lg)", border: "1px solid var(--apple-border)" }}>
+            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--apple-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Gasto Mensual en Súper
+            </div>
+            <div style={{ fontSize: "1.85rem", fontWeight: 800, color: "var(--apple-blue)", marginTop: "0.35rem", letterSpacing: "-0.03em" }}>
               {monthlyExpenses.current_month_total.toFixed(2)} €
             </div>
-            <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
-              Mes anterior: {monthlyExpenses.last_month_total.toFixed(2)} €
+            <div style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginTop: "0.25rem" }}>
+              Mes anterior: <strong>{monthlyExpenses.last_month_total.toFixed(2)} €</strong>
             </div>
           </div>
 
-          <div style={{ padding: "0.85rem", background: "var(--bg-surface)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "0.4rem" }}>Gasto por Supermercado</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+          {/* Tarjeta 2: Por Supermercado */}
+          <div style={{ padding: "1.1rem", background: "var(--apple-surface-secondary)", borderRadius: "var(--radius-lg)", border: "1px solid var(--apple-border)" }}>
+            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--apple-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
+              Gasto por Cadena
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
               {monthlyExpenses.by_store.length === 0 ? (
-                <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Sin tickets este mes</span>
+                <span style={{ fontSize: "0.8rem", color: "var(--apple-text-secondary)" }}>Sin tickets registrados este mes</span>
               ) : (
                 monthlyExpenses.by_store.map((s, idx) => (
-                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                      <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: s.color }} />
-                      <span>{s.store_name} ({s.count}):</span>
+                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.84rem", alignItems: "center" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                      <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: s.color, boxShadow: `0 0 6px ${s.color}66` }} />
+                      <span style={{ fontWeight: 500 }}>{s.store_name} ({s.count}):</span>
                     </span>
-                    <strong>{s.total.toFixed(2)} €</strong>
+                    <strong style={{ fontWeight: 700 }}>{s.total.toFixed(2)} €</strong>
                   </div>
                 ))
               )}
             </div>
           </div>
 
-          <div style={{ padding: "0.85rem", background: "var(--bg-surface)", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "0.4rem" }}>Categorías Principales</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+          {/* Tarjeta 3: Categorías */}
+          <div style={{ padding: "1.1rem", background: "var(--apple-surface-secondary)", borderRadius: "var(--radius-lg)", border: "1px solid var(--apple-border)" }}>
+            <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--apple-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
+              Distribución de Categorías
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
               {monthlyExpenses.by_category.slice(0, 3).map((c, idx) => (
-                <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem" }}>
-                  <span>{c.category}:</span>
-                  <span><strong>{c.total.toFixed(2)} €</strong> ({c.percentage}%)</span>
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.84rem", alignItems: "center" }}>
+                  <span style={{ color: "var(--apple-text)", fontWeight: 500 }}>{c.category}:</span>
+                  <span>
+                    <strong>{c.total.toFixed(2)} €</strong>{" "}
+                    <span style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)" }}>({c.percentage}%)</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -375,21 +436,31 @@ TOTAL 16.50 €`;
       </div>
 
       {/* ── COMPARADOR DE PRECIOS ENTRE SUPERMERCADOS ── */}
-      <div className="glass-card" style={{ padding: "1.25rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-          <div>
-            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.45rem", margin: 0 }}>
-              <span>⚖️</span>
-              <span>Comparador de Precios (Mercadona vs Carrefour vs Lidl)</span>
-            </h2>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-              Compara el precio real de productos básicos según vuestros tickets escaneados
+      <div className="glass-card" style={{ padding: "1.35rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+            <div
+              className="squircle-icon"
+              style={{
+                background: "var(--apple-teal-subtle)",
+                color: "var(--apple-teal)",
+              }}
+            >
+              ⚖️
+            </div>
+            <div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+                Comparador de Precios (Mercadona vs Carrefour vs Lidl)
+              </h2>
+              <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+                Precios reales extraídos de vuestros tickets de compra familiares
+              </p>
             </div>
           </div>
         </div>
 
         {priceComparisons.length === 0 ? (
-          <div style={{ padding: "1rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem", background: "var(--bg-surface)", borderRadius: "var(--radius-md)" }}>
+          <div style={{ padding: "2rem", textAlign: "center", color: "var(--apple-text-secondary)", background: "var(--apple-surface-secondary)", borderRadius: "var(--radius-lg)" }}>
             ℹ️ Escanea tickets de al menos dos supermercados distintos para ver la comparativa de precios y el ahorro.
           </div>
         ) : (
@@ -398,27 +469,27 @@ TOTAL 16.50 €`;
               <div
                 key={idx}
                 style={{
-                  padding: "0.95rem",
-                  borderRadius: "var(--radius-md)",
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border-subtle)",
+                  padding: "1rem",
+                  borderRadius: "var(--radius-lg)",
+                  background: "var(--apple-surface-secondary)",
+                  border: "1px solid var(--apple-border)",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
-                  gap: "0.6rem",
+                  gap: "0.75rem",
                 }}
               >
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.4rem" }}>
-                    <div style={{ fontWeight: 700, fontSize: "0.92rem" }}>{item.item_name}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.45rem" }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--apple-text)" }}>{item.item_name}</div>
                     {item.savings_percent > 0 && (
-                      <span className="badge badge-emerald" style={{ fontSize: "0.72rem" }}>
+                      <span className="badge badge-emerald" style={{ fontSize: "0.72rem", padding: "0.15rem 0.55rem" }}>
                         Hasta {item.savings_percent}% ahorro
                       </span>
                     )}
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", marginTop: "0.5rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", marginTop: "0.6rem" }}>
                     {item.prices.map((p, pIdx) => {
                       const isBest = p.store_name === item.best_store;
                       return (
@@ -428,17 +499,18 @@ TOTAL 16.50 €`;
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
-                            fontSize: "0.82rem",
-                            padding: "0.25rem 0.45rem",
+                            fontSize: "0.83rem",
+                            padding: "0.35rem 0.55rem",
                             borderRadius: "var(--radius-sm)",
-                            background: isBest ? "rgba(16, 185, 129, 0.1)" : "transparent",
+                            background: isBest ? "var(--apple-green-subtle)" : "transparent",
+                            border: isBest ? "1px solid rgba(52, 199, 89, 0.3)" : "1px solid transparent",
                           }}
                         >
-                          <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
                             <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: p.store_color }} />
-                            <span>{p.store_name}:</span>
+                            <span style={{ fontWeight: 500 }}>{p.store_name}:</span>
                           </span>
-                          <span style={{ fontWeight: isBest ? 700 : 500, color: isBest ? "var(--accent-emerald)" : undefined }}>
+                          <span style={{ fontWeight: isBest ? 700 : 500, color: isBest ? "var(--apple-green)" : "var(--apple-text)" }}>
                             {p.price.toFixed(2)} € {isBest && "🏆 Mejor"}
                           </span>
                         </div>
@@ -453,60 +525,72 @@ TOTAL 16.50 €`;
       </div>
 
       {/* ── APRENDIZAJE DE HÁBITOS DE COMPRA ── */}
-      <div className="glass-card" style={{ padding: "1.25rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-          <div>
-            <h2 style={{ fontSize: "1.1rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.45rem", margin: 0 }}>
-              <span>🧠</span>
-              <span>Hábitos de Compra &amp; Predicción de Reposición</span>
-            </h2>
-            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-              La IA aprende la cadencia de consumo de la familia y avisa antes de que se agoten
+      <div className="glass-card" style={{ padding: "1.35rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+            <div
+              className="squircle-icon"
+              style={{
+                background: "var(--apple-indigo-subtle)",
+                color: "var(--apple-indigo)",
+              }}
+            >
+              🧠
+            </div>
+            <div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+                Hábitos de Compra & Predicción de Reposición
+              </h2>
+              <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+                Algoritmo predictivo que detecta la frecuencia de consumo y avisa antes de que se agote
+              </p>
             </div>
           </div>
         </div>
 
         {habits.length === 0 ? (
-          <div style={{ padding: "1rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem", background: "var(--bg-surface)", borderRadius: "var(--radius-md)" }}>
+          <div style={{ padding: "2rem", textAlign: "center", color: "var(--apple-text-secondary)", background: "var(--apple-surface-secondary)", borderRadius: "var(--radius-lg)" }}>
             ℹ️ A medida que escaneéis los tickets semanales, el sistema calculará vuestra frecuencia exacta de compra.
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.75rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.85rem" }}>
             {habits.map((h, idx) => {
               const isOverdue = h.status === "overdue";
               const isSoon = h.status === "soon";
-              const badgeClass = isOverdue ? "badge-red" : isSoon ? "badge-amber" : "badge-blue";
+              const badgeClass = isOverdue ? "badge-rose" : isSoon ? "badge-amber" : "badge-blue";
 
               return (
                 <div
                   key={idx}
                   style={{
-                    padding: "0.85rem",
-                    borderRadius: "var(--radius-md)",
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border-subtle)",
+                    padding: "1rem",
+                    borderRadius: "var(--radius-lg)",
+                    background: "var(--apple-surface-secondary)",
+                    border: "1px solid var(--apple-border)",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "space-between",
-                    gap: "0.5rem",
+                    gap: "0.75rem",
                   }}
                 >
                   <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
-                      <span className={`badge ${badgeClass}`} style={{ fontSize: "0.7rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                      <span className={`badge ${badgeClass}`} style={{ fontSize: "0.72rem", padding: "0.2rem 0.55rem" }}>
                         {isOverdue
                           ? "Toca reponer ya"
                           : isSoon
                           ? `Reponer en ~${h.days_until_needed}d`
                           : `En ~${h.days_until_needed} días`}
                       </span>
-                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Cada ~{h.avg_days_between} días</span>
+                      <span style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)", fontWeight: 500 }}>
+                        Cada ~{h.avg_days_between} días
+                      </span>
                     </div>
-                    <div style={{ fontWeight: 600, fontSize: "0.92rem", marginTop: "0.2rem" }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--apple-text)" }}>
                       {h.item_name}
                     </div>
-                    <div style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>
-                      Comprado {h.purchase_count} veces • Última vez: {h.last_purchase_date}
+                    <div style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
+                      Comprado {h.purchase_count} veces · Última: {h.last_purchase_date}
                     </div>
                   </div>
 
@@ -518,9 +602,9 @@ TOTAL 16.50 €`;
                     }}
                     disabled={isPending}
                     className="btn-secondary"
-                    style={{ fontSize: "0.75rem", padding: "0.3rem 0.5rem", justifyContent: "center" }}
+                    style={{ fontSize: "0.78rem", padding: "0.4rem 0.65rem", justifyContent: "center" }}
                   >
-                    + Añadir a la lista de compra
+                    + Añadir a la lista
                   </button>
                 </div>
               );
