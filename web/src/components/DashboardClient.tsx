@@ -31,29 +31,34 @@ import type {
 import type { Weather, DayWeather } from "@/lib/weather";
 
 export function DashboardClient({
-  members,
-  weather,
+  members = [],
+  weather = null,
   today,
   formattedDate,
   greeting,
-  latestBriefing,
-  todayWeather,
-  dinners,
-  schoolLunch,
-  schoolDinnerRec,
-  shoppingItems,
-  stores,
-  staples,
-  pantry,
-  tasks,
-  schoolRun,
-  healthUpcoming,
-  events,
-  receipts,
-  perishables,
-  monthlyExpenses,
-  priceComparisons,
-  habits,
+  latestBriefing = null,
+  todayWeather = null,
+  dinners = [],
+  schoolLunch = null,
+  schoolDinnerRec = null,
+  shoppingItems = [],
+  stores = [],
+  staples = [],
+  pantry = [],
+  tasks = [],
+  schoolRun = null,
+  healthUpcoming = [],
+  events = [],
+  receipts = [],
+  perishables = [],
+  monthlyExpenses = {
+    current_month_total: 0,
+    last_month_total: 0,
+    by_store: [],
+    by_category: [],
+  },
+  priceComparisons = [],
+  habits = [],
 }: {
   members: Member[];
   weather: Weather | null;
@@ -88,7 +93,7 @@ export function DashboardClient({
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  const urgentPerishablesCount = perishables.filter((p) => p.days_left <= 3).length;
+  const urgentPerishablesCount = (perishables || []).filter((p) => p.days_left <= 3).length;
 
   return (
     <div className="container">

@@ -154,9 +154,7 @@ create table if not exists price_history (
 
 -- Migraciones seguras para columnas y tiendas actualizadas
 alter table school_menu add column if not exists dinner_recommendation text;
-update stores set name='Mercadona', color='#00a650' where name='Eroski';
-update stores set name='Lidl', color='#e6a100' where name='BM';
-insert into stores (name, color, sort) values ('Carrefour', '#0055b8', 2) on conflict (name) do nothing;
+delete from stores where name in ('Eroski', 'BM');
 `;
 
 /**
@@ -171,18 +169,29 @@ insert into members (name, role, birthdate, color, emoji) values
   ('Bruno', 'child', '2025-05-22', '#10b981', '👶')
 on conflict do nothing;
 
-insert into stores (id, name, color, sort) values
-  (1, 'Mercadona', '#00a650', 1),
-  (2, 'Carrefour', '#0055b8', 2),
-  (3, 'Lidl', '#e6a100', 3),
-  (4, 'Farmacia', '#2bb3a3', 4)
+insert into stores (name, color, sort) values
+  ('Mercadona', '#00a650', 1),
+  ('Carrefour', '#0055b8', 2),
+  ('Lidl', '#e6a100', 3),
+  ('Farmacia', '#2bb3a3', 4)
 on conflict (name) do update set color=excluded.color, sort=excluded.sort;
 
-insert into staples (name, emoji, store_id) values
-  ('Leche', '🥛', 1), ('Pan', '🥖', 3), ('Huevos', '🥚', 1), ('Fruta variada', '🍎', 2),
-  ('Yogures naturales', '🍶', 1), ('Pañales para Bruno', '🧷', 1), ('Toallitas húmedas', '🧻', 1),
-  ('Papel higiénico', '🧻', 3), ('Verdura fresca', '🥦', 2), ('Pescado fresco', '🐟', 2),
-  ('Dalsy / Apiretal', '💊', 4), ('Suero fisiológico', '💧', 4)
+insert into staples (name, emoji, store_id)
+select s.name, s.emoji, st.id from (values
+  ('Leche', '🥛', 'Mercadona'),
+  ('Pan', '🥖', 'Lidl'),
+  ('Huevos', '🥚', 'Mercadona'),
+  ('Fruta variada', '🍎', 'Carrefour'),
+  ('Yogures naturales', '🍶', 'Mercadona'),
+  ('Pañales para Bruno', '🧷', 'Mercadona'),
+  ('Toallitas húmedas', '🧻', 'Mercadona'),
+  ('Papel higiénico', '🧻', 'Lidl'),
+  ('Verdura fresca', '🥦', 'Carrefour'),
+  ('Pescado fresco', '🐟', 'Carrefour'),
+  ('Dalsy / Apiretal', '💊', 'Farmacia'),
+  ('Suero fisiológico', '💧', 'Farmacia')
+) as s(name, emoji, store_name)
+left join stores st on st.name = s.store_name
 on conflict (name) do nothing;
 
 insert into school_run_defaults (weekday, dropoff_id, pickup_id) values

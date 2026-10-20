@@ -32,7 +32,11 @@ export default async function HomePage() {
   const currentGreeting = greeting();
 
   // Asegurar tickets demo iniciales si no hay
-  await ensureDemoReceipts();
+  try {
+    await ensureDemoReceipts();
+  } catch (e) {
+    console.warn("[page] Error no bloqueante al cargar tickets demo:", e);
+  }
 
   const [
     members,
