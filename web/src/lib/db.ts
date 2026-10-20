@@ -26,7 +26,8 @@ async function connect(): Promise<Db> {
     const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
     const pool = new Pool({
       connectionString: url,
-      max: 10,
+      max: 5,
+      idleTimeoutMillis: 5000,
       ssl: isLocal ? false : { rejectUnauthorized: false },
       connectionTimeoutMillis: 10000,
     });
