@@ -602,79 +602,8 @@ export async function recordReceipt(data: {
 }
 
 /**
- * Semilla de tickets demostrativos reales de Mercadona, Carrefour y Lidl
- * para poblar el comparador de precios, perecederos y gastos mensuales al iniciar.
+ * Semilla de tickets desactivada para permitir al usuario comenzar con inventario limpio.
  */
 export async function ensureDemoReceipts() {
-  try {
-    const [existing] = await q<{ count: number }>("select count(*)::int as count from receipts");
-    if (existing && existing.count > 0) return;
-
-    const stores = await getStores();
-    const mercadona = stores.find((s) => s.name === "Mercadona")?.id ?? 1;
-    const carrefour = stores.find((s) => s.name === "Carrefour")?.id ?? 2;
-    const lidl = stores.find((s) => s.name === "Lidl")?.id ?? 3;
-
-    const today = isoDate();
-    const d3 = addDays(today, -3);
-    const d6 = addDays(today, -6);
-    const d12 = addDays(today, -12);
-
-    // Ticket 1: Mercadona hace 3 días
-    await recordReceipt({
-      storeId: mercadona,
-      date: d3,
-      totalAmount: 38.65,
-      rawText: "MERCADONA S.A. Salamanca\nLECHE ENTERA HACENDADO 6x1L 5.76\nHUEVOS CAMPEROS L 2.35\nYOGUR NATURAL 1.25\nPAÑALES TALLA 4 BRUNO 14.50\nTOALLITAS BEBÉ 3.20\nPLATANOS CANARIAS 1.5KG 2.85\nPECHUGA DE POLLO CORRAL 8.74",
-      items: [
-        { name: "Leche entera (pack 6L)", quantity: "6L", unitPrice: 0.96, totalPrice: 5.76, category: "Lácteos", isPerishable: true, expiryDate: addDays(today, 4) },
-        { name: "Huevos camperos L (docena)", quantity: "12 uds", unitPrice: 2.35, totalPrice: 2.35, category: "Huevos", isPerishable: true, expiryDate: addDays(today, 8) },
-        { name: "Yogures naturales (pack 8)", quantity: "8 uds", unitPrice: 1.25, totalPrice: 1.25, category: "Lácteos", isPerishable: true, expiryDate: addDays(today, 3) },
-        { name: "Pañales para Bruno", quantity: "pack 56", unitPrice: 14.50, totalPrice: 14.50, category: "Bebé / Higiene", isPerishable: false },
-        { name: "Toallitas húmedas bebé", quantity: "pack x3", unitPrice: 3.20, totalPrice: 3.20, category: "Bebé / Higiene", isPerishable: false },
-        { name: "Plátanos de Canarias", quantity: "1.5 kg", unitPrice: 1.90, totalPrice: 2.85, category: "Fruta y Verdura", isPerishable: true, expiryDate: addDays(today, 2) },
-        { name: "Pechuga de pollo corral", quantity: "900g", unitPrice: 9.71, totalPrice: 8.74, category: "Carnicería", isPerishable: true, expiryDate: addDays(today, 1) },
-      ],
-    });
-
-    // Ticket 2: Carrefour hace 6 días
-    await recordReceipt({
-      storeId: carrefour,
-      date: d6,
-      totalAmount: 46.80,
-      rawText: "CARREFOUR Salamanca\nLOMOS MERLUZA FRESCA 11.20\nSALMON FRESCO FILETES 12.50\nJUDIAS VERDES 500G 2.10\nZANAHORIAS 1KG 1.15\nLECHE ENTERA CARREFOUR BIO 6.10\nACEITE DE OLIVA VIRGEN EXTRA 1L 9.45\nQUESO TIERNO CUÑA 4.30",
-      items: [
-        { name: "Lomos de merluza fresca", quantity: "600g", unitPrice: 18.66, totalPrice: 11.20, category: "Pescadería", isPerishable: true, expiryDate: addDays(today, -1) },
-        { name: "Salmón fresco filetes", quantity: "500g", unitPrice: 25.00, totalPrice: 12.50, category: "Pescadería", isPerishable: true, expiryDate: addDays(today, 2) },
-        { name: "Judías verdes planas", quantity: "500g", unitPrice: 2.10, totalPrice: 2.10, category: "Fruta y Verdura", isPerishable: true, expiryDate: addDays(today, 3) },
-        { name: "Zanahorias bolsa 1kg", quantity: "1 kg", unitPrice: 1.15, totalPrice: 1.15, category: "Fruta y Verdura", isPerishable: true, expiryDate: addDays(today, 6) },
-        { name: "Leche entera (pack 6L)", quantity: "6L", unitPrice: 1.01, totalPrice: 6.10, category: "Lácteos", isPerishable: true, expiryDate: addDays(today, 5) },
-        { name: "Aceite oliva virgen extra 1L", quantity: "1L", unitPrice: 9.45, totalPrice: 9.45, category: "Despensa", isPerishable: false },
-        { name: "Queso tierno cuña", quantity: "350g", unitPrice: 4.30, totalPrice: 4.30, category: "Lácteos", isPerishable: true, expiryDate: addDays(today, 7) },
-      ],
-    });
-
-    // Ticket 3: Lidl hace 12 días
-    await recordReceipt({
-      storeId: lidl,
-      date: d12,
-      totalAmount: 31.40,
-      rawText: "LIDL Salamanca\nPAN DE HOGAZA ARTESANO 1.45\nPAPEL HIGIENICO 3 CAPAS 4.20\nHUEVOS CAMPEROS L 2.25\nLECHE ENTERA MILBONA 5.70\nMANZANAS GOLDEN 2KG 2.90\nYOGURES NATURALES 1.19\nGALLETAS AVENA 1.95\nDETERGENTE LIQUIDO 11.76",
-      items: [
-        { name: "Pan de hogaza artesano", quantity: "1 ud", unitPrice: 1.45, totalPrice: 1.45, category: "Panadería", isPerishable: true, expiryDate: addDays(today, -7) },
-        { name: "Papel higiénico 3 capas", quantity: "pack 12", unitPrice: 4.20, totalPrice: 4.20, category: "Limpieza", isPerishable: false },
-        { name: "Huevos camperos L (docena)", quantity: "12 uds", unitPrice: 2.25, totalPrice: 2.25, category: "Huevos", isPerishable: true, expiryDate: addDays(today, -2) },
-        { name: "Leche entera (pack 6L)", quantity: "6L", unitPrice: 0.95, totalPrice: 5.70, category: "Lácteos", isPerishable: true, expiryDate: addDays(today, -1) },
-        { name: "Manzanas Golden", quantity: "2 kg", unitPrice: 1.45, totalPrice: 2.90, category: "Fruta y Verdura", isPerishable: true, expiryDate: addDays(today, 4) },
-        { name: "Yogures naturales (pack 8)", quantity: "8 uds", unitPrice: 1.19, totalPrice: 1.19, category: "Lácteos", isPerishable: true, expiryDate: addDays(today, -3) },
-        { name: "Galletas de avena", quantity: "500g", unitPrice: 1.95, totalPrice: 1.95, category: "Despensa", isPerishable: false },
-        { name: "Detergente líquido ropa", quantity: "1 ud", unitPrice: 11.76, totalPrice: 11.76, category: "Limpieza", isPerishable: false },
-      ],
-    });
-
-    // Marcar los de hace 12 días y 6 días antiguos como consumidos
-    await q("update receipt_items set consumed = true where expiry_date < current_date");
-  } catch (err) {
-    console.warn("[repo] No se pudieron inicializar los tickets demo:", err);
-  }
+  return;
 }

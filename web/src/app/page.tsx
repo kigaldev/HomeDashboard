@@ -16,7 +16,6 @@ import {
   getMonthlyExpenses,
   getPriceComparisons,
   getShoppingHabits,
-  ensureDemoReceipts,
 } from "@/lib/repo";
 import { getWeather } from "@/lib/weather";
 import { ensureDinnerPlans } from "@/lib/dinners";
@@ -30,13 +29,6 @@ export default async function HomePage() {
   const today = isoDate();
   const formattedDate = longDate(today);
   const currentGreeting = greeting();
-
-  // Asegurar tickets demo iniciales si no hay
-  try {
-    await ensureDemoReceipts();
-  } catch (e) {
-    console.warn("[page] Error no bloqueante al cargar tickets demo:", e);
-  }
 
   const [
     members,
