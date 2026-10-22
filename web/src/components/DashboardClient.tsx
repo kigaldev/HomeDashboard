@@ -12,6 +12,7 @@ import { CalendarModule } from "./CalendarModule";
 import { ReceiptsModule } from "./ReceiptsModule";
 import { AiAssistantModal } from "./AiAssistantModal";
 import { SettingsModal } from "./SettingsModal";
+import { ProfileLoginModal } from "./ProfileLoginModal";
 import type {
   Member,
   ShoppingItem,
@@ -32,6 +33,7 @@ import type { Weather, DayWeather } from "@/lib/weather";
 
 export function DashboardClient({
   members = [],
+  currentMemberId = null,
   weather = null,
   today,
   formattedDate,
@@ -61,6 +63,7 @@ export function DashboardClient({
   habits = [],
 }: {
   members: Member[];
+  currentMemberId?: number | null;
   weather: Weather | null;
   today: string;
   formattedDate: string;
@@ -89,9 +92,13 @@ export function DashboardClient({
   priceComparisons: PriceComparison[];
   habits: HabitInsight[];
 }) {
-  const [activeTab, setActiveTab] = useState<"resumen" | "compra" | "tickets" | "tareas" | "peques" | "agenda">("resumen");
+  const activeMember = members.find((m) => m.id === currentMemberId);
+  const [activeTab, setActiveTab] = useState<"resumen" | "compra" | "tickets" | "tareas" | "peques" | "agenda">(
+    (activeMember?.preferred_tab as any) || "resumen"
+  );
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const urgentPerishablesCount = (perishables || []).filter((p) => p.days_left <= 3).length;
   const pendingTasksCount = (tasks || []).filter((t) => !t.done).length;
@@ -101,11 +108,13 @@ export function DashboardClient({
       {/* Header estilo Apple Status Island */}
       <Header
         members={members}
+        currentMemberId={currentMemberId}
         weather={weather}
         greeting={greeting}
         formattedDate={formattedDate}
         onOpenAssistant={() => setIsAssistantOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenProfile={() => setIsProfileOpen(true)}
       />
 
       {/* Banner de alerta estilo Apple Notification Card */}
@@ -382,6 +391,8 @@ export function DashboardClient({
               items={shoppingItems}
               stores={stores}
               staples={staples}
+              members={members}
+              currentMemberId={currentMemberId}
             />
           )}
 
@@ -390,7 +401,11 @@ export function DashboardClient({
           )}
 
           {activeTab === "tareas" && (
-            <TasksModule tasks={tasks} members={members} />
+            <TasksModule
+              tasks={tasks}
+              members={members}
+              currentMemberId={currentMemberId}
+            />
           )}
 
           {activeTab === "peques" && (
@@ -401,6 +416,7 @@ export function DashboardClient({
               schoolLunch={schoolLunch}
               schoolDinnerRec={schoolDinnerRec}
               healthUpcoming={healthUpcoming}
+              currentMemberId={currentMemberId}
             />
           )}
 
@@ -427,13 +443,18 @@ export function DashboardClient({
                 schoolLunch={schoolLunch}
                 schoolDinnerRec={schoolDinnerRec}
                 healthUpcoming={healthUpcoming}
+                currentMemberId={currentMemberId}
               />
               <CalendarModule
                 events={events}
                 members={members}
                 today={today}
               />
-              <TasksModule tasks={tasks} members={members} />
+              <TasksModule
+                tasks={tasks}
+                members={members}
+                currentMemberId={currentMemberId}
+              />
             </>
           )}
 
@@ -453,6 +474,8 @@ export function DashboardClient({
                 items={shoppingItems}
                 stores={stores}
                 staples={staples}
+                members={members}
+                currentMemberId={currentMemberId}
               />
             </>
           )}
@@ -462,6 +485,8 @@ export function DashboardClient({
               items={shoppingItems}
               stores={stores}
               staples={staples}
+              members={members}
+              currentMemberId={currentMemberId}
             />
           )}
         </aside>
@@ -477,6 +502,13 @@ export function DashboardClient({
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         members={members}
+      />
+
+      <ProfileLoginModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        members={members}
+        currentMemberId={currentMemberId ?? null}
       />
     </div>
   );

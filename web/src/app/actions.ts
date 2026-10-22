@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import {
   addShopping,
   toggleShopping,
@@ -19,6 +20,12 @@ import {
   chooseDinner,
   updateMember,
   setSetting,
+  createStaple,
+  deleteStaple,
+  toggleStapleByName,
+  updateMemberPreference,
+  setMemberPin,
+  verifyMemberPin,
   type PantryItem,
   type Task,
 } from "@/lib/repo";
@@ -35,15 +42,27 @@ export async function addShoppingAction(formData: FormData) {
   const name = formData.get("name") as string;
   const storeIdStr = formData.get("storeId") as string;
   const quantity = formData.get("quantity") as string;
+  const byStr = formData.get("by") as string;
   const storeId = storeIdStr ? parseInt(storeIdStr, 10) : null;
+
+  let by: number | null = byStr ? parseInt(byStr, 10) : null;
+  if (!by) {
+    const cookieStore = await cookies();
+    const activeMember = cookieStore.get("hd_active_member")?.value;
+    if (activeMember) by = parseInt(activeMember, 10);
+  }
+
   if (name?.trim()) {
-    await addShopping(name, { storeId, quantity: quantity?.trim() || null });
+    await addShopping(name, { storeId, quantity: quantity?.trim() || null, by });
     revalidatePath("/");
   }
 }
 
 export async function quickAddStapleAction(name: string, storeId: number | null) {
-  await addShopping(name, { storeId });
+  const cookieStore = await cookies();
+  const activeMember = cookieStore.get("hd_active_member")?.value;
+  const by = activeMember ? parseInt(activeMember, 10) : null;
+  await addShopping(name, { storeId, by });
   revalidatePath("/");
 }
 
@@ -235,5 +254,53 @@ export async function markPerishableConsumedAction(id: number) {
 export async function seedDemoReceiptsAction() {
   await ensureDemoReceipts();
   revalidatePath("/");
+}
+
+// ── Gestión manual de Básicos (Staples) ───────────────────
+export async function addStapleAction(name: string, emoji: string = "🛒", storeId?: number | null) {
+  await createStaple(name, emoji, storeId);
+  revalidatePath("/");
+}
+
+export async function deleteStapleAction(id: number) {
+  await deleteStaple(id);
+  revalidatePath("/");
+}
+
+export async function toggleStapleAction(name: string, emoji: string = "🛒", storeId?: number | null) {
+  const added = await toggleStapleByName(name, emoji, storeId);
+  revalidatePath("/");
+  return added;
+}
+
+// ── Zona de Login y Perfiles (Kike y Lara) ─────────────────
+export async function setActiveProfileCookieAction(memberId: number) {
+  const cookieStore = await cookies();
+  cookieStore.set("hd_active_member", memberId.toString(), {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
+  revalidatePath("/");
+}
+
+export async function clearActiveProfileCookieAction() {
+  const cookieStore = await cookies();
+  cookieStore.delete("hd_active_member");
+  revalidatePath("/");
+}
+
+export async function updateProfilePreferenceAction(memberId: number, preferredTab: string) {
+  await updateMemberPreference(memberId, preferredTab);
+  revalidatePath("/");
+}
+
+export async function setProfilePinAction(memberId: number, pin: string) {
+  await setMemberPin(memberId, pin);
+  revalidatePath("/");
+}
+
+export async function verifyProfilePinAction(memberId: number, pin: string): Promise<boolean> {
+  return await verifyMemberPin(memberId, pin);
 }
 

@@ -121,7 +121,15 @@ function detectStoreFromText(text: string): string {
   if (lower.includes("mercadona")) return "Mercadona";
   if (lower.includes("carrefour")) return "Carrefour";
   if (lower.includes("lidl")) return "Lidl";
-  return "Mercadona";
+  if (lower.includes("farmacia")) return "Farmacia";
+  if (lower.includes("alcampo")) return "Alcampo";
+  if (lower.includes("dia")) return "Dia";
+  if (lower.includes("aldi")) return "Aldi";
+  if (lower.includes("decathlon")) return "Decathlon";
+  if (lower.includes("primor")) return "Primor";
+  if (lower.includes("ikea")) return "Ikea";
+  if (lower.includes("leroy")) return "Leroy Merlin";
+  return "Otros";
 }
 
 function parseReceiptHeuristic(text: string): ParsedReceipt {
@@ -182,18 +190,18 @@ function parseReceiptHeuristic(text: string): ParsedReceipt {
 }
 
 /**
- * Parsea directamente una foto o imagen de ticket (Mercadona, Carrefour, Lidl)
+ * Parsea directamente una foto o imagen de ticket (Mercadona, Carrefour, Lidl, Alcampo u otros)
  * usando Gemini Vision.
  */
 export async function parseReceiptImage(base64Image: string, mimeType: string = "image/jpeg"): Promise<ParsedReceipt> {
   const prompt =
-    "Eres un analizador OCR visual experto de tickets de compra de supermercados españoles (Mercadona, Carrefour, Lidl). " +
+    "Eres un analizador OCR visual experto de tickets de compra de comercios y supermercados españoles. " +
     "Analiza la foto del ticket y extrae en JSON:\n" +
-    "- 'storeName': ('Mercadona', 'Carrefour', 'Lidl' u 'Otros')\n" +
+    "- 'storeName': el nombre del comercio o supermercado (ej. 'Mercadona', 'Carrefour', 'Lidl', 'Farmacia', 'Alcampo', 'Dia', 'Aldi', 'Decathlon', etc. Si no se distingue claramente el nombre, usa 'Otros')\n" +
     "- 'date': fecha en formato YYYY-MM-DD\n" +
     "- 'totalAmount': importe total numérico\n" +
     "- 'items': lista con 'name' (nombre limpio del producto), 'quantity' (opcional), 'unitPrice' (opcional numérico), " +
-    "'totalPrice' (numérico), 'category' ('Fruta y Verdura', 'Carnicería', 'Pescadería', 'Lácteos', 'Huevos', 'Panadería', 'Despensa', 'Bebé / Higiene', 'Limpieza'), " +
+    "'totalPrice' (numérico), 'category' ('Fruta y Verdura', 'Carnicería', 'Pescadería', 'Lácteos', 'Huevos', 'Panadería', 'Despensa', 'Bebé / Higiene', 'Limpieza', 'Otros'), " +
     "'isPerishable' (boolean), 'expiryDays' (número de días estimados hasta caducidad, ej. 2 para pescado, 3 para pollo, 4 para fruta, 6 para leche).\n" +
     "Devuelve ÚNICAMENTE el objeto JSON sin texto adicional ni formato markdown.";
 
@@ -203,7 +211,7 @@ export async function parseReceiptImage(base64Image: string, mimeType: string = 
   if (parsedAi && parsedAi.items && parsedAi.items.length > 0) {
     const today = isoDate();
     return {
-      storeName: parsedAi.storeName || "Mercadona",
+      storeName: parsedAi.storeName || "Otros",
       date: parsedAi.date || today,
       totalAmount: Number(parsedAi.totalAmount) || parsedAi.items.reduce((s, i) => s + (Number(i.totalPrice) || 0), 0),
       items: parsedAi.items.map((i) => {
@@ -222,7 +230,7 @@ export async function parseReceiptImage(base64Image: string, mimeType: string = 
   }
 
   return {
-    storeName: "Mercadona",
+    storeName: "Otros",
     date: isoDate(),
     totalAmount: 0,
     items: [],
@@ -235,10 +243,32 @@ export async function parseReceiptImage(base64Image: string, mimeType: string = 
  * - Historial de precios para comparación
  * - Estado de la despensa a 'ok'
  * - Tachado de productos de la lista de la compra si estaban pendientes
+ * - Auto-detección y promoción de tiendas si una compañía alcanza 3 o más tickets
  */
 export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: string) {
   const stores = await getStores();
-  const storeId = stores.find((s) => s.name.toLowerCase() === parsed.storeName.toLowerCase())?.id ?? null;
+  const rawStore = (parsed.storeName || "Otros").trim();
+  const storeLower = rawStore.toLowerCase();
+
+  // Buscar coincidencia en tiendas existentes
+  let matched = stores.find((s) => s.name.toLowerCase() === storeLower);
+  if (!matched && storeLower !== "otros") {
+    matched = stores.find((s) => storeLower.includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(storeLower));
+  }
+
+  const otrosStore = stores.find((s) => s.name.toLowerCase() === "otros") || { id: 5, name: "Otros" };
+
+  let storeId: number;
+  let companyName: string;
+
+  if (matched && matched.name.toLowerCase() !== "otros") {
+    storeId = matched.id;
+    companyName = matched.name;
+  } else {
+    storeId = otrosStore.id;
+    companyName = rawStore.toLowerCase() === "otros" ? "Otros" : (rawStore.charAt(0).toUpperCase() + rawStore.slice(1));
+  }
+
   const receiptDate = parsed.date || isoDate();
 
   const items = parsed.items.map((i) => ({
@@ -253,6 +283,7 @@ export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: stri
 
   const receiptId = await recordReceipt({
     storeId,
+    companyName,
     date: receiptDate,
     totalAmount: parsed.totalAmount,
     rawText: rawText || JSON.stringify(parsed),

@@ -3,8 +3,16 @@ import { q } from "./db";
 import { addDays, isoDate, weekday } from "./dates";
 
 export type Member = {
-  id: number; name: string; role: "adult" | "child"; birthdate: string | null;
-  color: string; emoji: string; telegram_user_id: string | null; allergies: string | null;
+  id: number;
+  name: string;
+  role: "adult" | "child";
+  birthdate: string | null;
+  color: string;
+  emoji: string;
+  telegram_user_id: string | null;
+  allergies: string | null;
+  pin?: string | null;
+  preferred_tab?: string | null;
 };
 export type Store = { id: number; name: string; color: string; sort: number };
 export type ShoppingItem = {
@@ -28,10 +36,10 @@ export type SchoolRun = { dropoff_id: number | null; pickup_id: number | null; n
 export type DinnerPlan = { option: "mambo" | "estandar"; title: string; description: string | null; chosen: boolean };
 
 export const DEFAULT_MEMBERS: Member[] = [
-  { id: 1, name: "Kike", role: "adult", birthdate: "1991-03-13", color: "#3b82f6", emoji: "👨", telegram_user_id: null, allergies: null },
-  { id: 2, name: "Lara", role: "adult", birthdate: "1999-06-19", color: "#ec4899", emoji: "👩", telegram_user_id: null, allergies: null },
-  { id: 3, name: "Fabio", role: "child", birthdate: "2023-09-06", color: "#f59e0b", emoji: "🧒", telegram_user_id: null, allergies: null },
-  { id: 4, name: "Bruno", role: "child", birthdate: "2025-05-22", color: "#10b981", emoji: "👶", telegram_user_id: null, allergies: null },
+  { id: 1, name: "Kike", role: "adult", birthdate: "1991-03-13", color: "#3b82f6", emoji: "👨", telegram_user_id: null, allergies: null, preferred_tab: "resumen" },
+  { id: 2, name: "Lara", role: "adult", birthdate: "1999-06-19", color: "#ec4899", emoji: "👩", telegram_user_id: null, allergies: null, preferred_tab: "resumen" },
+  { id: 3, name: "Fabio", role: "child", birthdate: "2023-09-06", color: "#f59e0b", emoji: "🧒", telegram_user_id: null, allergies: null, preferred_tab: "resumen" },
+  { id: 4, name: "Bruno", role: "child", birthdate: "2025-05-22", color: "#10b981", emoji: "👶", telegram_user_id: null, allergies: null, preferred_tab: "resumen" },
 ];
 
 export const DEFAULT_STORES: Store[] = [
@@ -39,28 +47,75 @@ export const DEFAULT_STORES: Store[] = [
   { id: 2, name: "Carrefour", color: "#0055b8", sort: 2 },
   { id: 3, name: "Lidl", color: "#e6a100", sort: 3 },
   { id: 4, name: "Farmacia", color: "#2bb3a3", sort: 4 },
+  { id: 5, name: "Otros", color: "#64748b", sort: 99 },
 ];
 
 // ── Miembros ──────────────────────────────────────────────
 export async function getMembers(): Promise<Member[]> {
-  const rows = await q<Member>("select id,name,role,birthdate::text,color,emoji,telegram_user_id,allergies from members order by role, id");
+  const rows = await q<Member>("select id,name,role,birthdate::text,color,emoji,telegram_user_id,allergies,pin,preferred_tab from members order by role, id");
   return rows && rows.length > 0 ? rows : DEFAULT_MEMBERS;
 }
 
-export async function updateMember(id: number, f: Partial<Pick<Member, "name" | "birthdate" | "emoji" | "color" | "telegram_user_id" | "allergies">>) {
+export async function updateMember(id: number, f: Partial<Pick<Member, "name" | "birthdate" | "emoji" | "color" | "telegram_user_id" | "allergies" | "pin" | "preferred_tab">>) {
   await q(
     `update members set name=coalesce($2,name), birthdate=$3, emoji=coalesce($4,emoji), color=coalesce($5,color),
-     telegram_user_id=$6, allergies=$7 where id=$1`,
-    [id, f.name ?? null, f.birthdate || null, f.emoji ?? null, f.color ?? null, f.telegram_user_id || null, f.allergies || null],
+     telegram_user_id=$6, allergies=$7, pin=coalesce($8,pin), preferred_tab=coalesce($9,preferred_tab) where id=$1`,
+    [id, f.name ?? null, f.birthdate || null, f.emoji ?? null, f.color ?? null, f.telegram_user_id || null, f.allergies || null, f.pin ?? null, f.preferred_tab ?? null],
   );
+}
+
+export async function updateMemberPreference(memberId: number, preferredTab: string) {
+  await q("update members set preferred_tab = $2 where id = $1", [memberId, preferredTab]);
+}
+
+export async function setMemberPin(memberId: number, pin: string) {
+  await q("update members set pin = $2 where id = $1", [memberId, pin]);
+}
+
+export async function verifyMemberPin(memberId: number, pin: string): Promise<boolean> {
+  const rows = await q<{ pin: string | null }>("select pin from members where id = $1", [memberId]);
+  if (!rows[0] || !rows[0].pin) return true;
+  return rows[0].pin === pin;
 }
 
 // ── Compra ────────────────────────────────────────────────
 export async function getStores(): Promise<Store[]> {
-  const rows = await q<Store>("select * from stores where name in ('Mercadona', 'Carrefour', 'Lidl', 'Farmacia') order by sort, name");
+  const rows = await q<Store>("select * from stores order by sort, name");
   return rows && rows.length > 0 ? rows : DEFAULT_STORES;
 }
+
 export const getStaples = () => q<Staple>("select * from staples order by name");
+
+export async function createStaple(name: string, emoji: string = "🛒", storeId?: number | null) {
+  const clean = name.trim();
+  if (!clean) return;
+  await q(
+    `insert into staples (name, emoji, store_id)
+     values ($1, $2, $3)
+     on conflict (name) do update set emoji = excluded.emoji, store_id = coalesce(excluded.store_id, staples.store_id)`,
+    [clean, emoji || "🛒", storeId ?? null],
+  );
+}
+
+export async function deleteStaple(id: number) {
+  await q("delete from staples where id = $1", [id]);
+}
+
+export async function toggleStapleByName(name: string, emoji: string = "🛒", storeId?: number | null): Promise<boolean> {
+  const clean = name.trim();
+  if (!clean) return false;
+  const existing = await q<{ id: number }>("select id from staples where lower(name) = lower($1)", [clean]);
+  if (existing.length > 0) {
+    await q("delete from staples where id = $1", [existing[0].id]);
+    return false;
+  } else {
+    await q(
+      "insert into staples (name, emoji, store_id) values ($1, $2, $3) on conflict (name) do nothing",
+      [clean, emoji, storeId ?? null],
+    );
+    return true;
+  }
+}
 export const getShopping = () =>
   q<ShoppingItem>(
     `select id,name,quantity,store_id,added_by,checked from shopping_items
@@ -281,6 +336,7 @@ export async function setSetting(key: string, value: string) {
 export type Receipt = {
   id: number;
   store_id: number | null;
+  company_name?: string | null;
   store_name?: string;
   store_color?: string;
   date: string;
@@ -336,7 +392,7 @@ export type HabitInsight = {
 
 export async function getReceipts(limit = 20): Promise<Receipt[]> {
   return q<Receipt>(
-    `select r.id, r.store_id, s.name as store_name, s.color as store_color,
+    `select r.id, r.store_id, r.company_name, s.name as store_name, s.color as store_color,
             r.date::text, r.total_amount::float as total_amount, r.photo_url, r.raw_text,
             (select count(*) from receipt_items ri where ri.receipt_id = r.id)::int as items_count
      from receipts r
@@ -529,8 +585,103 @@ export async function getShoppingHabits(): Promise<HabitInsight[]> {
   });
 }
 
+const DYNAMIC_STORE_COLORS = [
+  "#8b5cf6", // Purple
+  "#f97316", // Orange
+  "#ec4899", // Pink
+  "#06b6d4", // Cyan
+  "#14b8a6", // Teal
+  "#84cc16", // Lime
+  "#e11d48", // Rose
+  "#6366f1", // Indigo
+];
+
+/**
+ * Detecta si una compañía introducida en "Otros" tiene 3 o más tickets.
+ * Si es así, crea automáticamente la nueva tienda y reasigna los tickets y su histórico.
+ */
+export async function checkAndPromoteCompanyStores(): Promise<string[]> {
+  const otrosRows = await q<{ id: number }>("select id from stores where lower(name) = 'otros'");
+  const otrosId = otrosRows[0]?.id;
+  if (!otrosId) return [];
+
+  const candidates = await q<{ company_name: string; count: number }>(
+    `select company_name, count(*)::int as count
+     from receipts
+     where store_id = $1 and company_name is not null and trim(company_name) != ''
+     group by company_name
+     having count(*) >= 3`,
+    [otrosId],
+  );
+
+  if (!candidates || candidates.length === 0) return [];
+
+  const promoted: string[] = [];
+
+  for (const cand of candidates) {
+    const rawName = cand.company_name.trim();
+    if (!rawName || rawName.toLowerCase() === "otros") continue;
+
+    const storeName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+    const existing = await q<{ id: number }>("select id from stores where lower(name) = lower($1)", [storeName]);
+    let storeId: number;
+
+    if (existing.length > 0) {
+      storeId = existing[0].id;
+    } else {
+      const colorIndex = Math.abs(
+        storeName.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+      ) % DYNAMIC_STORE_COLORS.length;
+      const color = DYNAMIC_STORE_COLORS[colorIndex];
+
+      const maxSortRes = await q<{ max_sort: number }>("select coalesce(max(sort), 5) as max_sort from stores where name != 'Otros'");
+      const nextSort = (maxSortRes[0]?.max_sort ?? 5) + 1;
+
+      const created = await q<{ id: number }>(
+        `insert into stores (name, color, sort)
+         values ($1, $2, $3)
+         on conflict (name) do update set name = excluded.name
+         returning id`,
+        [storeName, color, nextSort],
+      );
+      storeId = created[0]?.id;
+    }
+
+    if (storeId) {
+      await q(
+        `update receipts
+         set store_id = $1
+         where store_id = $2 and lower(company_name) = lower($3)`,
+        [storeId, otrosId, rawName],
+      );
+
+      const items = await q<{ name: string }>(
+        `select distinct ri.name
+         from receipt_items ri
+         join receipts r on r.id = ri.receipt_id
+         where r.store_id = $1`,
+        [storeId],
+      );
+
+      for (const item of items) {
+        await q(
+          `update price_history
+           set store_id = $1
+           where store_id = $2 and lower(item_name) = lower($3)`,
+          [storeId, otrosId, item.name],
+        );
+      }
+
+      promoted.push(storeName);
+    }
+  }
+
+  return promoted;
+}
+
 export async function recordReceipt(data: {
   storeId: number | null;
+  companyName?: string | null;
   date: string;
   totalAmount: number;
   rawText?: string;
@@ -546,10 +697,10 @@ export async function recordReceipt(data: {
   }[];
 }) {
   const [receipt] = await q<{ id: number }>(
-    `insert into receipts (store_id, date, total_amount, photo_url, raw_text)
-     values ($1, $2, $3, $4, $5)
+    `insert into receipts (store_id, company_name, date, total_amount, photo_url, raw_text)
+     values ($1, $2, $3, $4, $5, $6)
      returning id`,
-    [data.storeId, data.date, data.totalAmount, data.photoUrl ?? null, data.rawText ?? null],
+    [data.storeId, data.companyName ?? null, data.date, data.totalAmount, data.photoUrl ?? null, data.rawText ?? null],
   );
 
   if (!receipt?.id) return null;
@@ -596,6 +747,13 @@ export async function recordReceipt(data: {
        where not checked and lower(name) = lower($1)`,
       [item.name],
     );
+  }
+
+  // 5. Comprobar si corresponde auto-crear nueva tienda por alcanzar 3 tickets
+  try {
+    await checkAndPromoteCompanyStores();
+  } catch (err) {
+    console.warn("[repo] Error al comprobar auto-promoción de tiendas:", err);
   }
 
   return receiptId;

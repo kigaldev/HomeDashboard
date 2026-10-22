@@ -7,13 +7,19 @@ import type { Task, Member } from "@/lib/repo";
 export function TasksModule({
   tasks = [],
   members = [],
+  currentMemberId = null,
 }: {
   tasks: Task[];
   members: Member[];
+  currentMemberId?: number | null;
 }) {
-  const [filterAssignee, setFilterAssignee] = useState<number | "all">("all");
+  const [filterAssignee, setFilterAssignee] = useState<number | "all">(
+    currentMemberId ? currentMemberId : "all"
+  );
   const [newTitle, setNewTitle] = useState("");
-  const [newAssignee, setNewAssignee] = useState<string>("");
+  const [newAssignee, setNewAssignee] = useState<string>(
+    currentMemberId ? currentMemberId.toString() : ""
+  );
   const [newDueDate, setNewDueDate] = useState<string>("");
   const [newRecurrence, setNewRecurrence] = useState<string>("");
   const [isPending, startTransition] = useTransition();

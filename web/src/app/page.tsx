@@ -20,6 +20,7 @@ import {
 import { getWeather } from "@/lib/weather";
 import { ensureDinnerPlans } from "@/lib/dinners";
 import { connection } from "next/server";
+import { cookies } from "next/headers";
 import { DashboardClient } from "@/components/DashboardClient";
 
 export const instant = false;
@@ -29,6 +30,10 @@ export default async function HomePage() {
   const today = isoDate();
   const formattedDate = longDate(today);
   const currentGreeting = greeting();
+
+  const cookieStore = await cookies();
+  const activeMemberStr = cookieStore.get("hd_active_member")?.value;
+  const currentMemberId = activeMemberStr ? parseInt(activeMemberStr, 10) : null;
 
   const [
     members,
@@ -77,6 +82,7 @@ export default async function HomePage() {
   return (
     <DashboardClient
       members={members}
+      currentMemberId={currentMemberId}
       weather={weather}
       today={today}
       formattedDate={formattedDate}

@@ -123,6 +123,7 @@ create table if not exists settings (
 create table if not exists receipts (
   id serial primary key,
   store_id int references stores(id) on delete set null,
+  company_name text,
   date date not null default current_date,
   total_amount numeric(8,2) not null,
   photo_url text,
@@ -154,12 +155,15 @@ create table if not exists price_history (
 
 -- Migraciones seguras para columnas y tiendas actualizadas
 alter table school_menu add column if not exists dinner_recommendation text;
+alter table receipts add column if not exists company_name text;
+alter table members add column if not exists pin text;
+alter table members add column if not exists preferred_tab text default 'resumen';
 delete from stores where name in ('Eroski', 'BM');
 `;
 
 /**
  * Datos iniciales adaptados a la familia de Kike, Lara, Fabio y Bruno.
- * Supermercados: Mercadona, Carrefour, Lidl, Farmacia.
+ * Supermercados: Mercadona, Carrefour, Lidl, Farmacia, Otros.
  */
 export const SEED_SQL = /* sql */ `
 insert into members (name, role, birthdate, color, emoji) values
@@ -173,7 +177,8 @@ insert into stores (name, color, sort) values
   ('Mercadona', '#00a650', 1),
   ('Carrefour', '#0055b8', 2),
   ('Lidl', '#e6a100', 3),
-  ('Farmacia', '#2bb3a3', 4)
+  ('Farmacia', '#2bb3a3', 4),
+  ('Otros', '#64748b', 99)
 on conflict (name) do update set color=excluded.color, sort=excluded.sort;
 
 insert into staples (name, emoji, store_id)

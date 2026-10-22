@@ -17,6 +17,7 @@ export function KidsModule({
   schoolLunch,
   schoolDinnerRec,
   healthUpcoming = [],
+  currentMemberId = null,
 }: {
   members: Member[];
   today: string;
@@ -24,6 +25,7 @@ export function KidsModule({
   schoolLunch: string | null;
   schoolDinnerRec?: string | null;
   healthUpcoming: HealthItem[];
+  currentMemberId?: number | null;
 }) {
   const [lunchInput, setLunchInput] = useState(schoolLunch || "");
   const [isEditingLunch, setIsEditingLunch] = useState(false);
@@ -153,19 +155,39 @@ export function KidsModule({
               <div style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)", marginBottom: "0.25rem" }}>Lleva a la mañana</div>
               <span
                 className="badge badge-blue"
-                style={{ fontSize: "0.82rem", padding: "0.3rem 0.65rem" }}
+                style={{
+                  fontSize: "0.82rem",
+                  padding: "0.3rem 0.65rem",
+                  boxShadow: dropoff?.id === currentMemberId ? "0 0 10px rgba(59, 130, 246, 0.4)" : "none",
+                  border: dropoff?.id === currentMemberId ? "1.5px solid var(--apple-blue)" : "none",
+                }}
               >
                 {dropoff ? `${dropoff.emoji} ${dropoff.name}` : "Por definir"}
               </span>
+              {dropoff?.id === currentMemberId && (
+                <div style={{ fontSize: "0.68rem", color: "var(--apple-blue)", marginTop: "0.25rem", fontWeight: 700 }}>
+                  ★ Te toca a ti
+                </div>
+              )}
             </div>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)", marginBottom: "0.25rem" }}>Recoge a la tarde</div>
               <span
                 className="badge badge-purple"
-                style={{ fontSize: "0.82rem", padding: "0.3rem 0.65rem" }}
+                style={{
+                  fontSize: "0.82rem",
+                  padding: "0.3rem 0.65rem",
+                  boxShadow: pickup?.id === currentMemberId ? "0 0 10px rgba(168, 85, 247, 0.4)" : "none",
+                  border: pickup?.id === currentMemberId ? "1.5px solid var(--apple-purple)" : "none",
+                }}
               >
                 {pickup ? `${pickup.emoji} ${pickup.name}` : "Por definir"}
               </span>
+              {pickup?.id === currentMemberId && (
+                <div style={{ fontSize: "0.68rem", color: "var(--apple-purple)", marginTop: "0.25rem", fontWeight: 700 }}>
+                  ★ Te toca a ti
+                </div>
+              )}
             </div>
           </div>
           {schoolRun?.note && (
