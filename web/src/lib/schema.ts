@@ -153,6 +153,23 @@ create table if not exists price_history (
   date date not null default current_date
 );
 
+create table if not exists energy_contracts (
+  id serial primary key,
+  service text not null check (service in ('electricity', 'gas')),
+  provider text not null default 'Naturgy',
+  tariff_name text not null,
+  access_toll text,
+  energy_price_kwh numeric(8,4) not null,
+  power_p1_kw numeric(8,4),
+  power_p2_kw numeric(8,4),
+  fixed_monthly_price numeric(8,4),
+  contract_date date default current_date,
+  active boolean not null default true,
+  notes text,
+  metadata jsonb default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 -- Migraciones seguras para columnas y tiendas actualizadas
 alter table school_menu add column if not exists dinner_recommendation text;
 alter table receipts add column if not exists company_name text;
@@ -204,5 +221,14 @@ insert into school_run_defaults (weekday, dropoff_id, pickup_id) values
 on conflict do nothing;
 
 insert into settings (key, value) values ('family_name', 'Familia Kike y Lara')
+on conflict do nothing;
+
+insert into energy_contracts (service, provider, tariff_name, access_toll, energy_price_kwh, power_p1_kw, power_p2_kw, fixed_monthly_price, notes, metadata) values
+  ('electricity', 'Naturgy', 'Tarifa Por Uso Luz', '2.0TD', 0.1230, 0.1230, 0.0615, null,
+   'Precio fijo de energía 24h garantizado 12 meses. Potencia P1 (Punta: 08:00-00:00 lun-vie) y P2 (Valle: 00:00-08:00 lun-vie y 24h fines de semana). Carga de VE recomendada en P2 para evitar sobrecostes de potencia y disparos de ICP.',
+   '{"ev_recommended_hours": "00:00 - 07:30", "appliances_avoid_hours": ["13:30-15:00", "20:30-22:30"], "battery_kwh_standard": 50, "ev_charger_power_kw": 3.7}'::jsonb),
+  ('gas', 'Naturgy', 'Tarifa Por Uso Gas', 'RL.2', 0.0899, null, null, 9.55,
+   'Tarifa fija 24h para calefacción de gas y ACS (peaje RL.2). Optimización térmica adaptada a Salamanca: 20°C día y 17.5°C noche. Ventilación óptima de 13:00 a 15:00.',
+   '{"comfort_temp": 20.0, "eco_temp": 17.5, "ventilation_hours": "13:00 - 15:00", "boiler_kw_avg": 9.0}'::jsonb)
 on conflict do nothing;
 `;

@@ -2,16 +2,18 @@ import "server-only";
 import { addDays, ageLabel, isoDate, longDate, timeOf } from "./dates";
 import {
   getEventsBetween, getHealthUpcoming, getMembers, getOpenTasks, getPantry, getSchoolMenu,
-  getSchoolRun, getShopping, getStores, type Member,
+  getSchoolRun, getShopping, getStores, getEnergyContracts, type Member,
 } from "./repo";
 import { getWeather, kidsOutfit, weatherLabel } from "./weather";
 import { ensureDinnerPlans } from "./dinners";
+import { getEnergyRecommendations } from "./energy";
 
 /** Fotografía de un día: la usan el briefing, el chat IA y el bot. */
 export async function daySnapshot(date: string) {
-  const [members, events, run, schoolMenu, tasks, health, weather, dinners, shopping, pantry, stores] = await Promise.all([
+  const [members, events, run, schoolMenu, tasks, health, weather, dinners, shopping, pantry, stores, energyContracts] = await Promise.all([
     getMembers(), getEventsBetween(date, addDays(date, 1)), getSchoolRun(date), getSchoolMenu(date),
     getOpenTasks(), getHealthUpcoming(14), getWeather(), ensureDinnerPlans(date), getShopping(), getPantry(), getStores(),
+    getEnergyContracts(),
   ]);
   const byId = new Map(members.map((m) => [m.id, m]));
   const name = (id: number | null) => (id ? byId.get(id)?.name ?? "?" : "los dos");
@@ -20,7 +22,12 @@ export async function daySnapshot(date: string) {
   const tasksDue = tasks.filter((t) => !t.done && (!t.due_date || t.due_date <= date));
   const lunch = schoolMenu?.lunch ?? null;
   const dinnerRec = schoolMenu?.dinner_recommendation ?? null;
-  return { date, members, byId, name, events, run, lunch, dinnerRec, tasksDue, health, day, dinners, shopping, pantry, stores, birthdays };
+  const energyRecs = getEnergyRecommendations(energyContracts, day);
+
+  return {
+    date, members, byId, name, events, run, lunch, dinnerRec, tasksDue, health, day, dinners, shopping, pantry, stores, birthdays,
+    energyContracts, energyRecs,
+  };
 }
 
 export type Snapshot = Awaited<ReturnType<typeof daySnapshot>>;
@@ -36,6 +43,16 @@ export function snapshotText(s: Snapshot): string {
   if (s.day) {
     const w = weatherLabel(s.day.code);
     L.push(`Tiempo: ${w.text}, ${s.day.tMin}°–${s.day.tMax}°, lluvia ${s.day.rainProb}%. Ropa niños: ${kidsOutfit(s.day).join("; ")}`);
+  }
+  if (s.energyRecs) {
+    const elecKwh = s.energyRecs.electricityContract?.energy_price_kwh ?? 0.123;
+    const gasKwh = s.energyRecs.gasContract?.energy_price_kwh ?? 0.0899;
+    L.push(
+      `Energía y Tarifas (Naturgy): Luz plana 24h a ${elecKwh} €/kWh (${s.energyRecs.periodInfo.name} ${s.energyRecs.periodInfo.period}). Gas calefacción a ${gasKwh} €/kWh.`
+    );
+    L.push(
+      `Recomendaciones hoy: Coche Eléctrico (${s.energyRecs.ev.statusLabel} · Mejor: ${s.energyRecs.ev.bestHours}) | Lavadora (${s.energyRecs.washer.statusLabel}) | Calefacción (${s.energyRecs.heating.bestHours} · Ventilar 13-15h).`
+    );
   }
   if (s.run) L.push(`Cole: lleva ${s.name(s.run.dropoff_id)}, recoge ${s.name(s.run.pickup_id)}${s.run.note ? ` (${s.run.note})` : ""}`);
   L.push(`Menú del cole: ${s.lunch ?? "sin datos"}${s.dinnerRec ? ` (Cena recomendada *: ${s.dinnerRec})` : ""}`);

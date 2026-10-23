@@ -13,6 +13,7 @@ import { ReceiptsModule } from "./ReceiptsModule";
 import { AiAssistantModal } from "./AiAssistantModal";
 import { SettingsModal } from "./SettingsModal";
 import { ProfileLoginModal } from "./ProfileLoginModal";
+import { EnergyModule } from "./EnergyModule";
 import type {
   Member,
   ShoppingItem,
@@ -28,6 +29,7 @@ import type {
   PerishableAlert,
   PriceComparison,
   HabitInsight,
+  EnergyContract,
 } from "@/lib/repo";
 import type { Weather, DayWeather } from "@/lib/weather";
 
@@ -61,6 +63,7 @@ export function DashboardClient({
   },
   priceComparisons = [],
   habits = [],
+  energyContracts = [],
 }: {
   members: Member[];
   currentMemberId?: number | null;
@@ -91,9 +94,10 @@ export function DashboardClient({
   };
   priceComparisons: PriceComparison[];
   habits: HabitInsight[];
+  energyContracts: EnergyContract[];
 }) {
   const activeMember = members.find((m) => m.id === currentMemberId);
-  const [activeTab, setActiveTab] = useState<"resumen" | "compra" | "tickets" | "tareas" | "peques" | "agenda">(
+  const [activeTab, setActiveTab] = useState<"resumen" | "compra" | "tickets" | "tareas" | "peques" | "agenda" | "energia">(
     (activeMember?.preferred_tab as any) || "resumen"
   );
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -256,6 +260,13 @@ export function DashboardClient({
           <span>📅</span>
           <span>Agenda</span>
         </button>
+        <button
+          onClick={() => setActiveTab("energia")}
+          className={`tab-btn ${activeTab === "energia" ? "active" : ""}`}
+        >
+          <span>⚡</span>
+          <span>Energía Naturgy</span>
+        </button>
       </nav>
 
       {/* Barra de Navegación Inferior Nativa iOS para Smartphone (UITabBar con Thumb Zone) */}
@@ -310,7 +321,7 @@ export function DashboardClient({
         <button
           type="button"
           onClick={() => setActiveTab("peques")}
-          className={`mobile-tab-item ${activeTab === "peques" || activeTab === "agenda" || activeTab === "tareas" ? "active" : ""}`}
+          className={`mobile-tab-item ${activeTab === "peques" || activeTab === "agenda" || activeTab === "tareas" || activeTab === "energia" ? "active" : ""}`}
         >
           <span className="mobile-tab-icon">🧒</span>
           <span className="mobile-tab-label">Familia</span>
@@ -321,8 +332,8 @@ export function DashboardClient({
       <main className="dashboard-grid">
         {/* Columna Principal Izquierda */}
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem", minWidth: 0, width: "100%" }}>
-          {/* Sub-navegador Segmentado Móvil para Familia (Cole / Agenda / Tareas) - 100% ancho, 0 scroll lateral */}
-          {(activeTab === "peques" || activeTab === "agenda" || activeTab === "tareas") && (
+          {/* Sub-navegador Segmentado Móvil para Familia (Cole / Agenda / Tareas / Energía) */}
+          {(activeTab === "peques" || activeTab === "agenda" || activeTab === "tareas" || activeTab === "energia") && (
             <div className="family-subnav-segmented" role="tablist">
               <button
                 type="button"
@@ -332,7 +343,7 @@ export function DashboardClient({
                 aria-selected={activeTab === "peques"}
               >
                 <span>🚸</span>
-                <span>Cole & Salud</span>
+                <span>Cole</span>
               </button>
               <button
                 type="button"
@@ -357,6 +368,16 @@ export function DashboardClient({
                   <span style={{ fontSize: "0.72rem", opacity: 0.85, fontWeight: 700 }}>({pendingTasksCount})</span>
                 )}
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("energia")}
+                className={`family-subnav-btn ${activeTab === "energia" ? "active" : ""}`}
+                role="tab"
+                aria-selected={activeTab === "energia"}
+              >
+                <span>⚡</span>
+                <span>Energía</span>
+              </button>
             </div>
           )}
 
@@ -365,6 +386,60 @@ export function DashboardClient({
               initialContent={latestBriefing}
               todayWeather={todayWeather}
             />
+          )}
+
+          {/* Widget Rápido Apple: Semáforo Energético Naturgy */}
+          {activeTab === "resumen" && (
+            <div
+              onClick={() => setActiveTab("energia")}
+              style={{
+                cursor: "pointer",
+                padding: "0.85rem 1.15rem",
+                borderRadius: "var(--radius-lg)",
+                background: "var(--apple-surface)",
+                border: "1px solid var(--apple-border)",
+                borderLeft: "4px solid var(--apple-green)",
+                boxShadow: "var(--shadow-sm)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+                transition: "all 0.2s var(--ease-spring)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
+                <div
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "10px",
+                    background: "rgba(52, 199, 89, 0.15)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "1.1rem",
+                    flexShrink: 0,
+                  }}
+                >
+                  ⚡
+                </div>
+                <div>
+                  <p style={{ fontWeight: 700, margin: 0, color: "var(--apple-text)", letterSpacing: "-0.01em" }}>
+                    Naturgy Tarifas Por Uso · Recomendaciones Activas
+                  </p>
+                  <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: "0.15rem 0 0 0" }}>
+                    🚗 Coche (00:00–07:30) · 🧺 Lavadora (Despejado) · ♨️ Calefacción (20°C diurna)
+                  </p>
+                </div>
+              </div>
+              <span
+                className="badge badge-blue"
+                style={{ fontSize: "0.76rem", padding: "0.35rem 0.75rem", fontWeight: 600 }}
+              >
+                Abrir Gestor →
+              </span>
+            </div>
           )}
 
           {activeTab === "resumen" && (
@@ -427,6 +502,13 @@ export function DashboardClient({
               today={today}
             />
           )}
+
+          {activeTab === "energia" && (
+            <EnergyModule
+              contracts={energyContracts}
+              todayWeather={todayWeather}
+            />
+          )}
         </section>
 
         {/* Columna Secundaria Derecha (Widgets Bento en desktop) */}
@@ -436,6 +518,10 @@ export function DashboardClient({
         >
           {activeTab === "resumen" && (
             <>
+              <EnergyModule
+                contracts={energyContracts}
+                todayWeather={todayWeather}
+              />
               <KidsModule
                 members={members}
                 today={today}
@@ -480,7 +566,7 @@ export function DashboardClient({
             </>
           )}
 
-          {(activeTab === "tareas" || activeTab === "agenda" || activeTab === "peques") && (
+          {(activeTab === "tareas" || activeTab === "agenda" || activeTab === "peques" || activeTab === "energia") && (
             <ShoppingModule
               items={shoppingItems}
               stores={stores}

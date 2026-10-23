@@ -41,6 +41,12 @@ function template(kind: BriefingKind, s: Snapshot): string {
   if (std) L.push(`• Estándar: ${x(std.title)}`);
   const pending = s.shopping.filter((i) => !i.checked).length;
   if (pending) L.push(`\n🛒 ${pending} cosas en la lista de la compra`);
+  if (s.energyRecs) {
+    L.push(`\n⚡ <b>Energía & Tarifa Naturgy</b>`);
+    L.push(`• 🚗 Coche: ${s.energyRecs.ev.bestHours} (${s.energyRecs.ev.statusLabel})`);
+    L.push(`• 🧺 Lavadora: ${s.energyRecs.washer.statusLabel} (evitar 13:30-15h y 20:30-22h)`);
+    L.push(`• ♨️ Calefacción: ${s.energyRecs.heating.bestHours}`);
+  }
   if (kind === "evening") L.push(`\n🎒 Antes de dormir: mochila, ropa preparada y biberón/agua.`);
   return L.join("\n");
 }

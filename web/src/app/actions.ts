@@ -36,7 +36,8 @@ import { generateSaturdayShoppingList } from "@/lib/weeklyShopping";
 import { syncMontessoriMenu } from "@/lib/schoolMenu";
 import { syncGoogleCalendars } from "@/lib/gcal";
 import { parseReceiptText, parseReceiptImage, saveProcessedReceipt, type ParsedReceipt } from "@/lib/receipts";
-import { markItemConsumed, ensureDemoReceipts } from "@/lib/repo";
+import { markItemConsumed, ensureDemoReceipts, updateEnergyContract, upsertEnergyContract, type EnergyContract } from "@/lib/repo";
+import { parseEnergyBillText, parseEnergyBillImage } from "@/lib/energy";
 
 export async function addShoppingAction(formData: FormData) {
   const name = formData.get("name") as string;
@@ -302,5 +303,23 @@ export async function setProfilePinAction(memberId: number, pin: string) {
 
 export async function verifyProfilePinAction(memberId: number, pin: string): Promise<boolean> {
   return await verifyMemberPin(memberId, pin);
+}
+
+// ── Optimización Energética y Memoria de Tarifas (Naturgy) ─
+export async function updateEnergyContractAction(id: number, data: Partial<EnergyContract>) {
+  await updateEnergyContract(id, data);
+  revalidatePath("/");
+}
+
+export async function ingestEnergyBillTextAction(text: string) {
+  const result = await parseEnergyBillText(text);
+  revalidatePath("/");
+  return result;
+}
+
+export async function ingestEnergyBillImageAction(base64Image: string, mimeType: string = "image/jpeg") {
+  const result = await parseEnergyBillImage(base64Image, mimeType);
+  revalidatePath("/");
+  return result;
 }
 

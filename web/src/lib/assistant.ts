@@ -13,12 +13,15 @@ import {
   setSchoolRunOverride,
   chooseDinner,
   getOpenTasks,
+  getEnergyContracts,
+  upsertEnergyContract,
 } from "./repo";
+import { getEnergyRecommendations, parseEnergyBillText } from "./energy";
 
 export type AgentActionResult = {
   message: string;
   actionExecuted?: {
-    type: "shopping" | "pantry" | "task" | "school_run" | "dinner" | "info";
+    type: "shopping" | "pantry" | "task" | "school_run" | "dinner" | "energy" | "info";
     description: string;
   };
 };
@@ -168,6 +171,59 @@ export async function runAgentInstruction(
     };
   }
 
+  // ── Heurística Rápida 6: Factura o Documento de Energía (Detección y Memoria) ──
+  if ((lower.includes("factura") || lower.includes("contrato") || lower.includes("recibo")) && (lower.includes("luz") || lower.includes("gas") || lower.includes("naturgy") || lower.includes("kwh"))) {
+    const parseRes = await parseEnergyBillText(clean);
+    if (parseRes.success && parseRes.contract) {
+      return {
+        message: `⚡ **¡Factura/Tarifa analizada e incorporada a la memoria!**\n\n- **Servicio:** ${parseRes.contract.service === "electricity" ? "Electricidad (Luz)" : "Gas Natural"}\n- **Comercializadora:** ${parseRes.contract.provider || "Naturgy"}\n- **Tarifa:** ${parseRes.contract.tariff_name}\n- **Precio energía:** ${parseRes.contract.energy_price_kwh} €/kWh\n${parseRes.contract.power_p1_kw ? `- **Potencia P1:** ${parseRes.contract.power_p1_kw} €/kW día\n` : ""}${parseRes.contract.power_p2_kw ? `- **Potencia P2:** ${parseRes.contract.power_p2_kw} €/kW día\n` : ""}\n${parseRes.summary}\n\n*He actualizado los parámetros en el dashboard para recalcular las recomendaciones del coche, lavadora y calefacción.*`,
+        actionExecuted: {
+          type: "energy",
+          description: `Tarifa actualizada: ${parseRes.contract.tariff_name} (${parseRes.contract.energy_price_kwh} €/kWh)`,
+        },
+      };
+    }
+  }
+
+  // ── Heurística Rápida 7: Consulta rápida de optimización de coche, lavadora o calefacción ──
+  if (
+    lower.includes("cargar el coche") ||
+    lower.includes("cargar coche") ||
+    lower.includes("coche eléctrico") ||
+    lower.includes("poner la lavadora") ||
+    lower.includes("lavavajillas") ||
+    lower.includes("calefacción") ||
+    lower.includes("calefaccion") ||
+    lower.includes("tarifa por uso") ||
+    lower.includes("tarifa de luz") ||
+    lower.includes("tarifa de gas")
+  ) {
+    const contracts = await getEnergyContracts();
+    const snapToday = await daySnapshot(today);
+    const recs = getEnergyRecommendations(contracts, snapToday.day);
+
+    if (lower.includes("coche")) {
+      return {
+        message: `🚗 **Recomendación Coche Eléctrico (Naturgy Tarifa Por Uso):**\n\n- **Estado actual:** ${recs.ev.statusLabel} (${recs.periodInfo.name} ${recs.periodInfo.period})\n- **Mejor horario:** ${recs.ev.bestHours}\n- **Consejo:** ${recs.ev.tip}\n- **Coste estimado:** ${recs.ev.estimatedCost}\n\n*Con tu tarifa el precio de energía es plano 24h (~${recs.electricityContract?.energy_price_kwh ?? 0.123} €/kWh), por lo que la clave es evitar sobrepasar la potencia diurna.*`,
+        actionExecuted: { type: "energy", description: "Consulta de recarga de coche eléctrico" },
+      };
+    }
+
+    if (lower.includes("lavadora") || lower.includes("lavavajillas") || lower.includes("secadora")) {
+      return {
+        message: `🧺 **Recomendación Electrodomésticos (Naturgy Tarifa Por Uso):**\n\n- **Lavadora:** ${recs.washer.statusLabel}\n- **Horarios despejados:** ${recs.washer.bestHours}\n- **Horarios a evitar:** 13:30 a 15:00 y 20:30 a 22:30 (pico de preparación de comidas en la cocina)\n- **Coste estimado:** ${recs.washer.estimatedCost}\n\n💡 *Tip de ahorro: Lavar a 30°C o en modo ECO gasta la mitad de kWh sin perder eficacia.*`,
+        actionExecuted: { type: "energy", description: "Consulta de horario de lavadora/electrodomésticos" },
+      };
+    }
+
+    if (lower.includes("calefacción") || lower.includes("calefaccion") || lower.includes("gas") || lower.includes("caldera")) {
+      return {
+        message: `♨️ **Recomendación Calefacción de Gas (Naturgy Tarifa Por Uso Gas):**\n\n- **Temperatura diurna recomendada:** 19,5°C – 20,5°C\n- **Temperatura nocturna:** 17,5°C (no apagues del todo para no perder la inercia térmica en Salamanca)\n- **Ventilación óptima:** De 13:00 a 15:00 durante 10 minutos (con sol y máxima temperatura exterior)\n- **Coste estimado caldera:** ${recs.heating.estimatedCost}\n\n${recs.heating.tip}`,
+        actionExecuted: { type: "energy", description: "Consulta de optimización de calefacción de gas" },
+      };
+    }
+  }
+
   // ── Análisis Inteligente con LLM (Action Tool Calling o respuesta de conocimiento) ──
   const target = parseRelativeDay(clean, today) ?? today;
   const [snap, week, menu] = await Promise.all([
@@ -185,12 +241,12 @@ export async function runAgentInstruction(
     "Eres el Asistente Inteligente y Segundo Cerebro del hogar de Kike, Lara, Fabio (nacido en sept 2023) y Bruno (nacido en mayo 2025) en Salamanca. " +
     "Puedes tanto responder dudas como ejecutar acciones en el dashboard. " +
     "Si el usuario pide realizar una acción que no haya sido ejecutada, puedes responder con un bloque JSON al inicio con formato:\n" +
-    '{"action": "add_shopping"|"update_pantry"|"add_task", "params": {...}}\n\n' +
+    '{"action": "add_shopping"|"update_pantry"|"add_task"|"update_energy_tariff", "params": {...}}\n\n' +
     `Hoy es ${today}.\n\n` +
-    `## Datos de la casa:\n${snapshotText(snap)}\n\n` +
+    `## Datos de la casa (incluye tarifas Naturgy, clima y recomendaciones):\n${snapshotText(snap)}\n\n` +
     `## Agenda 7 días:\n${weekText}\n\n` +
     `## Menú del cole Montessori:\n${menuText}\n\n` +
-    "Responde siempre en español, con tono cercano, eficiente, cariñoso y muy familiar.";
+    "Responde siempre en español, con tono cercano, eficiente, cariñoso y muy familiar. Si te preguntan por energía, coche eléctrico o calefacción, utiliza los datos exactos de las Tarifas Por Uso de Naturgy de la casa.";
 
   const aiResp = await llm(
     [
@@ -215,6 +271,25 @@ export async function runAgentInstruction(
       return {
         message: `🛒 Añadido **${actionJson.params.name}** a la lista de la compra.`,
         actionExecuted: { type: "shopping", description: actionJson.params.name },
+      };
+    }
+    if (actionJson.action === "update_energy_tariff" && actionJson.params?.service && typeof actionJson.params?.energy_price_kwh === "number") {
+      await upsertEnergyContract({
+        service: actionJson.params.service,
+        provider: actionJson.params.provider || "Naturgy",
+        tariff_name: actionJson.params.tariff_name || (actionJson.params.service === "electricity" ? "Tarifa Por Uso Luz" : "Tarifa Por Uso Gas"),
+        energy_price_kwh: actionJson.params.energy_price_kwh,
+        power_p1_kw: actionJson.params.power_p1_kw,
+        power_p2_kw: actionJson.params.power_p2_kw,
+        fixed_monthly_price: actionJson.params.fixed_monthly_price,
+        notes: `Actualizado por chat el ${new Date().toLocaleDateString("es-ES")}`,
+      });
+      return {
+        message: `⚡ He actualizado la tarifa de **${actionJson.params.service === "electricity" ? "electricidad" : "gas"}** a **${actionJson.params.energy_price_kwh} €/kWh** en la memoria del hogar.`,
+        actionExecuted: {
+          type: "energy",
+          description: `Tarifa ${actionJson.params.service}: ${actionJson.params.energy_price_kwh} €/kWh`,
+        },
       };
     }
   }

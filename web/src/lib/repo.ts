@@ -765,3 +765,150 @@ export async function recordReceipt(data: {
 export async function ensureDemoReceipts() {
   return;
 }
+
+export type EnergyContract = {
+  id: number;
+  service: "electricity" | "gas";
+  provider: string;
+  tariff_name: string;
+  access_toll: string | null;
+  energy_price_kwh: number;
+  power_p1_kw: number | null;
+  power_p2_kw: number | null;
+  fixed_monthly_price: number | null;
+  contract_date: string;
+  active: boolean;
+  notes: string | null;
+  metadata?: Record<string, any>;
+  updated_at: string;
+};
+
+export async function getEnergyContracts(): Promise<EnergyContract[]> {
+  try {
+    const rows = await q<EnergyContract>(
+      `select id, service, provider, tariff_name, access_toll,
+              energy_price_kwh::float as energy_price_kwh,
+              power_p1_kw::float as power_p1_kw,
+              power_p2_kw::float as power_p2_kw,
+              fixed_monthly_price::float as fixed_monthly_price,
+              contract_date::text, active, notes, metadata, updated_at::text
+       from energy_contracts
+       where active = true
+       order by service asc`,
+    );
+    if (rows && rows.length > 0) return rows;
+  } catch (err) {
+    console.warn("[repo] getEnergyContracts error, returning defaults:", err);
+  }
+
+  // Fallback por defecto adaptado a Naturgy Tarifa Por Uso
+  return [
+    {
+      id: 1,
+      service: "electricity",
+      provider: "Naturgy",
+      tariff_name: "Tarifa Por Uso Luz",
+      access_toll: "2.0TD",
+      energy_price_kwh: 0.1230,
+      power_p1_kw: 0.1230,
+      power_p2_kw: 0.0615,
+      fixed_monthly_price: null,
+      contract_date: new Date().toISOString().slice(0, 10),
+      active: true,
+      notes: "Precio fijo de energía 24h. Potencia P1 (Punta: 08:00-00:00) y P2 (Valle: 00:00-08:00 y fines de semana). Carga de VE recomendada en P2.",
+      metadata: {
+        ev_recommended_hours: "00:00 - 07:30",
+        appliances_avoid_hours: ["13:30-15:00", "20:30-22:30"],
+        battery_kwh_standard: 50,
+      },
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: 2,
+      service: "gas",
+      provider: "Naturgy",
+      tariff_name: "Tarifa Por Uso Gas",
+      access_toll: "RL.2",
+      energy_price_kwh: 0.0899,
+      power_p1_kw: null,
+      power_p2_kw: null,
+      fixed_monthly_price: 9.55,
+      contract_date: new Date().toISOString().slice(0, 10),
+      active: true,
+      notes: "Tarifa fija 24h para calefacción de gas y ACS. Optimización por inercia térmica en Salamanca: 20°C día y 17.5°C noche.",
+      metadata: {
+        comfort_temp: 20.0,
+        eco_temp: 17.5,
+        ventilation_hours: "13:00 - 15:00",
+      },
+      updated_at: new Date().toISOString(),
+    },
+  ];
+}
+
+export async function upsertEnergyContract(data: {
+  service: "electricity" | "gas";
+  provider?: string;
+  tariff_name: string;
+  access_toll?: string | null;
+  energy_price_kwh: number;
+  power_p1_kw?: number | null;
+  power_p2_kw?: number | null;
+  fixed_monthly_price?: number | null;
+  notes?: string | null;
+  metadata?: Record<string, any>;
+}): Promise<number> {
+  // Desactivar contrato previo del mismo servicio
+  await q("update energy_contracts set active = false where service = $1", [data.service]);
+
+  const [row] = await q<{ id: number }>(
+    `insert into energy_contracts (
+       service, provider, tariff_name, access_toll, energy_price_kwh,
+       power_p1_kw, power_p2_kw, fixed_monthly_price, notes, metadata, active, updated_at
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, now())
+     returning id`,
+    [
+      data.service,
+      data.provider || "Naturgy",
+      data.tariff_name,
+      data.access_toll || (data.service === "electricity" ? "2.0TD" : "RL.2"),
+      data.energy_price_kwh,
+      data.power_p1_kw ?? null,
+      data.power_p2_kw ?? null,
+      data.fixed_monthly_price ?? null,
+      data.notes ?? null,
+      JSON.stringify(data.metadata || {}),
+    ],
+  );
+  return row?.id ?? 0;
+}
+
+export async function updateEnergyContract(
+  id: number,
+  data: Partial<EnergyContract>,
+) {
+  await q(
+    `update energy_contracts
+     set provider = coalesce($2, provider),
+         tariff_name = coalesce($3, tariff_name),
+         access_toll = coalesce($4, access_toll),
+         energy_price_kwh = coalesce($5, energy_price_kwh),
+         power_p1_kw = coalesce($6, power_p1_kw),
+         power_p2_kw = coalesce($7, power_p2_kw),
+         fixed_monthly_price = coalesce($8, fixed_monthly_price),
+         notes = coalesce($9, notes),
+         updated_at = now()
+     where id = $1`,
+    [
+      id,
+      data.provider ?? null,
+      data.tariff_name ?? null,
+      data.access_toll ?? null,
+      data.energy_price_kwh ?? null,
+      data.power_p1_kw ?? null,
+      data.power_p2_kw ?? null,
+      data.fixed_monthly_price ?? null,
+      data.notes ?? null,
+    ],
+  );
+}
