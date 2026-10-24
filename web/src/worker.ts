@@ -122,8 +122,10 @@ async function pollTelegram() {
 
             const text = msg.text || "";
             if (text) {
+              console.log(`[worker] [Telegram] Mensaje de ${msg.from?.first_name || fromId} (${fromId}): "${text}"`);
               const reply = await handleBotMessage(text, fromId);
               await tgSend(msg.chat.id, reply);
+              console.log(`[worker] [Telegram] Respuesta enviada con éxito.`);
             }
           }
         }
