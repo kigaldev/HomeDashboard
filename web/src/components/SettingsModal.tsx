@@ -1,7 +1,14 @@
 "use client";
 
 import { useRef, useEffect, useState, useTransition } from "react";
-import { updateMemberAction } from "@/app/actions";
+import {
+  updateMemberAction,
+  updateSettingAction,
+  getGcalUrlsAction,
+  verifyGoogleCalendarAction,
+  verifyTelegramIntegrationAction,
+  syncGoogleCalendarAction,
+} from "@/app/actions";
 import type { Member } from "@/lib/repo";
 
 export function SettingsModal({
@@ -23,6 +30,25 @@ export function SettingsModal({
   const [allergies, setAllergies] = useState(selectedMember?.allergies || "");
   const [isPending, startTransition] = useTransition();
 
+  // Calendarios de Google (iCal)
+  const [gcalKike, setGcalKike] = useState("");
+  const [gcalLara, setGcalLara] = useState("");
+  const [gcalKikeChecking, setGcalKikeChecking] = useState(false);
+  const [gcalLaraChecking, setGcalLaraChecking] = useState(false);
+  const [gcalKikeResult, setGcalKikeResult] = useState<{ ok: boolean; message: string; count?: number } | null>(null);
+  const [gcalLaraResult, setGcalLaraResult] = useState<{ ok: boolean; message: string; count?: number } | null>(null);
+
+  // Verificación Telegram
+  const [telegramChecking, setTelegramChecking] = useState(false);
+  const [telegramResult, setTelegramResult] = useState<{
+    ok: boolean;
+    status?: string;
+    botUsername?: string;
+    botName?: string;
+    message: string;
+  } | null>(null);
+
+  // Sincronizar datos al cambiar de miembro seleccionado
   useEffect(() => {
     if (selectedMember) {
       setName(selectedMember.name);
@@ -31,8 +57,21 @@ export function SettingsModal({
       setBirthdate(selectedMember.birthdate || "");
       setTelegramUserId(selectedMember.telegram_user_id || "");
       setAllergies(selectedMember.allergies || "");
+      setTelegramResult(null);
     }
   }, [selectedMember]);
+
+  // Cargar URLs de Google Calendar cuando se abre el modal
+  useEffect(() => {
+    if (isOpen) {
+      getGcalUrlsAction()
+        .then(({ urlKike, urlLara }) => {
+          setGcalKike(urlKike || "");
+          setGcalLara(urlLara || "");
+        })
+        .catch(console.error);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -81,6 +120,59 @@ export function SettingsModal({
       await updateMemberAction(fd);
       onClose();
     });
+  };
+
+  const handleVerifyTelegram = async () => {
+    setTelegramChecking(true);
+    try {
+      const res = await verifyTelegramIntegrationAction(telegramUserId);
+      setTelegramResult(res);
+    } catch (err: unknown) {
+      setTelegramResult({
+        ok: false,
+        message: `Error inesperado: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    } finally {
+      setTelegramChecking(false);
+    }
+  };
+
+  const handleVerifyGcal = async (member: "kike" | "lara") => {
+    if (member === "kike") {
+      setGcalKikeChecking(true);
+      try {
+        const res = await verifyGoogleCalendarAction("kike", gcalKike);
+        setGcalKikeResult(res);
+      } catch (err: unknown) {
+        setGcalKikeResult({
+          ok: false,
+          message: `Error al conectar: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      } finally {
+        setGcalKikeChecking(false);
+      }
+    } else {
+      setGcalLaraChecking(true);
+      try {
+        const res = await verifyGoogleCalendarAction("lara", gcalLara);
+        setGcalLaraResult(res);
+      } catch (err: unknown) {
+        setGcalLaraResult({
+          ok: false,
+          message: `Error al conectar: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      } finally {
+        setGcalLaraChecking(false);
+      }
+    }
+  };
+
+  const handleSaveAllCalendars = async () => {
+    if (gcalKike) await updateSettingAction("gcal_url_kike", gcalKike);
+    if (gcalLara) await updateSettingAction("gcal_url_lara", gcalLara);
+    await syncGoogleCalendarAction();
+    await handleVerifyGcal("kike");
+    if (gcalLara) await handleVerifyGcal("lara");
   };
 
   return (
@@ -207,18 +299,91 @@ export function SettingsModal({
           />
         </div>
 
+        {/* Sección Telegram con verificación */}
         <div>
-          <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--apple-text-secondary)" }}>
-            ID de usuario de Telegram (para autorizar comandos por bot)
-          </label>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+            <label style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--apple-text-secondary)" }}>
+              ID de usuario de Telegram
+            </label>
+            <button
+              type="button"
+              onClick={handleVerifyTelegram}
+              disabled={telegramChecking}
+              className="btn-ghost"
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.2rem 0.55rem",
+                color: "var(--apple-blue)",
+                fontWeight: 600,
+                borderRadius: "var(--radius-sm)",
+                background: "rgba(0, 113, 227, 0.08)",
+              }}
+            >
+              {telegramChecking ? "⏳ Comprobando..." : "🔍 Verificar Bot & Acceso"}
+            </button>
+          </div>
           <input
             type="text"
-            placeholder="Ej. 123456789"
+            placeholder="Ej. 6684237859"
             value={telegramUserId}
             onChange={(e) => setTelegramUserId(e.target.value)}
             className="input-field"
-            style={{ marginTop: "0.25rem" }}
           />
+
+          {telegramResult && (
+            <div
+              style={{
+                marginTop: "0.5rem",
+                padding: "0.6rem 0.75rem",
+                borderRadius: "var(--radius-md)",
+                fontSize: "0.75rem",
+                lineHeight: 1.45,
+                background:
+                  telegramResult.status === "active"
+                    ? "rgba(48, 209, 88, 0.12)"
+                    : telegramResult.status === "pending_start"
+                    ? "rgba(255, 159, 10, 0.12)"
+                    : "rgba(255, 69, 58, 0.12)",
+                border: `1px solid ${
+                  telegramResult.status === "active"
+                    ? "rgba(48, 209, 88, 0.3)"
+                    : telegramResult.status === "pending_start"
+                    ? "rgba(255, 159, 10, 0.3)"
+                    : "rgba(255, 69, 58, 0.3)"
+                }`,
+                color: "var(--apple-text)",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "0.5rem",
+              }}
+            >
+              <span style={{ fontSize: "0.95rem" }}>
+                {telegramResult.status === "active" ? "✅" : telegramResult.status === "pending_start" ? "⚡" : "❌"}
+              </span>
+              <div style={{ flex: 1 }}>
+                <div>{telegramResult.message}</div>
+                {telegramResult.botUsername && (
+                  <div style={{ marginTop: "0.35rem" }}>
+                    <a
+                      href={`https://t.me/${telegramResult.botUsername}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: "var(--apple-blue)",
+                        fontWeight: 600,
+                        textDecoration: "underline",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                      }}
+                    >
+                      Abrir @{telegramResult.botUsername} en Telegram ↗
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
@@ -240,7 +405,7 @@ export function SettingsModal({
             Cancelar
           </button>
           <button type="submit" disabled={isPending} className="btn-primary" style={{ padding: "0.55rem 1.25rem" }}>
-            Guardar cambios
+            Guardar cambios del perfil
           </button>
         </div>
       </form>
@@ -255,40 +420,125 @@ export function SettingsModal({
           border: "1px solid var(--apple-border)",
         }}
       >
-        <h3 style={{ fontSize: "0.88rem", fontWeight: 700, marginBottom: "0.35rem", display: "flex", alignItems: "center", gap: "0.45rem" }}>
-          <span>📅</span> <span>Google Calendar (Kike & Lara)</span>
-        </h3>
-        <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginBottom: "0.75rem", lineHeight: 1.45 }}>
-          En Google Calendar: <em>Configuración</em> → <em>Integrar</em> → Copia la <strong>Dirección secreta en formato iCal</strong> y pégala aquí:
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+          <h3 style={{ fontSize: "0.88rem", fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: "0.45rem" }}>
+            <span>📅</span> <span>Google Calendar (Kike & Lara)</span>
+          </h3>
+        </div>
+        <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginBottom: "0.85rem", lineHeight: 1.45 }}>
+          En Google Calendar: <em>Configuración</em> → <em>Integrar</em> → Copia la <strong>Dirección secreta en formato iCal</strong> (.ics) y pégala aquí:
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          <input
-            type="url"
-            placeholder="URL iCal secreta Google Calendar (Kike)..."
-            id="gcal-kike"
-            className="input-field"
-            style={{ fontSize: "0.82rem" }}
-          />
-          <input
-            type="url"
-            placeholder="URL iCal secreta Google Calendar (Lara)..."
-            id="gcal-lara"
-            className="input-field"
-            style={{ fontSize: "0.82rem" }}
-          />
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          {/* Calendario Kike */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+              <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--apple-text)" }}>
+                👨 Calendario de Kike
+              </label>
+              <button
+                type="button"
+                onClick={() => handleVerifyGcal("kike")}
+                disabled={gcalKikeChecking}
+                className="btn-ghost"
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.15rem 0.5rem",
+                  color: "var(--apple-blue)",
+                  fontWeight: 600,
+                  borderRadius: "var(--radius-sm)",
+                  background: "rgba(0, 113, 227, 0.08)",
+                }}
+              >
+                {gcalKikeChecking ? "⏳ Verificando..." : "🔍 Verificar Feed iCal"}
+              </button>
+            </div>
+            <input
+              type="url"
+              placeholder="URL iCal secreta Google Calendar (Kike)..."
+              value={gcalKike}
+              onChange={(e) => setGcalKike(e.target.value)}
+              className="input-field"
+              style={{ fontSize: "0.82rem" }}
+            />
+            {gcalKikeResult && (
+              <div
+                style={{
+                  marginTop: "0.35rem",
+                  padding: "0.45rem 0.65rem",
+                  borderRadius: "var(--radius-md)",
+                  fontSize: "0.74rem",
+                  background: gcalKikeResult.ok ? "rgba(48, 209, 88, 0.12)" : "rgba(255, 69, 58, 0.12)",
+                  border: `1px solid ${gcalKikeResult.ok ? "rgba(48, 209, 88, 0.3)" : "rgba(255, 69, 58, 0.3)"}`,
+                  color: "var(--apple-text)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+              >
+                <span>{gcalKikeResult.ok ? "✅" : "❌"}</span>
+                <span>{gcalKikeResult.message}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Calendario Lara */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+              <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--apple-text)" }}>
+                👩 Calendario de Lara
+              </label>
+              <button
+                type="button"
+                onClick={() => handleVerifyGcal("lara")}
+                disabled={gcalLaraChecking}
+                className="btn-ghost"
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.15rem 0.5rem",
+                  color: "var(--apple-blue)",
+                  fontWeight: 600,
+                  borderRadius: "var(--radius-sm)",
+                  background: "rgba(0, 113, 227, 0.08)",
+                }}
+              >
+                {gcalLaraChecking ? "⏳ Verificando..." : "🔍 Verificar Feed iCal"}
+              </button>
+            </div>
+            <input
+              type="url"
+              placeholder="URL iCal secreta Google Calendar (Lara)..."
+              value={gcalLara}
+              onChange={(e) => setGcalLara(e.target.value)}
+              className="input-field"
+              style={{ fontSize: "0.82rem" }}
+            />
+            {gcalLaraResult && (
+              <div
+                style={{
+                  marginTop: "0.35rem",
+                  padding: "0.45rem 0.65rem",
+                  borderRadius: "var(--radius-md)",
+                  fontSize: "0.74rem",
+                  background: gcalLaraResult.ok ? "rgba(48, 209, 88, 0.12)" : "rgba(255, 69, 58, 0.12)",
+                  border: `1px solid ${gcalLaraResult.ok ? "rgba(48, 209, 88, 0.3)" : "rgba(255, 69, 58, 0.3)"}`,
+                  color: "var(--apple-text)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+              >
+                <span>{gcalLaraResult.ok ? "✅" : "❌"}</span>
+                <span>{gcalLaraResult.message}</span>
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
-            onClick={async () => {
-              const kike = (document.getElementById("gcal-kike") as HTMLInputElement)?.value;
-              const lara = (document.getElementById("gcal-lara") as HTMLInputElement)?.value;
-              const { updateSettingAction, syncGoogleCalendarAction } = await import("@/app/actions");
-              if (kike) await updateSettingAction("gcal_url_kike", kike);
-              if (lara) await updateSettingAction("gcal_url_lara", lara);
-              await syncGoogleCalendarAction();
-              alert("Calendarios guardados y sincronizados.");
-            }}
+            onClick={handleSaveAllCalendars}
             className="btn-secondary"
-            style={{ alignSelf: "flex-start", fontSize: "0.8rem", padding: "0.45rem 0.95rem" }}
+            style={{ alignSelf: "flex-start", fontSize: "0.8rem", padding: "0.5rem 1rem", marginTop: "0.25rem" }}
           >
             Guardar y Sincronizar Calendarios
           </button>

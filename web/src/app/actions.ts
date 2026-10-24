@@ -24,6 +24,8 @@ import {
   completeHealth,
   chooseDinner,
   updateMember,
+  getMembers,
+  getSetting,
   setSetting,
   createStaple,
   deleteStaple,
@@ -250,6 +252,106 @@ export async function syncGoogleCalendarAction() {
   const result = await syncGoogleCalendars();
   revalidatePath("/");
   return result;
+}
+
+export async function getGcalUrlsAction() {
+  const urlKike = await getSetting("gcal_url_kike");
+  const urlLara = await getSetting("gcal_url_lara");
+  return { urlKike: urlKike || "", urlLara: urlLara || "" };
+}
+
+export async function verifyGoogleCalendarAction(member: "kike" | "lara", testUrl?: string) {
+  try {
+    const key = member === "kike" ? "gcal_url_kike" : "gcal_url_lara";
+    const url = testUrl?.trim() || (await getSetting(key));
+
+    if (!url) {
+      return { ok: false, message: `No hay URL de Google Calendar especificada para ${member === "kike" ? "Kike" : "Lara"}.` };
+    }
+
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) {
+      return { ok: false, message: `Error HTTP ${res.status}: no se pudo leer el feed. Revisa que sea la 'Dirección secreta en formato iCal'.` };
+    }
+
+    const text = await res.text();
+    if (!text.includes("BEGIN:VCALENDAR")) {
+      return { ok: false, message: "El enlace no contiene un calendario iCal válido (falta BEGIN:VCALENDAR)." };
+    }
+
+    const eventMatches = text.match(/BEGIN:VEVENT/gi);
+    const count = eventMatches ? eventMatches.length : 0;
+
+    // Sincronizar en base de datos si la URL ya está guardada o se pasó una válida
+    if (testUrl) {
+      await setSetting(key, testUrl.trim());
+    }
+    await syncGoogleCalendars();
+    revalidatePath("/");
+
+    return {
+      ok: true,
+      count,
+      message: `Calendario verificado con éxito (${count} eventos cargados y sincronizados).`,
+    };
+  } catch (err: unknown) {
+    return { ok: false, message: `Error al verificar iCal: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+export async function verifyTelegramIntegrationAction(targetUserId?: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    return { ok: false, status: "no_token", message: "TELEGRAM_BOT_TOKEN no configurado en el servidor (.env.local)." };
+  }
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`, { signal: AbortSignal.timeout(6000) });
+    const data = await res.json();
+    if (!data.ok) {
+      return { ok: false, status: "invalid_token", message: "Token de Telegram no reconocido por la API de Telegram." };
+    }
+    const members = await getMembers();
+    const kike = members.find((m) => m.name.toLowerCase() === "kike");
+    const lara = members.find((m) => m.name.toLowerCase() === "lara");
+    const userIdToCheck = targetUserId?.trim() || kike?.telegram_user_id;
+
+    if (!userIdToCheck) {
+      return {
+        ok: true,
+        status: "bot_only",
+        botUsername: data.result.username,
+        botName: data.result.first_name,
+        message: `Bot @${data.result.username} (${data.result.first_name}) activo. Introduce tu Telegram User ID para vincularte.`,
+      };
+    }
+
+    // Comprobar si el usuario ya inició conversación con el bot (/start)
+    const chatRes = await fetch(`https://api.telegram.org/bot${token}/getChat?chat_id=${userIdToCheck}`, { signal: AbortSignal.timeout(6000) });
+    const chatData = await chatRes.json();
+
+    if (chatData.ok) {
+      return {
+        ok: true,
+        status: "active",
+        botUsername: data.result.username,
+        botName: data.result.first_name,
+        userId: userIdToCheck,
+        chatTitle: chatData.result.first_name || chatData.result.username || "Usuario",
+        message: `✅ Bot @${data.result.username} activo y vinculado al ID ${userIdToCheck} (${chatData.result.first_name || "Kike"}). Listo para recibir órdenes y notificaciones.`,
+      };
+    } else {
+      return {
+        ok: true,
+        status: "pending_start",
+        botUsername: data.result.username,
+        botName: data.result.first_name,
+        userId: userIdToCheck,
+        message: `Bot @${data.result.username} validado con ID ${userIdToCheck}. Falta abrir @${data.result.username} en Telegram y pulsar 'INICIAR' (/start) para activar los mensajes directos.`,
+      };
+    }
+  } catch (err: unknown) {
+    return { ok: false, status: "error", message: `Error al conectar con la API de Telegram: ${err instanceof Error ? err.message : String(err)}` };
+  }
 }
 
 export async function runAgentInstructionAction(instruction: string, history: any[] = []): Promise<AgentActionResult> {
