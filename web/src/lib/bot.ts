@@ -85,6 +85,6 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
       `\nTu ID de Telegram es <code>${escapeHtml(telegramUserId ?? "?")}</code> (ponlo en Ajustes).`,
     ].join("\n");
 
-  // ── Cualquier otra cosa: pregunta al segundo cerebro
+  // ── Cualquier otra cosa: consulta al Asistente Inteligente
   return escapeHtml(await askAssistant(t));
 }

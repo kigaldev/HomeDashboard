@@ -9,11 +9,20 @@ import { PantryModule } from "./PantryModule";
 import { TasksModule } from "./TasksModule";
 import { KidsModule } from "./KidsModule";
 import { CalendarModule } from "./CalendarModule";
-import { ReceiptsModule } from "./ReceiptsModule";
+import { EconomyModule } from "./EconomyModule";
 import { AiAssistantModal } from "./AiAssistantModal";
 import { SettingsModal } from "./SettingsModal";
 import { ProfileLoginModal } from "./ProfileLoginModal";
-import { EnergyModule } from "./EnergyModule";
+import {
+  IconHome,
+  IconCart,
+  IconEconomy,
+  IconFamily,
+  IconCalendar,
+  IconSparkles,
+  IconClock,
+  IconEnergy,
+} from "./Icons";
 import type {
   Member,
   ShoppingItem,
@@ -30,21 +39,18 @@ import type {
   PriceComparison,
   HabitInsight,
   EnergyContract,
+  FamilyInsurance,
+  Warranty,
 } from "@/lib/repo";
 import type { Weather, DayWeather } from "@/lib/weather";
 
-const CARDS: Array<{
-  id: "resumen" | "compra" | "energia" | "tickets" | "familia" | "agenda";
-  label: string;
-  icon: string;
-}> = [
-  { id: "resumen", label: "Hoy", icon: "🏠" },
-  { id: "compra", label: "Compra", icon: "🛒" },
-  { id: "energia", label: "Energía", icon: "⚡" },
-  { id: "tickets", label: "Gastos", icon: "🧾" },
-  { id: "familia", label: "Familia", icon: "🧒" },
-  { id: "agenda", label: "Agenda", icon: "📅" },
-];
+const CARDS = [
+  { id: "resumen", label: "Hoy", icon: (s = 16) => <IconHome size={s} /> },
+  { id: "compra", label: "Compra", icon: (s = 16) => <IconCart size={s} /> },
+  { id: "economia", label: "Economía", icon: (s = 16) => <IconEconomy size={s} /> },
+  { id: "familia", label: "Familia", icon: (s = 16) => <IconFamily size={s} /> },
+  { id: "agenda", label: "Agenda", icon: (s = 16) => <IconCalendar size={s} /> },
+] as const;
 
 export function DashboardClient({
   members = [],
@@ -77,6 +83,8 @@ export function DashboardClient({
   priceComparisons = [],
   habits = [],
   energyContracts = [],
+  insurances = [],
+  warranties = [],
 }: {
   members: Member[];
   currentMemberId?: number | null;
@@ -108,6 +116,8 @@ export function DashboardClient({
   priceComparisons: PriceComparison[];
   habits: HabitInsight[];
   energyContracts: EnergyContract[];
+  insurances: FamilyInsurance[];
+  warranties: Warranty[];
 }) {
   const activeMember = members.find((m) => m.id === currentMemberId);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -167,7 +177,12 @@ export function DashboardClient({
     const pref = activeMember?.preferred_tab;
     if (pref) {
       const target = CARDS.findIndex(
-        (c) => c.id === pref || (pref === "peques" && c.id === "familia") || (pref === "tareas" && c.id === "familia")
+        (c) =>
+          c.id === pref ||
+          (pref === "energia" && c.id === "economia") ||
+          (pref === "tickets" && c.id === "economia") ||
+          (pref === "peques" && c.id === "familia") ||
+          (pref === "tareas" && c.id === "familia")
       );
       if (target > 0) {
         goToCard(target);
@@ -202,9 +217,9 @@ export function DashboardClient({
               onClick={() => goToCard(idx)}
               className={`deck-nav-btn ${activeCardIndex === idx ? "active" : ""}`}
             >
-              <span>{card.icon}</span>
+              <span style={{ display: "inline-flex", alignItems: "center" }}>{card.icon(15)}</span>
               <span>{card.label}</span>
-              {card.id === "tickets" && urgentPerishablesCount > 0 && (
+              {card.id === "economia" && urgentPerishablesCount > 0 && (
                 <span
                   style={{
                     marginLeft: "0.2rem",
@@ -262,13 +277,13 @@ export function DashboardClient({
           <div className="deck-card">
             {urgentPerishablesCount > 0 && (
               <div
-                onClick={() => goToCard(3)}
+                onClick={() => goToCard(2)}
                 style={{
                   cursor: "pointer",
                   padding: "0.85rem 1.25rem",
                   borderRadius: "var(--radius-lg)",
                   background: "var(--apple-surface-secondary)",
-                  borderLeft: "5px solid var(--apple-orange)",
+                  borderLeft: "4px solid var(--apple-orange)",
                   boxShadow: "var(--shadow-sm)",
                   display: "flex",
                   justifyContent: "space-between",
@@ -277,19 +292,19 @@ export function DashboardClient({
                   gap: "0.75rem",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.875rem" }}>
-                  <span style={{ fontSize: "1.2rem" }}>⏳</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
+                  <IconClock size={16} className="text-orange" />
                   <div>
                     <p style={{ fontWeight: 600, color: "var(--apple-text)", margin: 0 }}>
                       Atención en despensa · {urgentPerishablesCount} alimentos perecederos
                     </p>
-                    <p style={{ fontSize: "0.8rem", color: "var(--apple-text-secondary)", margin: 0 }}>
+                    <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
                       Consumir pronto: {perishables.slice(0, 3).map((p) => p.name).join(", ")}
                     </p>
                   </div>
                 </div>
-                <span className="badge badge-amber" style={{ fontSize: "0.78rem" }}>
-                  Ver en Gastos →
+                <span className="badge badge-amber" style={{ fontSize: "0.76rem" }}>
+                  Ver en Economía →
                 </span>
               </div>
             )}
@@ -299,12 +314,12 @@ export function DashboardClient({
               todayWeather={todayWeather}
             />
 
-            {/* Widget Rápido: Semáforo Energético Naturgy */}
+            {/* Widget Rápido: Economía & Suministros Naturgy */}
             <div
               onClick={() => goToCard(2)}
               style={{
                 cursor: "pointer",
-                padding: "0.85rem 1.15rem",
+                padding: "0.95rem 1.25rem",
                 borderRadius: "var(--radius-lg)",
                 background: "var(--apple-surface-secondary)",
                 borderLeft: "4px solid var(--apple-green)",
@@ -317,18 +332,31 @@ export function DashboardClient({
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
-                <span style={{ fontSize: "1.25rem" }}>⚡</span>
+                <div
+                  style={{
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "50%",
+                    background: "rgba(52, 199, 89, 0.15)",
+                    color: "var(--apple-green)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <IconEnergy size={15} />
+                </div>
                 <div>
                   <p style={{ fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
-                    Naturgy Tarifas Por Uso · Recomendaciones Activas
+                    Economía Familiar & Suministros Naturgy
                   </p>
                   <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: "0.15rem 0 0 0" }}>
-                    🚗 Coche (00:00–07:30) · 🧺 Lavadora (Despejado) · ♨️ Calefacción (20°C diurna)
+                    Luz fija 24h a 0.123 €/kWh · Carga recomendada de VE en Valle P2 (00:00–07:30)
                   </p>
                 </div>
               </div>
               <span className="badge badge-blue" style={{ fontSize: "0.76rem" }}>
-                Ver Tarjeta Energía →
+                Ver Módulo Economía →
               </span>
             </div>
 
@@ -355,30 +383,24 @@ export function DashboardClient({
           </div>
         </div>
 
-        {/* 🃏 Tarjeta 3: Energía Naturgy */}
+        {/* 🃏 Tarjeta 3: Economía & Patrimonio Familiar (Unificada) */}
         <div className="deck-slide">
           <div className="deck-card">
-            <EnergyModule
-              contracts={energyContracts}
-              todayWeather={todayWeather}
-            />
-          </div>
-        </div>
-
-        {/* 🃏 Tarjeta 4: Gastos & Tickets */}
-        <div className="deck-slide">
-          <div className="deck-card">
-            <ReceiptsModule
+            <EconomyModule
               receipts={receipts}
               perishables={perishables}
               monthlyExpenses={monthlyExpenses}
               priceComparisons={priceComparisons}
               habits={habits}
+              energyContracts={energyContracts}
+              todayWeather={todayWeather}
+              insurances={insurances}
+              warranties={warranties}
             />
           </div>
         </div>
 
-        {/* 🃏 Tarjeta 5: Familia (Peques & Tareas) */}
+        {/* 🃏 Tarjeta 4: Familia & Hogar (Peques & Tareas) */}
         <div className="deck-slide">
           <div className="deck-card">
             <KidsModule
@@ -398,7 +420,7 @@ export function DashboardClient({
           </div>
         </div>
 
-        {/* 🃏 Tarjeta 6: Agenda */}
+        {/* 🃏 Tarjeta 5: Agenda & Cronograma */}
         <div className="deck-slide">
           <div className="deck-card">
             <CalendarModule
@@ -410,16 +432,16 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* ── Botón Flotante Apple Intelligence (Segundo Cerebro por Voz / Chat) ── */}
+      {/* ── Botón Flotante Apple Intelligence (Asistente por Voz / Chat) ── */}
       <button
         type="button"
         onClick={() => setIsAssistantOpen(true)}
         className="fab-apple-ai"
-        title="Hablar o escribir al Segundo Cerebro"
-        aria-label="Segundo Cerebro con Inteligencia Artificial"
+        title="Hablar o escribir al Asistente"
+        aria-label="Asistente con Inteligencia Artificial"
       >
-        <span style={{ fontSize: "1.2rem" }}>✨</span>
-        <span>Segundo Cerebro</span>
+        <IconSparkles size={16} />
+        <span>Asistente</span>
       </button>
 
       {/* Modales */}

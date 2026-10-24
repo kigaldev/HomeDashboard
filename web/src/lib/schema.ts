@@ -171,6 +171,32 @@ create table if not exists energy_contracts (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists family_insurances (
+  id serial primary key,
+  title text not null,
+  category text not null check (category in ('hogar', 'coche', 'salud', 'vida', 'decesos', 'otro')),
+  provider text not null,
+  policy_number text,
+  annual_cost numeric(8,2) not null,
+  payment_frequency text default 'anual',
+  renewal_date date not null,
+  active boolean not null default true,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists warranties (
+  id serial primary key,
+  item_name text not null,
+  store_name text,
+  purchase_date date not null,
+  warranty_years int not null default 3,
+  price numeric(8,2),
+  status text not null default 'vigente',
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 -- Migraciones seguras para columnas y tiendas actualizadas
 alter table school_menu add column if not exists dinner_recommendation text;
 alter table receipts add column if not exists company_name text;
@@ -234,5 +260,17 @@ insert into energy_contracts (service, provider, tariff_name, access_toll, energ
   ('gas', 'Naturgy', 'Tarifa Por Uso Gas', 'RL.2', 0.0899, null, null, 9.55,
    'Tarifa fija 24h para calefacción de gas y ACS (peaje RL.2). Optimización térmica adaptada a Salamanca: 20°C día y 17.5°C noche. Ventilación óptima de 13:00 a 15:00.',
    '{"comfort_temp": 20.0, "eco_temp": 17.5, "ventilation_hours": "13:00 - 15:00", "boiler_kw_avg": 9.0}'::jsonb)
+on conflict do nothing;
+
+insert into family_insurances (title, category, provider, policy_number, annual_cost, payment_frequency, renewal_date, notes) values
+  ('Seguro Multirriesgo Hogar', 'hogar', 'Mapfre', 'MAP-HG-884920', 285.00, 'anual', '2027-06-15', 'Continente 180.000€, contenido 45.000€. Asistencia 24h y daños por agua.'),
+  ('Póliza Automóvil Todo Riesgo', 'coche', 'Línea Directa', 'LD-AUTO-4921', 440.00, 'anual', '2026-11-20', 'Franquicia 150€. Vehículo de sustitución y lunas sin penalización.'),
+  ('Cuadro Médico Familiar', 'salud', 'Sanitas', 'SAN-FAM-9912', 1320.00, 'mensual (110€/mes)', '2027-01-01', 'Sin copagos. Incluye cobertura dental y pediatría integral para Fabio y Bruno.')
+on conflict do nothing;
+
+insert into warranties (item_name, store_name, purchase_date, warranty_years, price, notes) values
+  ('Lavadora Serie 6 EcoSilence', 'El Corte Inglés', '2024-03-10', 3, 629.00, 'Motor garantizado 10 años por Bosch. Ticket archivado.'),
+  ('Frigorífico Combi No Frost', 'MediaMarkt', '2024-05-18', 3, 799.00, 'Garantía oficial hasta mayo 2027.'),
+  ('Silla de Paseo Infantil Doble', 'Bebés Victoria', '2025-06-02', 3, 480.00, 'Garantía de chasis y textiles hasta junio 2028.')
 on conflict do nothing;
 `;

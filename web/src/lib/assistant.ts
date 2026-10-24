@@ -238,7 +238,7 @@ export async function runAgentInstruction(
   const menuText = menu.map((m) => `${m.date}: ${m.lunch} (Cena sugerida *: ${m.dinner_recommendation || "general"})`).join("\n") || "sin datos";
 
   const systemPrompt =
-    "Eres el Asistente Inteligente y Segundo Cerebro del hogar de Kike, Lara, Fabio (nacido en sept 2023) y Bruno (nacido en mayo 2025) en Salamanca. " +
+    "Eres el Asistente Inteligente del hogar de Kike, Lara, Fabio (nacido en sept 2023) y Bruno (nacido en mayo 2025) en Salamanca. " +
     "Puedes tanto responder dudas como ejecutar acciones en el dashboard. " +
     "Si el usuario pide realizar una acción que no haya sido ejecutada, puedes responder con un bloque JSON al inicio con formato:\n" +
     '{"action": "add_shopping"|"update_pantry"|"add_task"|"update_energy_tariff", "params": {...}}\n\n' +

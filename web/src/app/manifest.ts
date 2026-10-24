@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Home Dashboard · Segundo Cerebro",
+    name: "Home Dashboard · Asistente",
     short_name: "Hogar",
-    description: "Dashboard familiar y segundo cerebro para nuestro día a día.",
+    description: "Dashboard familiar y asistente inteligente para nuestro día a día.",
     start_url: "/",
     display: "standalone",
     background_color: "#0c0e14",

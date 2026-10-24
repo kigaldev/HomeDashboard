@@ -3,6 +3,7 @@
 import type { Member } from "@/lib/repo";
 import type { Weather } from "@/lib/weather";
 import { weatherLabel, kidsOutfit } from "@/lib/weather";
+import { IconSparkles, IconSettings } from "./Icons";
 
 export function Header({
   members,
@@ -31,13 +32,13 @@ export function Header({
 
   return (
     <header className="top-bar">
-      {/* Fila superior / barra de estado en móvil */}
+      {/* Fila superior / barra de estado */}
       <div className="top-bar-header">
         <div className="top-bar-identity">
           <div className="top-bar-status-pill">
             <span className="status-dot-live" />
-            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--apple-blue)" }}>
-              SEGUNDO CEREBRO
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--apple-blue)" }}>
+              ASISTENTE
             </span>
             <span style={{ fontSize: "0.65rem", color: "var(--apple-text-tertiary)" }}>•</span>
             <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", fontWeight: 500 }}>
@@ -47,7 +48,6 @@ export function Header({
 
           <h1 className="greeting-title">
             <span>{activeMember ? `${greeting}, ${activeMember.name}` : greeting}</span>
-            <span className="greeting-icon">{activeMember ? activeMember.emoji : "🏡"}</span>
           </h1>
           <p className="greeting-subtitle">{formattedDate}</p>
         </div>
@@ -60,14 +60,14 @@ export function Header({
               className="weather-capsule"
               title={`Mín: ${todayWeather.tMin}° / Máx: ${todayWeather.tMax}°. Ropa: ${outfit.join(" · ")}`}
             >
-              <span style={{ fontSize: "1.1rem" }}>{wInfo.icon}</span>
+              <span style={{ fontSize: "1rem" }}>{wInfo.icon}</span>
               <span className="weather-temp">{currentWeather?.temp ?? todayWeather.tMax}°</span>
               <span className="weather-range">
                 {todayWeather.tMin}°/{todayWeather.tMax}°
               </span>
               {todayWeather.rainProb >= 25 && (
                 <span className="weather-rain">
-                  🌧️ {todayWeather.rainProb}%
+                  {todayWeather.rainProb}% lluvia
                 </span>
               )}
             </div>
@@ -81,8 +81,8 @@ export function Header({
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "0.4rem",
-                padding: activeMember ? "0.32rem 0.75rem" : "0.35rem 0.65rem",
+                gap: "0.45rem",
+                padding: activeMember ? "0.35rem 0.85rem" : "0.38rem 0.75rem",
                 borderRadius: "var(--radius-full)",
                 background: activeMember ? `${activeMember.color}1e` : "var(--apple-surface-secondary)",
                 border: `1.5px solid ${activeMember ? activeMember.color : "var(--apple-border)"}`,
@@ -95,7 +95,14 @@ export function Header({
             >
               {activeMember ? (
                 <>
-                  <span style={{ fontSize: "1.05rem", lineHeight: 1 }}>{activeMember.emoji}</span>
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      background: activeMember.color,
+                    }}
+                  />
                   <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--apple-text)" }}>
                     {activeMember.name}
                   </span>
@@ -103,7 +110,6 @@ export function Header({
                 </>
               ) : (
                 <>
-                  <span style={{ fontSize: "0.95rem" }}>👤</span>
                   <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--apple-text-secondary)" }}>
                     Perfil
                   </span>
@@ -112,12 +118,12 @@ export function Header({
             </button>
           )}
 
-          {/* Botón Segundo Cerebro (Desktop & Tablet) */}
+          {/* Botón Asistente (Desktop & Tablet) */}
           <div className="btn-apple-intelligence hide-on-mobile" onClick={onOpenAssistant} role="button" tabIndex={0}>
             <div className="btn-apple-intelligence-inner">
               <span className="ai-status-indicator" />
-              <span>Segundo Cerebro</span>
-              <span style={{ fontSize: "0.9rem" }}>✨</span>
+              <span>Asistente</span>
+              <IconSparkles size={14} />
             </div>
           </div>
 
@@ -125,10 +131,10 @@ export function Header({
           <button
             onClick={onOpenSettings}
             className="btn-settings-header"
-            title="Ajustes del hogar"
-            aria-label="Ajustes del hogar"
+            title="Ajustes del sistema"
+            aria-label="Ajustes del sistema"
           >
-            ⚙️
+            <IconSettings size={17} />
           </button>
         </div>
       </div>

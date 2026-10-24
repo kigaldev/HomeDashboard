@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Home Dashboard · Segundo Cerebro",
-  description: "Dashboard familiar y segundo cerebro para nuestro día a día con niños.",
+  title: "Home Dashboard · Asistente",
+  description: "Dashboard familiar y asistente inteligente para nuestro día a día.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

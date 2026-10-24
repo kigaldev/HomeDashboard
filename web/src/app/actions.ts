@@ -452,3 +452,63 @@ export async function ingestEnergyBillImageAction(base64Image: string, mimeType:
   return result;
 }
 
+// ── Pólizas & Seguros Familiares ─────────────────────────────
+export async function addFamilyInsuranceAction(formData: FormData) {
+  const title = formData.get("title") as string;
+  const category = (formData.get("category") as any) || "hogar";
+  const provider = formData.get("provider") as string;
+  const policyNumber = formData.get("policyNumber") as string;
+  const annualCostStr = formData.get("annualCost") as string;
+  const paymentFrequency = formData.get("paymentFrequency") as string;
+  const renewalDate = formData.get("renewalDate") as string;
+  const notes = formData.get("notes") as string;
+
+  const { addFamilyInsurance } = await import("@/lib/repo");
+  await addFamilyInsurance({
+    title,
+    category,
+    provider,
+    policy_number: policyNumber || null,
+    annual_cost: parseFloat(annualCostStr) || 0,
+    payment_frequency: paymentFrequency || "anual",
+    renewal_date: renewalDate,
+    active: true,
+    notes: notes || null,
+  });
+  revalidatePath("/");
+}
+
+export async function deleteFamilyInsuranceAction(id: number) {
+  const { deleteFamilyInsurance } = await import("@/lib/repo");
+  await deleteFamilyInsurance(id);
+  revalidatePath("/");
+}
+
+// ── Garantías & Documentos de Valor ──────────────────────────
+export async function addWarrantyAction(formData: FormData) {
+  const itemName = formData.get("itemName") as string;
+  const storeName = formData.get("storeName") as string;
+  const purchaseDate = formData.get("purchaseDate") as string;
+  const warrantyYearsStr = formData.get("warrantyYears") as string;
+  const priceStr = formData.get("price") as string;
+  const notes = formData.get("notes") as string;
+
+  const { addWarranty } = await import("@/lib/repo");
+  await addWarranty({
+    item_name: itemName,
+    store_name: storeName || null,
+    purchase_date: purchaseDate,
+    warranty_years: parseInt(warrantyYearsStr, 10) || 3,
+    price: priceStr ? parseFloat(priceStr) : null,
+    status: "vigente",
+    notes: notes || null,
+  });
+  revalidatePath("/");
+}
+
+export async function deleteWarrantyAction(id: number) {
+  const { deleteWarranty } = await import("@/lib/repo");
+  await deleteWarranty(id);
+  revalidatePath("/");
+}
+

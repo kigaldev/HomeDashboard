@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import { runAgentInstructionAction } from "@/app/actions";
+import { IconSparkles } from "./Icons";
 
 export function AiAssistantModal({
   isOpen,
@@ -190,19 +191,18 @@ export function AiAssistantModal({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "1.2rem",
               boxShadow: "0 4px 12px rgba(175, 82, 222, 0.35)",
             }}
           >
-            ✨
+            <IconSparkles size={18} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
               <h2 id="assistant-title" style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
-                Segundo Cerebro
+                Asistente Inteligente
               </h2>
               <span className="badge badge-purple" style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem" }}>
-                Siri / Agente Activo
+                Agente Activo
               </span>
             </div>
             <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>

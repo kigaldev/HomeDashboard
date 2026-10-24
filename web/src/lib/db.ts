@@ -9,7 +9,7 @@ import { SCHEMA_SQL, SEED_SQL } from "./schema";
  * - Si no hay DATABASE_URL en local: usa PGlite embebido en ./.data/pglite.
  * - Si está en Vercel sin DATABASE_URL: usa PGlite en memoria para evitar errores de sistema de ficheros.
  */
-type Row = Record<string, unknown>;
+type Row = any;
 interface Db {
   query<T extends Row = Row>(sql: string, params?: unknown[]): Promise<T[]>;
   exec(sql: string): Promise<void>;

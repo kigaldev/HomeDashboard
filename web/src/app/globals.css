@@ -675,7 +675,7 @@ input, select, textarea, .input-field {
   background: light-dark(rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.08));
 }
 
-/* Botón Apple Intelligence (Segundo Cerebro) */
+/* Botón Apple Intelligence (Asistente) */
 .btn-apple-intelligence {
   position: relative;
   background: linear-gradient(135deg, #FF2D55 0%, #AF52DE 35%, #0071E3 70%, #34C759 100%);
@@ -921,7 +921,7 @@ dialog::backdrop {
     box-shadow: 0 2px 4px rgba(255, 149, 0, 0.4);
   }
 
-  /* Botón central Apple Intelligence (Siri / Segundo Cerebro) */
+  /* Botón central Apple Intelligence (Asistente) */
   .mobile-tab-center-ai {
     position: relative;
     width: 48px;

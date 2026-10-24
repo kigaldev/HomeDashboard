@@ -936,3 +936,89 @@ export async function updateEnergyContract(
     ],
   );
 }
+
+// ── Pólizas & Seguros Familiares ─────────────────────────────
+export interface FamilyInsurance {
+  id: number;
+  title: string;
+  category: "hogar" | "coche" | "salud" | "vida" | "decesos" | "otro";
+  provider: string;
+  policy_number: string | null;
+  annual_cost: number;
+  payment_frequency: string;
+  renewal_date: string;
+  active: boolean;
+  notes: string | null;
+  created_at?: string;
+}
+
+export async function getFamilyInsurances(): Promise<FamilyInsurance[]> {
+  return await q<FamilyInsurance>(
+    `select id, title, category, provider, policy_number, annual_cost::float, payment_frequency, renewal_date::text, active, notes
+     from family_insurances order by renewal_date asc`
+  );
+}
+
+export async function addFamilyInsurance(data: Omit<FamilyInsurance, "id" | "created_at">): Promise<number> {
+  const [row] = await q<{ id: number }>(
+    `insert into family_insurances (title, category, provider, policy_number, annual_cost, payment_frequency, renewal_date, active, notes)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
+    [
+      data.title,
+      data.category,
+      data.provider,
+      data.policy_number || null,
+      data.annual_cost,
+      data.payment_frequency || "anual",
+      data.renewal_date,
+      data.active ?? true,
+      data.notes || null,
+    ]
+  );
+  return row?.id ?? 0;
+}
+
+export async function deleteFamilyInsurance(id: number): Promise<void> {
+  await q("delete from family_insurances where id = $1", [id]);
+}
+
+// ── Garantías & Documentos de Valor ──────────────────────────
+export interface Warranty {
+  id: number;
+  item_name: string;
+  store_name: string | null;
+  purchase_date: string;
+  warranty_years: number;
+  price: number | null;
+  status: string;
+  notes: string | null;
+  created_at?: string;
+}
+
+export async function getWarranties(): Promise<Warranty[]> {
+  return await q<Warranty>(
+    `select id, item_name, store_name, purchase_date::text, warranty_years, price::float, status, notes
+     from warranties order by purchase_date desc`
+  );
+}
+
+export async function addWarranty(data: Omit<Warranty, "id" | "created_at">): Promise<number> {
+  const [row] = await q<{ id: number }>(
+    `insert into warranties (item_name, store_name, purchase_date, warranty_years, price, status, notes)
+     values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+    [
+      data.item_name,
+      data.store_name || null,
+      data.purchase_date,
+      data.warranty_years || 3,
+      data.price ?? null,
+      data.status || "vigente",
+      data.notes || null,
+    ]
+  );
+  return row?.id ?? 0;
+}
+
+export async function deleteWarranty(id: number): Promise<void> {
+  await q("delete from warranties where id = $1", [id]);
+}

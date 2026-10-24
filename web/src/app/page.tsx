@@ -17,6 +17,8 @@ import {
   getPriceComparisons,
   getShoppingHabits,
   getEnergyContracts,
+  getFamilyInsurances,
+  getWarranties,
 } from "@/lib/repo";
 import { getWeather } from "@/lib/weather";
 import { ensureDinnerPlans } from "@/lib/dinners";
@@ -56,6 +58,8 @@ export default async function HomePage() {
     priceComparisons,
     habits,
     energyContracts,
+    insurances,
+    warranties,
   ] = await Promise.all([
     getMembers(),
     getWeather(),
@@ -69,13 +73,15 @@ export default async function HomePage() {
     getOpenTasks(),
     getSchoolRun(today),
     getHealthUpcoming(30),
-    getEventsBetween(today, addDays(today, 8)),
+    getEventsBetween(today, addDays(today, 60)),
     getReceipts(15),
     getExpiringPerishables(7),
     getMonthlyExpenses(),
     getPriceComparisons(),
     getShoppingHabits(),
     getEnergyContracts(),
+    getFamilyInsurances(),
+    getWarranties(),
   ]);
 
   const todayWeather = weather?.days.find((d) => d.date === today) ?? null;
@@ -109,6 +115,8 @@ export default async function HomePage() {
       priceComparisons={priceComparisons}
       habits={habits}
       energyContracts={energyContracts}
+      insurances={insurances}
+      warranties={warranties}
     />
   );
 }
