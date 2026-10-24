@@ -338,6 +338,174 @@ input, select, textarea, .input-field {
   }
 }
 
+/* ── Apple Card Deck Carousel & Swipe Navigation ────────────── */
+.deck-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--apple-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 0.35rem 0 0.55rem 0;
+  margin-bottom: 1rem;
+}
+
+.deck-top-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px;
+  background: light-dark(rgba(118, 118, 128, 0.12), rgba(118, 118, 128, 0.24));
+  border-radius: var(--radius-full);
+  width: 100%;
+  box-sizing: border-box;
+}
+.deck-top-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.deck-nav-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--apple-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.22s var(--ease-spring);
+  user-select: none;
+}
+
+.deck-nav-btn:hover {
+  color: var(--apple-text);
+}
+
+.deck-nav-btn.active {
+  background: var(--apple-surface-elevated);
+  color: var(--apple-text);
+  font-weight: 600;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.deck-dots-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0.45rem;
+}
+
+.deck-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--apple-border-strong);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-spring);
+}
+
+.deck-dot.active {
+  width: 20px;
+  border-radius: 4px;
+  background: var(--apple-blue);
+}
+
+/* El viewport horizontal que contiene las 6 tarjetas y permite Swipe */
+.deck-viewport {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  display: flex;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  box-sizing: border-box;
+  padding-bottom: 2rem;
+  overscroll-behavior-x: contain;
+}
+.deck-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.deck-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  box-sizing: border-box;
+  padding: 0 0.15rem;
+}
+
+.deck-card {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--apple-surface);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid var(--apple-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  padding: 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: calc(100vh - 220px);
+}
+
+@media (max-width: 640px) {
+  .deck-card {
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    min-height: calc(100vh - 190px);
+  }
+}
+
+/* Botón flotante Apple Intelligence para voz/chat */
+.fab-apple-ai {
+  position: fixed;
+  bottom: calc(1.25rem + var(--safe-bottom));
+  right: 1.25rem;
+  z-index: 95;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 1.15rem;
+  border-radius: var(--radius-full);
+  background: light-dark(rgba(255, 255, 255, 0.92), rgba(30, 30, 32, 0.92));
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--apple-border);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15), 0 0 20px rgba(0, 113, 227, 0.25);
+  color: var(--apple-text);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.2s var(--ease-spring), box-shadow 0.2s ease;
+}
+
+.fab-apple-ai:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2), 0 0 28px rgba(0, 113, 227, 0.35);
+}
+
+.fab-apple-ai:active {
+  transform: scale(0.96);
+}
+
 /* ── Segmented Control (iOS Tabs - Desktop / Tablet) ─────────── */
 .tab-nav {
   display: flex;
@@ -355,13 +523,6 @@ input, select, textarea, .input-field {
   -webkit-backdrop-filter: blur(16px);
 }
 .tab-nav::-webkit-scrollbar { display: none; }
-
-/* En móvil, ocultar la barra horizontal superior porque ya existe la barra inferior nativa iOS sin scroll */
-@media (max-width: 768px) {
-  .tab-nav {
-    display: none !important;
-  }
-}
 
 /* Sub-navegador Segmentado Móvil (100% ancho, 0 scroll lateral) */
 .family-subnav-segmented {

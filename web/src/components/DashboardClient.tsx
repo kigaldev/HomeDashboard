@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Header } from "./Header";
 import { BriefingCard } from "./BriefingCard";
 import { DinnerCard } from "./DinnerCard";
@@ -32,6 +32,19 @@ import type {
   EnergyContract,
 } from "@/lib/repo";
 import type { Weather, DayWeather } from "@/lib/weather";
+
+const CARDS: Array<{
+  id: "resumen" | "compra" | "energia" | "tickets" | "familia" | "agenda";
+  label: string;
+  icon: string;
+}> = [
+  { id: "resumen", label: "Hoy", icon: "🏠" },
+  { id: "compra", label: "Compra", icon: "🛒" },
+  { id: "energia", label: "Energía", icon: "⚡" },
+  { id: "tickets", label: "Gastos", icon: "🧾" },
+  { id: "familia", label: "Familia", icon: "🧒" },
+  { id: "agenda", label: "Agenda", icon: "📅" },
+];
 
 export function DashboardClient({
   members = [],
@@ -97,9 +110,12 @@ export function DashboardClient({
   energyContracts: EnergyContract[];
 }) {
   const activeMember = members.find((m) => m.id === currentMemberId);
-  const [activeTab, setActiveTab] = useState<"resumen" | "compra" | "tickets" | "tareas" | "peques" | "agenda" | "energia">(
-    (activeMember?.preferred_tab as any) || "resumen"
-  );
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const deckRef = useRef<HTMLDivElement>(null);
+  const tabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const isProgrammaticScroll = useRef(false);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -107,9 +123,61 @@ export function DashboardClient({
   const urgentPerishablesCount = (perishables || []).filter((p) => p.days_left <= 3).length;
   const pendingTasksCount = (tasks || []).filter((t) => !t.done).length;
 
+  // Desplazamiento suave hacia la tarjeta seleccionada
+  const goToCard = (index: number) => {
+    if (index < 0 || index >= CARDS.length) return;
+    setActiveCardIndex(index);
+    isProgrammaticScroll.current = true;
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+
+    if (deckRef.current) {
+      const cardWidth = deckRef.current.clientWidth;
+      deckRef.current.scrollTo({
+        left: index * cardWidth,
+        behavior: "smooth",
+      });
+    }
+
+    scrollTimeout.current = setTimeout(() => {
+      isProgrammaticScroll.current = false;
+    }, 450);
+  };
+
+  // Detector de gesto Swipe táctil horizontal
+  const handleDeckScroll = () => {
+    if (isProgrammaticScroll.current || !deckRef.current) return;
+    const { scrollLeft, clientWidth } = deckRef.current;
+    if (clientWidth <= 0) return;
+    const newIndex = Math.round(scrollLeft / clientWidth);
+    if (newIndex >= 0 && newIndex < CARDS.length && newIndex !== activeCardIndex) {
+      setActiveCardIndex(newIndex);
+    }
+  };
+
+  // Auto-centrado de la pestaña activa en la barra superior
+  useEffect(() => {
+    const btn = tabBtnRefs.current[activeCardIndex];
+    if (btn) {
+      btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [activeCardIndex]);
+
+  // Selección inicial según pestaña favorita de perfil
+  useEffect(() => {
+    const pref = activeMember?.preferred_tab;
+    if (pref) {
+      const target = CARDS.findIndex(
+        (c) => c.id === pref || (pref === "peques" && c.id === "familia") || (pref === "tareas" && c.id === "familia")
+      );
+      if (target > 0) {
+        goToCard(target);
+      }
+    }
+  }, []);
+
   return (
     <div className="container">
-      {/* Header estilo Apple Status Island */}
+      {/* Header compacto con estatus e identidad familiar */}
       <Header
         members={members}
         currentMemberId={currentMemberId}
@@ -121,283 +189,124 @@ export function DashboardClient({
         onOpenProfile={() => setIsProfileOpen(true)}
       />
 
-      {/* Banner de alerta estilo Apple Notification Card */}
-      {urgentPerishablesCount > 0 && activeTab !== "tickets" && (
-        <div
-          onClick={() => setActiveTab("tickets")}
-          style={{
-            cursor: "pointer",
-            padding: "0.85rem 1.25rem",
-            marginBottom: "1.25rem",
-            borderRadius: "var(--radius-lg)",
-            background: "var(--apple-surface)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
-            border: "1px solid var(--apple-border)",
-            borderLeft: "5px solid var(--apple-orange)",
-            boxShadow: "var(--shadow-sm)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "0.75rem",
-            transition: "all 0.2s var(--ease-spring)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.875rem" }}>
-            <div
-              style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "10px",
-                background: "var(--apple-orange-subtle)",
-                color: "var(--apple-orange)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "1.1rem",
-                flexShrink: 0,
+      {/* ── Menú Superior Sticky Fácil de Acceder (Apple Pill Bar) ── */}
+      <div className="deck-sticky-header">
+        <nav className="deck-top-nav" aria-label="Tarjetas principales">
+          {CARDS.map((card, idx) => (
+            <button
+              key={card.id}
+              ref={(el) => {
+                tabBtnRefs.current[idx] = el;
               }}
+              type="button"
+              onClick={() => goToCard(idx)}
+              className={`deck-nav-btn ${activeCardIndex === idx ? "active" : ""}`}
             >
-              ⏳
-            </div>
-            <div>
-              <p style={{ fontWeight: 600, color: "var(--apple-text)", margin: 0, letterSpacing: "-0.01em" }}>
-                Atención en despensa · {urgentPerishablesCount} {urgentPerishablesCount === 1 ? "alimento perecedero" : "alimentos perecederos"}
-              </p>
-              <p style={{ fontSize: "0.8rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.15rem" }}>
-                Consumir en los próximos 3 días: {perishables.slice(0, 3).map((p) => p.name).join(", ")}
-                {urgentPerishablesCount > 3 ? "..." : ""}
-              </p>
-            </div>
-          </div>
-          <span
-            className="badge badge-amber"
-            style={{
-              padding: "0.4rem 0.85rem",
-              fontSize: "0.8rem",
-              fontWeight: 600,
-              boxShadow: "0 2px 6px rgba(255, 149, 0, 0.2)",
-            }}
-          >
-            Ver Radar de Caducidades →
-          </span>
+              <span>{card.icon}</span>
+              <span>{card.label}</span>
+              {card.id === "tickets" && urgentPerishablesCount > 0 && (
+                <span
+                  style={{
+                    marginLeft: "0.2rem",
+                    padding: "0.1rem 0.4rem",
+                    borderRadius: "var(--radius-full)",
+                    background: "var(--apple-orange)",
+                    color: "#ffffff",
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                  }}
+                >
+                  {urgentPerishablesCount}
+                </span>
+              )}
+              {card.id === "familia" && pendingTasksCount > 0 && (
+                <span
+                  style={{
+                    marginLeft: "0.2rem",
+                    padding: "0.1rem 0.4rem",
+                    borderRadius: "var(--radius-full)",
+                    background: "var(--apple-surface-tertiary)",
+                    color: "var(--apple-text-secondary)",
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                  }}
+                >
+                  {pendingTasksCount}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* Indicador de puntos de paginación sutiles */}
+        <div className="deck-dots-bar" aria-hidden="true">
+          {CARDS.map((card, idx) => (
+            <span
+              key={card.id}
+              onClick={() => goToCard(idx)}
+              className={`deck-dot ${activeCardIndex === idx ? "active" : ""}`}
+              title={`Ir a ${card.label}`}
+            />
+          ))}
         </div>
-      )}
+      </div>
 
-      {/* Segmented Control iOS Tabs (Visible en desktop y como selector horizontal suave en mobile) */}
-      <nav className="tab-nav" aria-label="Secciones del dashboard">
-        <button
-          onClick={() => setActiveTab("resumen")}
-          className={`tab-btn ${activeTab === "resumen" ? "active" : ""}`}
-        >
-          <span>✨</span>
-          <span>Resumen</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("compra")}
-          className={`tab-btn ${activeTab === "compra" ? "active" : ""}`}
-        >
-          <span>🛒</span>
-          <span>Compra & Despensa</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("tickets")}
-          className={`tab-btn ${activeTab === "tickets" ? "active" : ""}`}
-          style={{ position: "relative" }}
-        >
-          <span>🧾</span>
-          <span>Tickets & Gastos</span>
-          {urgentPerishablesCount > 0 && (
-            <span
-              style={{
-                marginLeft: "0.25rem",
-                padding: "0.12rem 0.45rem",
-                borderRadius: "var(--radius-full)",
-                background: "var(--apple-orange)",
-                color: "#ffffff",
-                fontSize: "0.7rem",
-                fontWeight: 700,
-              }}
-            >
-              {urgentPerishablesCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("tareas")}
-          className={`tab-btn ${activeTab === "tareas" ? "active" : ""}`}
-        >
-          <span>✅</span>
-          <span>Tareas</span>
-          {pendingTasksCount > 0 && (
-            <span
-              style={{
-                marginLeft: "0.25rem",
-                padding: "0.12rem 0.45rem",
-                borderRadius: "var(--radius-full)",
-                background: "var(--apple-surface-tertiary)",
-                color: "var(--apple-text-secondary)",
-                fontSize: "0.7rem",
-                fontWeight: 700,
-              }}
-            >
-              {pendingTasksCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("peques")}
-          className={`tab-btn ${activeTab === "peques" ? "active" : ""}`}
-        >
-          <span>🧒</span>
-          <span>Peques & Cole</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("agenda")}
-          className={`tab-btn ${activeTab === "agenda" ? "active" : ""}`}
-        >
-          <span>📅</span>
-          <span>Agenda</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("energia")}
-          className={`tab-btn ${activeTab === "energia" ? "active" : ""}`}
-        >
-          <span>⚡</span>
-          <span>Energía Naturgy</span>
-        </button>
-      </nav>
-
-      {/* Barra de Navegación Inferior Nativa iOS para Smartphone (UITabBar con Thumb Zone) */}
-      <nav className="mobile-bottom-bar" aria-label="Navegación móvil inferior">
-        <button
-          type="button"
-          onClick={() => setActiveTab("resumen")}
-          className={`mobile-tab-item ${activeTab === "resumen" ? "active" : ""}`}
-        >
-          <span className="mobile-tab-icon">🏠</span>
-          <span className="mobile-tab-label">Hoy</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("compra")}
-          className={`mobile-tab-item ${activeTab === "compra" ? "active" : ""}`}
-        >
-          <span className="mobile-tab-icon">🛒</span>
-          <span className="mobile-tab-label">Compra</span>
-        </button>
-
-        {/* Botón Central Apple Intelligence (Segundo Cerebro por Voz / Chat) */}
-        <button
-          type="button"
-          onClick={() => setIsAssistantOpen(true)}
-          className="mobile-tab-center-ai"
-          title="Hablar o escribir al Segundo Cerebro"
-          aria-label="Segundo Cerebro con Inteligencia Artificial"
-        >
-          <div className="mobile-tab-center-glow" />
-          <div className="mobile-tab-center-inner">
-            <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>✨</span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("tickets")}
-          className={`mobile-tab-item ${activeTab === "tickets" ? "active" : ""}`}
-          style={{ position: "relative" }}
-        >
-          <span className="mobile-tab-icon">🧾</span>
-          <span className="mobile-tab-label">Tickets</span>
-          {urgentPerishablesCount > 0 && (
-            <span className="mobile-tab-badge">
-              {urgentPerishablesCount}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("peques")}
-          className={`mobile-tab-item ${activeTab === "peques" || activeTab === "agenda" || activeTab === "tareas" || activeTab === "energia" ? "active" : ""}`}
-        >
-          <span className="mobile-tab-icon">🧒</span>
-          <span className="mobile-tab-label">Familia</span>
-        </button>
-      </nav>
-
-      {/* Bento Grid Principal */}
-      <main className="dashboard-grid">
-        {/* Columna Principal Izquierda */}
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem", minWidth: 0, width: "100%" }}>
-          {/* Sub-navegador Segmentado Móvil para Familia (Cole / Agenda / Tareas / Energía) */}
-          {(activeTab === "peques" || activeTab === "agenda" || activeTab === "tareas" || activeTab === "energia") && (
-            <div className="family-subnav-segmented" role="tablist">
-              <button
-                type="button"
-                onClick={() => setActiveTab("peques")}
-                className={`family-subnav-btn ${activeTab === "peques" ? "active" : ""}`}
-                role="tab"
-                aria-selected={activeTab === "peques"}
+      {/* ── Viewport Horizontal de Tarjetas Maestras (Desplazamiento por Swipe o Tap) ── */}
+      <div
+        ref={deckRef}
+        onScroll={handleDeckScroll}
+        className="deck-viewport"
+      >
+        {/* 🃏 Tarjeta 1: Hoy (Centro de Mando) */}
+        <div className="deck-slide">
+          <div className="deck-card">
+            {urgentPerishablesCount > 0 && (
+              <div
+                onClick={() => goToCard(3)}
+                style={{
+                  cursor: "pointer",
+                  padding: "0.85rem 1.25rem",
+                  borderRadius: "var(--radius-lg)",
+                  background: "var(--apple-surface-secondary)",
+                  borderLeft: "5px solid var(--apple-orange)",
+                  boxShadow: "var(--shadow-sm)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "0.75rem",
+                }}
               >
-                <span>🚸</span>
-                <span>Cole</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("agenda")}
-                className={`family-subnav-btn ${activeTab === "agenda" ? "active" : ""}`}
-                role="tab"
-                aria-selected={activeTab === "agenda"}
-              >
-                <span>📅</span>
-                <span>Agenda</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("tareas")}
-                className={`family-subnav-btn ${activeTab === "tareas" ? "active" : ""}`}
-                role="tab"
-                aria-selected={activeTab === "tareas"}
-              >
-                <span>✅</span>
-                <span>Tareas</span>
-                {pendingTasksCount > 0 && (
-                  <span style={{ fontSize: "0.72rem", opacity: 0.85, fontWeight: 700 }}>({pendingTasksCount})</span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("energia")}
-                className={`family-subnav-btn ${activeTab === "energia" ? "active" : ""}`}
-                role="tab"
-                aria-selected={activeTab === "energia"}
-              >
-                <span>⚡</span>
-                <span>Energía</span>
-              </button>
-            </div>
-          )}
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.875rem" }}>
+                  <span style={{ fontSize: "1.2rem" }}>⏳</span>
+                  <div>
+                    <p style={{ fontWeight: 600, color: "var(--apple-text)", margin: 0 }}>
+                      Atención en despensa · {urgentPerishablesCount} alimentos perecederos
+                    </p>
+                    <p style={{ fontSize: "0.8rem", color: "var(--apple-text-secondary)", margin: 0 }}>
+                      Consumir pronto: {perishables.slice(0, 3).map((p) => p.name).join(", ")}
+                    </p>
+                  </div>
+                </div>
+                <span className="badge badge-amber" style={{ fontSize: "0.78rem" }}>
+                  Ver en Gastos →
+                </span>
+              </div>
+            )}
 
-          {activeTab === "resumen" && (
             <BriefingCard
               initialContent={latestBriefing}
               todayWeather={todayWeather}
             />
-          )}
 
-          {/* Widget Rápido Apple: Semáforo Energético Naturgy */}
-          {activeTab === "resumen" && (
+            {/* Widget Rápido: Semáforo Energético Naturgy */}
             <div
-              onClick={() => setActiveTab("energia")}
+              onClick={() => goToCard(2)}
               style={{
                 cursor: "pointer",
                 padding: "0.85rem 1.15rem",
                 borderRadius: "var(--radius-lg)",
-                background: "var(--apple-surface)",
-                border: "1px solid var(--apple-border)",
+                background: "var(--apple-surface-secondary)",
                 borderLeft: "4px solid var(--apple-green)",
                 boxShadow: "var(--shadow-sm)",
                 display: "flex",
@@ -405,27 +314,12 @@ export function DashboardClient({
                 alignItems: "center",
                 flexWrap: "wrap",
                 gap: "0.75rem",
-                transition: "all 0.2s var(--ease-spring)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
-                <div
-                  style={{
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "10px",
-                    background: "rgba(52, 199, 89, 0.15)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "1.1rem",
-                    flexShrink: 0,
-                  }}
-                >
-                  ⚡
-                </div>
+                <span style={{ fontSize: "1.25rem" }}>⚡</span>
                 <div>
-                  <p style={{ fontWeight: 700, margin: 0, color: "var(--apple-text)", letterSpacing: "-0.01em" }}>
+                  <p style={{ fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
                     Naturgy Tarifas Por Uso · Recomendaciones Activas
                   </p>
                   <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: "0.15rem 0 0 0" }}>
@@ -433,35 +327,23 @@ export function DashboardClient({
                   </p>
                 </div>
               </div>
-              <span
-                className="badge badge-blue"
-                style={{ fontSize: "0.76rem", padding: "0.35rem 0.75rem", fontWeight: 600 }}
-              >
-                Abrir Gestor →
+              <span className="badge badge-blue" style={{ fontSize: "0.76rem" }}>
+                Ver Tarjeta Energía →
               </span>
             </div>
-          )}
 
-          {activeTab === "resumen" && (
             <DinnerCard
               date={today}
               initialPlans={dinners}
               schoolLunch={schoolLunch}
               schoolDinnerRec={schoolDinnerRec}
             />
-          )}
+          </div>
+        </div>
 
-          {activeTab === "tickets" && (
-            <ReceiptsModule
-              receipts={receipts}
-              perishables={perishables}
-              monthlyExpenses={monthlyExpenses}
-              priceComparisons={priceComparisons}
-              habits={habits}
-            />
-          )}
-
-          {(activeTab === "compra" || activeTab === "resumen") && (
+        {/* 🃏 Tarjeta 2: Compra & Despensa */}
+        <div className="deck-slide">
+          <div className="deck-card">
             <ShoppingModule
               items={shoppingItems}
               stores={stores}
@@ -469,21 +351,36 @@ export function DashboardClient({
               members={members}
               currentMemberId={currentMemberId}
             />
-          )}
-
-          {activeTab === "compra" && (
             <PantryModule items={pantry} />
-          )}
+          </div>
+        </div>
 
-          {activeTab === "tareas" && (
-            <TasksModule
-              tasks={tasks}
-              members={members}
-              currentMemberId={currentMemberId}
+        {/* 🃏 Tarjeta 3: Energía Naturgy */}
+        <div className="deck-slide">
+          <div className="deck-card">
+            <EnergyModule
+              contracts={energyContracts}
+              todayWeather={todayWeather}
             />
-          )}
+          </div>
+        </div>
 
-          {activeTab === "peques" && (
+        {/* 🃏 Tarjeta 4: Gastos & Tickets */}
+        <div className="deck-slide">
+          <div className="deck-card">
+            <ReceiptsModule
+              receipts={receipts}
+              perishables={perishables}
+              monthlyExpenses={monthlyExpenses}
+              priceComparisons={priceComparisons}
+              habits={habits}
+            />
+          </div>
+        </div>
+
+        {/* 🃏 Tarjeta 5: Familia (Peques & Tareas) */}
+        <div className="deck-slide">
+          <div className="deck-card">
             <KidsModule
               members={members}
               today={today}
@@ -493,90 +390,37 @@ export function DashboardClient({
               healthUpcoming={healthUpcoming}
               currentMemberId={currentMemberId}
             />
-          )}
+            <TasksModule
+              tasks={tasks}
+              members={members}
+              currentMemberId={currentMemberId}
+            />
+          </div>
+        </div>
 
-          {activeTab === "agenda" && (
+        {/* 🃏 Tarjeta 6: Agenda */}
+        <div className="deck-slide">
+          <div className="deck-card">
             <CalendarModule
               events={events}
               members={members}
               today={today}
             />
-          )}
+          </div>
+        </div>
+      </div>
 
-          {activeTab === "energia" && (
-            <EnergyModule
-              contracts={energyContracts}
-              todayWeather={todayWeather}
-            />
-          )}
-        </section>
-
-        {/* Columna Secundaria Derecha (Widgets Bento en desktop) */}
-        <aside
-          className={activeTab !== "resumen" ? "hide-on-mobile" : ""}
-          style={{ display: "flex", flexDirection: "column", gap: "1.25rem", minWidth: 0, width: "100%" }}
-        >
-          {activeTab === "resumen" && (
-            <>
-              <EnergyModule
-                contracts={energyContracts}
-                todayWeather={todayWeather}
-              />
-              <KidsModule
-                members={members}
-                today={today}
-                schoolRun={schoolRun}
-                schoolLunch={schoolLunch}
-                schoolDinnerRec={schoolDinnerRec}
-                healthUpcoming={healthUpcoming}
-                currentMemberId={currentMemberId}
-              />
-              <CalendarModule
-                events={events}
-                members={members}
-                today={today}
-              />
-              <TasksModule
-                tasks={tasks}
-                members={members}
-                currentMemberId={currentMemberId}
-              />
-            </>
-          )}
-
-          {activeTab === "compra" && (
-            <DinnerCard
-              date={today}
-              initialPlans={dinners}
-              schoolLunch={schoolLunch}
-              schoolDinnerRec={schoolDinnerRec}
-            />
-          )}
-
-          {activeTab === "tickets" && (
-            <>
-              <PantryModule items={pantry} />
-              <ShoppingModule
-                items={shoppingItems}
-                stores={stores}
-                staples={staples}
-                members={members}
-                currentMemberId={currentMemberId}
-              />
-            </>
-          )}
-
-          {(activeTab === "tareas" || activeTab === "agenda" || activeTab === "peques" || activeTab === "energia") && (
-            <ShoppingModule
-              items={shoppingItems}
-              stores={stores}
-              staples={staples}
-              members={members}
-              currentMemberId={currentMemberId}
-            />
-          )}
-        </aside>
-      </main>
+      {/* ── Botón Flotante Apple Intelligence (Segundo Cerebro por Voz / Chat) ── */}
+      <button
+        type="button"
+        onClick={() => setIsAssistantOpen(true)}
+        className="fab-apple-ai"
+        title="Hablar o escribir al Segundo Cerebro"
+        aria-label="Segundo Cerebro con Inteligencia Artificial"
+      >
+        <span style={{ fontSize: "1.2rem" }}>✨</span>
+        <span>Segundo Cerebro</span>
+      </button>
 
       {/* Modales */}
       <AiAssistantModal
