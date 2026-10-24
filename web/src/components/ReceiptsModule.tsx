@@ -14,6 +14,7 @@ import type {
   PriceComparison,
   HabitInsight,
 } from "@/lib/repo";
+import type { ReceiptReconciliationResult } from "@/lib/receiptShared";
 
 export function ReceiptsModule({
   receipts = [],
@@ -43,6 +44,7 @@ export function ReceiptsModule({
   const [showScanner, setShowScanner] = useState(false);
   const [showAllPerishables, setShowAllPerishables] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
+  const [reconciliation, setReconciliation] = useState<ReceiptReconciliationResult | null>(null);
 
   const displayedPerishables = showAllPerishables ? perishables : perishables.slice(0, 4);
 
@@ -51,8 +53,12 @@ export function ReceiptsModule({
     startTransition(async () => {
       try {
         const parsed = await processReceiptAction(text);
+        if (parsed.reconciliation) {
+          setReconciliation(parsed.reconciliation);
+        }
         setScanFeedback(
-          `✅ Ticket de ${parsed.storeName} (${parsed.totalAmount.toFixed(2)} €) procesado con éxito. Se han añadido ${parsed.items.length} productos y actualizado la despensa.`,
+          parsed.reconciliation?.summaryMessage ||
+            `✅ Ticket de ${parsed.storeName} (${parsed.totalAmount.toFixed(2)} €) procesado con éxito. Se han añadido ${parsed.items.length} productos y actualizado la despensa.`
         );
         setRawInput("");
         setShowScanner(false);
@@ -103,8 +109,14 @@ TOTAL 16.50 €`;
       startTransition(async () => {
         try {
           const res = await processReceiptImageAction(base64, file.type || "image/jpeg");
+          if (res.reconciliation) {
+            setReconciliation(res.reconciliation);
+          }
           if (res.items && res.items.length > 0) {
-            setScanFeedback(`✅ ¡Ticket procesado con éxito! ${res.storeName} · ${res.items.length} productos registrados (${res.totalAmount} €).`);
+            setScanFeedback(
+              res.reconciliation?.summaryMessage ||
+                `✅ ¡Ticket procesado con éxito! ${res.storeName} · ${res.items.length} productos registrados (${res.totalAmount} €).`
+            );
             setShowScanner(false);
           } else {
             setScanFeedback("ℹ️ Foto enviada. Si no se aprecian bien los textos, puedes pegar el texto del ticket.");
@@ -293,7 +305,57 @@ TOTAL 16.50 €`;
           </div>
         </div>
 
-        {scanFeedback && (
+        {/* Banner de Reconciliación Inteligente */}
+        {reconciliation && (
+          <div
+            style={{
+              padding: "1rem",
+              background: "rgba(52, 199, 89, 0.12)",
+              border: "1px solid rgba(52, 199, 89, 0.35)",
+              borderRadius: "var(--radius-lg)",
+              marginBottom: "1rem",
+              boxShadow: "0 4px 16px rgba(52, 199, 89, 0.1)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                <span style={{ fontSize: "1.2rem" }}>🎉</span>
+                <h4 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "var(--apple-green)" }}>
+                  Reconciliación de Compra Completada
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReconciliation(null)}
+                className="btn-ghost"
+                style={{ fontSize: "0.8rem", color: "var(--apple-green)" }}
+              >
+                ✕
+              </button>
+            </div>
+            <p style={{ fontSize: "0.84rem", color: "var(--apple-text)", margin: 0, marginBottom: "0.65rem", lineHeight: 1.4 }}>
+              {reconciliation.summaryMessage}
+            </p>
+            <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+              <span className="badge badge-emerald" style={{ fontSize: "0.74rem" }}>
+                ✓ {reconciliation.matchedCount} tachados de tu lista de la compra
+              </span>
+              <span className="badge" style={{ fontSize: "0.74rem", background: "rgba(255, 255, 255, 0.08)", color: "var(--apple-text-secondary)" }}>
+                📋 {reconciliation.pendingRemainingCount} pendientes para otra compra
+              </span>
+              <span className="badge badge-blue" style={{ fontSize: "0.74rem" }}>
+                🥫 {reconciliation.pantryUpdatedCount} actualizados en despensa
+              </span>
+            </div>
+            {reconciliation.matchedNames.length > 0 && (
+              <div style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)", marginTop: "0.35rem" }}>
+                Comprados: <em>{reconciliation.matchedNames.join(", ")}</em>
+              </div>
+            )}
+          </div>
+        )}
+
+        {scanFeedback && !reconciliation && (
           <div
             style={{
               padding: "0.85rem 1rem",

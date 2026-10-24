@@ -16,8 +16,13 @@ export type Member = {
 };
 export type Store = { id: number; name: string; color: string; sort: number };
 export type ShoppingItem = {
-  id: number; name: string; quantity: string | null; store_id: number | null;
-  added_by: number | null; checked: boolean;
+  id: number;
+  name: string;
+  quantity: string | null;
+  store_id: number | null;
+  added_by: number | null;
+  checked: boolean;
+  in_cart?: boolean;
 };
 export type Staple = { id: number; name: string; emoji: string; store_id: number | null };
 export type PantryItem = { id: number; name: string; status: "ok" | "low" | "out" };
@@ -46,8 +51,10 @@ export const DEFAULT_STORES: Store[] = [
   { id: 1, name: "Mercadona", color: "#00a650", sort: 1 },
   { id: 2, name: "Carrefour", color: "#0055b8", sort: 2 },
   { id: 3, name: "Lidl", color: "#e6a100", sort: 3 },
-  { id: 4, name: "Farmacia", color: "#2bb3a3", sort: 4 },
-  { id: 5, name: "Otros", color: "#64748b", sort: 99 },
+  { id: 4, name: "Aldi", color: "#00205b", sort: 4 },
+  { id: 5, name: "E.Leclerc", color: "#0066b3", sort: 5 },
+  { id: 6, name: "Farmacia", color: "#2bb3a3", sort: 6 },
+  { id: 7, name: "Otros", color: "#64748b", sort: 99 },
 ];
 
 // ── Miembros ──────────────────────────────────────────────
@@ -118,10 +125,27 @@ export async function toggleStapleByName(name: string, emoji: string = "🛒", s
 }
 export const getShopping = () =>
   q<ShoppingItem>(
-    `select id,name,quantity,store_id,added_by,checked from shopping_items
+    `select id, name, quantity, store_id, added_by, checked, coalesce(in_cart, false) as in_cart from shopping_items
      where not checked or checked_at > now() - interval '6 hours'
-     order by checked, created_at desc`,
+     order by checked, in_cart desc, created_at desc`,
   );
+
+export async function toggleInCart(id: number) {
+  await q(
+    "update shopping_items set in_cart = not coalesce(in_cart, false) where id=$1",
+    [id],
+  );
+}
+
+export async function setShoppingItemStore(id: number, storeId: number | null) {
+  await q("update shopping_items set store_id = $1 where id = $2", [storeId, id]);
+}
+
+export async function batchUpdateShoppingStores(assignments: { id: number; storeId: number }[]) {
+  for (const a of assignments) {
+    await q("update shopping_items set store_id = $1 where id = $2", [a.storeId, a.id]);
+  }
+}
 
 export async function findStoreId(text: string): Promise<number | null> {
   const stores = await getStores();
@@ -140,14 +164,14 @@ export async function addShopping(name: string, opts: { storeId?: number | null;
     const st = await q<{ store_id: number | null }>("select store_id from staples where lower(name)=lower($1)", [pretty]);
     storeId = st[0]?.store_id ?? null;
   }
-  await q("insert into shopping_items (name, quantity, store_id, added_by) values ($1,$2,$3,$4)", [
+  await q("insert into shopping_items (name, quantity, store_id, added_by, in_cart) values ($1,$2,$3,$4,false)", [
     pretty, opts.quantity ?? null, storeId, opts.by ?? null,
   ]);
 }
 
 export async function toggleShopping(id: number) {
   await q(
-    "update shopping_items set checked = not checked, checked_at = case when checked then null else now() end where id=$1",
+    "update shopping_items set checked = not checked, in_cart = false, checked_at = case when checked then null else now() end where id=$1",
     [id],
   );
   // Al comprar algo de la despensa, vuelve a estado OK

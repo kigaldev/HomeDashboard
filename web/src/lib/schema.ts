@@ -28,6 +28,7 @@ create table if not exists shopping_items (
   store_id int references stores(id) on delete set null,
   added_by int references members(id) on delete set null,
   checked boolean not null default false,
+  in_cart boolean not null default false,
   created_at timestamptz not null default now(),
   checked_at timestamptz
 );
@@ -175,12 +176,13 @@ alter table school_menu add column if not exists dinner_recommendation text;
 alter table receipts add column if not exists company_name text;
 alter table members add column if not exists pin text;
 alter table members add column if not exists preferred_tab text default 'resumen';
+alter table shopping_items add column if not exists in_cart boolean not null default false;
 delete from stores where name in ('Eroski', 'BM');
 `;
 
 /**
  * Datos iniciales adaptados a la familia de Kike, Lara, Fabio y Bruno.
- * Supermercados: Mercadona, Carrefour, Lidl, Farmacia, Otros.
+ * Supermercados: Mercadona, Carrefour, Lidl, Aldi, E.Leclerc, Farmacia, Otros.
  */
 export const SEED_SQL = /* sql */ `
 insert into members (name, role, birthdate, color, emoji) values
@@ -194,7 +196,9 @@ insert into stores (name, color, sort) values
   ('Mercadona', '#00a650', 1),
   ('Carrefour', '#0055b8', 2),
   ('Lidl', '#e6a100', 3),
-  ('Farmacia', '#2bb3a3', 4),
+  ('Aldi', '#00205b', 4),
+  ('E.Leclerc', '#0066b3', 5),
+  ('Farmacia', '#2bb3a3', 6),
   ('Otros', '#64748b', 99)
 on conflict (name) do update set color=excluded.color, sort=excluded.sort;
 

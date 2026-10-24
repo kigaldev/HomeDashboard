@@ -2,24 +2,9 @@ import "server-only";
 import { llm, geminiVision, parseJson } from "./llm";
 import { addDays, isoDate } from "./dates";
 import { findStoreId, recordReceipt, getStores } from "./repo";
-
-export type ParsedReceiptItem = {
-  name: string;
-  quantity?: string;
-  unitPrice?: number;
-  totalPrice: number;
-  category: string;
-  isPerishable: boolean;
-  expiryDays?: number;
-};
-
-export type ParsedReceipt = {
-  storeName: string;
-  date: string;
-  totalAmount: number;
-  items: ParsedReceiptItem[];
-  notes?: string;
-};
+import { q } from "./db";
+export type { ParsedReceiptItem, ParsedReceipt, ReceiptReconciliationResult } from "./receiptShared";
+import type { ParsedReceiptItem, ParsedReceipt, ReceiptReconciliationResult } from "./receiptShared";
 
 const PERISHABLE_SHELF_LIFE: Record<string, number> = {
   pescado: 2,
@@ -238,14 +223,28 @@ export async function parseReceiptImage(base64Image: string, mimeType: string = 
 }
 
 /**
- * Guarda un ticket procesado en la base de datos, actualizando:
- * - Tabla de tickets y desglose de items
- * - Historial de precios para comparación
- * - Estado de la despensa a 'ok'
- * - Tachado de productos de la lista de la compra si estaban pendientes
- * - Auto-detección y promoción de tiendas si una compañía alcanza 3 o más tickets
+ * Normaliza nombres de productos quitando marcas y acentos para comparación semántica.
  */
-export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: string) {
+function cleanProductName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(hacendado|carrefour|lidl|aldi|leclerc|bio|pack|extra|clasica|entera|desnatada|fresca|1l|6x1l|1kg|500g|kg|g|ud)\b/gi, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Guarda un ticket procesado en la base de datos, realizando:
+ * 1. Registro del ticket y desglose de items
+ * 2. Historial de precios por tienda
+ * 3. Reconciliación semántica con la lista de la compra pendiente (tacha lo comprado)
+ * 4. Actualización del inventario de despensa y nevera a 'ok' con fechas de caducidad
+ * 5. Auto-detección y promoción de tiendas si procede
+ */
+export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: string): Promise<ReceiptReconciliationResult> {
   const stores = await getStores();
   const rawStore = (parsed.storeName || "Otros").trim();
   const storeLower = rawStore.toLowerCase();
@@ -290,5 +289,71 @@ export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: stri
     items,
   });
 
-  return receiptId;
+  // Reconciliación semántica con los productos actualmente pendientes en la lista de la compra
+  const pendingItems = await q<{ id: number; name: string }>(
+    "select id, name from shopping_items where not checked",
+  );
+
+  const matchedIds: number[] = [];
+  const matchedNames: string[] = [];
+
+  const receiptCleanNames = parsed.items.map((it) => ({
+    original: it.name,
+    clean: cleanProductName(it.name),
+  }));
+
+  for (const pending of pendingItems) {
+    const pendingClean = cleanProductName(pending.name);
+    if (!pendingClean) continue;
+
+    // Comprobar coincidencia por inclusión de raíz o palabras clave
+    const isMatched = receiptCleanNames.some((r) => {
+      if (!r.clean) return false;
+      if (r.clean.includes(pendingClean) || pendingClean.includes(r.clean)) return true;
+      // Comprobar palabras compartidas significativas
+      const pWords = pendingClean.split(" ").filter((w) => w.length > 2);
+      const rWords = r.clean.split(" ").filter((w) => w.length > 2);
+      return pWords.some((pw) => rWords.includes(pw));
+    });
+
+    if (isMatched) {
+      matchedIds.push(pending.id);
+      matchedNames.push(pending.name);
+    }
+  }
+
+  // Tachar de la lista de la compra los productos reconciliados
+  if (matchedIds.length > 0) {
+    await q(
+      "update shopping_items set checked = true, in_cart = false, checked_at = now() where id = any($1)",
+      [matchedIds],
+    );
+  }
+
+  // Actualizar la despensa con todos los productos del ticket a estado 'ok'
+  for (const item of parsed.items) {
+    await q(
+      `insert into pantry (name, status, updated_at)
+       values ($1, 'ok', now())
+       on conflict (name) do update set status = 'ok', updated_at = now()`,
+      [item.name],
+    );
+  }
+
+  const remainingItems = pendingItems.filter((p) => !matchedIds.includes(p.id));
+  const remainingNames = remainingItems.map((r) => r.name);
+
+  const summaryMessage = `Ticket de ${companyName} procesado (${parsed.totalAmount.toFixed(2)} €). ${matchedNames.length} productos tachados de la lista. Quedan ${remainingNames.length} pendientes. Despensa actualizada con ${parsed.items.length} artículos.`;
+
+  return {
+    receiptId: receiptId || 0,
+    storeName: companyName,
+    totalAmount: parsed.totalAmount,
+    matchedCount: matchedNames.length,
+    pendingRemainingCount: remainingNames.length,
+    matchedNames,
+    remainingNames,
+    pantryUpdatedCount: parsed.items.length,
+    summaryMessage,
+  };
 }

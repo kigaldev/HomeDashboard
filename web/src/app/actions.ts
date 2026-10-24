@@ -5,6 +5,11 @@ import { cookies } from "next/headers";
 import {
   addShopping,
   toggleShopping,
+  toggleInCart,
+  setShoppingItemStore,
+  batchUpdateShoppingStores,
+  getShopping,
+  getStores,
   deleteShopping,
   clearChecked,
   setPantry,
@@ -35,7 +40,8 @@ import { askAssistant, runAgentInstruction, type AgentActionResult } from "@/lib
 import { generateSaturdayShoppingList } from "@/lib/weeklyShopping";
 import { syncMontessoriMenu } from "@/lib/schoolMenu";
 import { syncGoogleCalendars } from "@/lib/gcal";
-import { parseReceiptText, parseReceiptImage, saveProcessedReceipt, type ParsedReceipt } from "@/lib/receipts";
+import { parseReceiptText, parseReceiptImage, saveProcessedReceipt, type ParsedReceipt, type ReceiptReconciliationResult } from "@/lib/receipts";
+import { optimizeShoppingBasket, type BasketOptimizationResult } from "@/lib/pricesProvider";
 import { markItemConsumed, ensureDemoReceipts, updateEnergyContract, upsertEnergyContract, type EnergyContract } from "@/lib/repo";
 import { parseEnergyBillText, parseEnergyBillImage } from "@/lib/energy";
 
@@ -69,6 +75,27 @@ export async function quickAddStapleAction(name: string, storeId: number | null)
 
 export async function toggleShoppingAction(id: number) {
   await toggleShopping(id);
+  revalidatePath("/");
+}
+
+export async function toggleInCartAction(id: number) {
+  await toggleInCart(id);
+  revalidatePath("/");
+}
+
+export async function setShoppingItemStoreAction(id: number, storeId: number | null) {
+  await setShoppingItemStore(id, storeId);
+  revalidatePath("/");
+}
+
+export async function optimizeShoppingBasketAction(): Promise<BasketOptimizationResult> {
+  const items = await getShopping();
+  const stores = await getStores();
+  return await optimizeShoppingBasket(items, stores);
+}
+
+export async function applyBasketOptimizationAction(assignments: { id: number; storeId: number }[]) {
+  await batchUpdateShoppingStores(assignments);
   revalidatePath("/");
 }
 
@@ -233,18 +260,18 @@ export async function runAgentInstructionAction(instruction: string, history: an
   return result;
 }
 
-export async function processReceiptAction(rawText: string): Promise<ParsedReceipt> {
+export async function processReceiptAction(rawText: string): Promise<ParsedReceipt & { reconciliation: ReceiptReconciliationResult }> {
   const parsed = await parseReceiptText(rawText);
-  await saveProcessedReceipt(parsed, rawText);
+  const reconciliation = await saveProcessedReceipt(parsed, rawText);
   revalidatePath("/");
-  return parsed;
+  return { ...parsed, reconciliation };
 }
 
-export async function processReceiptImageAction(base64Image: string, mimeType: string = "image/jpeg"): Promise<ParsedReceipt> {
+export async function processReceiptImageAction(base64Image: string, mimeType: string = "image/jpeg"): Promise<ParsedReceipt & { reconciliation: ReceiptReconciliationResult }> {
   const parsed = await parseReceiptImage(base64Image, mimeType);
-  await saveProcessedReceipt(parsed, "[Ticket escaneado mediante Gemini Vision]");
+  const reconciliation = await saveProcessedReceipt(parsed, "[Ticket escaneado mediante Gemini Vision]");
   revalidatePath("/");
-  return parsed;
+  return { ...parsed, reconciliation };
 }
 
 export async function markPerishableConsumedAction(id: number) {
