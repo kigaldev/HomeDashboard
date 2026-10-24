@@ -8,8 +8,27 @@ import { addShopping, addTask, findStoreId, getMembers, getOpenTasks, getShoppin
 function splitItems(s: string): string[] {
   return s
     .split(/,|\by\b|\be\b|\n/i)
-    .map((x) => x.trim().replace(/[.!]+$/, ""))
+    .map((x) => x.trim().replace(/^[-*•\d.)\s]+/, "").replace(/[.!]+$/, ""))
     .filter(Boolean);
+}
+
+/** Infiere la tienda más idónea para un producto */
+function inferStoreId(name: string, stores: { id: number; name: string }[]): number | null {
+  const n = name.toLowerCase();
+  if (/jeringa|medicamento|paracetamol|ibuprofeno|gasas|tiritas|suero|termómetro|farmacia|crema|vacuna/i.test(n)) {
+    const s = stores.find((st) => /farmacia/i.test(st.name));
+    if (s) return s.id;
+  }
+  if (/pepinillos|conserva|conservas|lata|latas|bazar|herramienta/i.test(n)) {
+    const s = stores.find((st) => /lidl/i.test(st.name));
+    if (s) return s.id;
+  }
+  if (/fruta|verdura|verduras|piña|fresa|fresas|plátano|platanos|manzana|manzanas|aguacate|ecológico|bio/i.test(n)) {
+    const s = stores.find((st) => /carrefour/i.test(st.name));
+    if (s) return s.id;
+  }
+  const mercadona = stores.find((st) => /mercadona/i.test(st.name));
+  return mercadona ? mercadona.id : stores[0]?.id ?? null;
 }
 
 /**
@@ -19,10 +38,63 @@ function splitItems(s: string): string[] {
 export async function handleBotMessage(text: string, telegramUserId?: string): Promise<string> {
   const members = await getMembers();
   const me = members.find((m) => m.telegram_user_id && m.telegram_user_id === telegramUserId) ?? null;
-  const t = text.trim();
+  // Limpiar menciones de bot (ej. @Kike_pepe_homebot)
+  let t = text.replace(/@\w+bot\b/gi, "").trim();
   const low = t.toLowerCase();
 
-  // ── Compra: "añade leche, huevos y pan [en mercadona]"
+  // ── Compra en Bloque / Lista Multilínea (ej. "Pendientes para la compra:\nGarrafas agua\nLeche...")
+  const isMultiLineList =
+    /^(?:pendientes\s+(?:para\s+)?(?:la\s+)?compra|lista\s+(?:de\s+)?(?:la\s+)?compra|para\s+comprar|a\s+comprar|compra):?\s*$/im.test(
+      t.split("\n")[0] || ""
+    ) ||
+    (/(?:pendientes\s+para\s+la\s+compra|lista\s+de\s+la\s+compra|para\s+la\s+compra)/i.test(low) && t.includes("\n"));
+
+  if (isMultiLineList) {
+    const stores = await getStores();
+    const rawLines = t.split("\n");
+    // Filtrar cabeceras
+    const itemLines = rawLines
+      .map((l) => l.trim())
+      .filter((l) => l && !/^(?:pendientes|lista|para\s+comprar|compra)/i.test(l))
+      .map((l) => l.replace(/^[-*•\d.)\s]+/, "").trim())
+      .filter(Boolean);
+
+    if (itemLines.length > 0) {
+      const addedByStore = new Map<string, string[]>();
+
+      for (const rawItem of itemLines) {
+        let cleanItem = rawItem;
+        let assignedStoreId = await findStoreId(cleanItem);
+        if (assignedStoreId) {
+          const st = stores.find((s) => s.id === assignedStoreId);
+          if (st) {
+            cleanItem = cleanItem.replace(new RegExp(`\\s*(en|de|del|de la)?\\s*(el |la )?${st.name}`, "i"), "").trim();
+          }
+        } else {
+          assignedStoreId = inferStoreId(cleanItem, stores);
+        }
+
+        await addShopping(cleanItem, { storeId: assignedStoreId, by: me?.id });
+        const stName = stores.find((s) => s.id === assignedStoreId)?.name || "General";
+        const currentList = addedByStore.get(stName) || [];
+        currentList.push(cleanItem);
+        addedByStore.set(stName, currentList);
+      }
+
+      const storeSummaries: string[] = [];
+      for (const [stName, stItems] of addedByStore.entries()) {
+        storeSummaries.push(`<b>${escapeHtml(stName)}</b>:\n• ` + stItems.map(escapeHtml).join(", "));
+      }
+
+      return (
+        `🛒 <b>¡Anotado! Añadidos ${itemLines.length} productos a la compra:</b>\n\n` +
+        storeSummaries.join("\n\n") +
+        `\n\n<i>✓ Ya están disponibles en la pestaña Compras del Dashboard.</i>`
+      );
+    }
+  }
+
+  // ── Compra en Línea Simple: "añade leche, huevos y pan [en mercadona]"
   let m = low.match(/^(?:añade|añadir|apunta|compra|comprar|pon)\s+(.+)$/i);
   if (m) {
     const stores = await getStores();
@@ -34,8 +106,11 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
     }
     rest = rest.replace(/\s*a la (lista|compra)\b/i, "");
     const items = splitItems(rest);
-    for (const it of items) await addShopping(it, { storeId, by: me?.id });
-    return `🛒 Añadido: <b>${items.map(escapeHtml).join(", ")}</b>`;
+    for (const it of items) {
+      const targetStore = storeId || inferStoreId(it, stores);
+      await addShopping(it, { storeId: targetStore, by: me?.id });
+    }
+    return `🛒 Añadido a la compra: <b>${items.map(escapeHtml).join(", ")}</b>`;
   }
 
   // ── Despensa: "se acaba el aceite" / "no queda leche"
@@ -75,14 +150,15 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
 
   if (/^(\/start|\/help|ayuda)$/.test(low))
     return [
-      "👋 <b>Soy el asistente de casa.</b> Puedes decirme:",
+      "👋 <b>Soy Pepe, tu asistente de hogar.</b> Puedes decirme:",
       "• <i>añade leche, huevos y pan en Mercadona</i>",
+      "• Pegar listas completas de la compra directamente",
       "• <i>se acaba el aceite</i>",
       "• <i>lista</i> · <i>tareas</i>",
       "• <i>tarea llamar al pediatra para Mamá mañana</i>",
       "• <i>briefing</i> · <i>mañana</i>",
-      "• O pregúntame cualquier cosa: <i>¿quién recoge a los peques el jueves?</i>",
-      `\nTu ID de Telegram es <code>${escapeHtml(telegramUserId ?? "?")}</code> (ponlo en Ajustes).`,
+      "• O pregúntame cualquier duda familiar o de la casa.",
+      `\nTu ID de Telegram es <code>${escapeHtml(telegramUserId ?? "?")}</code>.`,
     ].join("\n");
 
   // ── Cualquier otra cosa: consulta al Asistente Inteligente

@@ -33,7 +33,8 @@ export function ShoppingModule({
   currentMemberId?: number | null;
 }) {
   const [selectedStore, setSelectedStore] = useState<number | "all">("all");
-  const [viewMode, setViewMode] = useState<"grouped" | "tabs">("grouped");
+  const [viewMode, setViewMode] = useState<"store_chips" | "grouped">("store_chips");
+  const [showCompleted, setShowCompleted] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemStore, setNewItemStore] = useState<string>("");
   const [isManagingStaples, setIsManagingStaples] = useState(false);
@@ -47,20 +48,32 @@ export function ShoppingModule({
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimizeFeedback, setOptimizeFeedback] = useState<string | null>(null);
 
-  const checkedCount = items.filter((i) => i.checked).length;
-  const pendingCount = items.filter((i) => !i.checked).length;
-  const inCartCount = items.filter((i) => !i.checked && i.in_cart).length;
+  const pendingItems = items.filter((i) => !i.checked);
+  const checkedItems = items.filter((i) => i.checked);
+  const checkedCount = checkedItems.length;
+  const pendingCount = pendingItems.length;
+  const inCartCount = pendingItems.filter((i) => i.in_cart).length;
+  const totalItems = items.length;
+  const progressPercent = totalItems > 0 ? Math.round(((checkedCount + inCartCount) / totalItems) * 100) : 0;
 
   const storeMap = new Map(stores.map((s) => [s.id, s]));
   const memberMap = new Map((members || []).map((m) => [m.id, m]));
   const stapleNamesSet = new Set(staples.map((st) => st.name.trim().toLowerCase()));
+
+  // Filtrado de items pendientes según la tienda seleccionada
+  const filteredPendingItems =
+    selectedStore === "all"
+      ? pendingItems
+      : pendingItems.filter((i) => i.store_id === selectedStore);
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
     const fd = new FormData();
     fd.append("name", newItemName);
-    if (newItemStore) fd.append("storeId", newItemStore);
+    // Si hay una tienda seleccionada en los filtros o en el selector, usarla
+    const targetStore = newItemStore || (selectedStore !== "all" ? String(selectedStore) : "");
+    if (targetStore) fd.append("storeId", targetStore);
     if (currentMemberId) fd.append("by", currentMemberId.toString());
     startTransition(async () => {
       await addShoppingAction(fd);
@@ -121,12 +134,12 @@ export function ShoppingModule({
         `✓ ¡Lista organizada! ${assignments.length} productos distribuidos en sus supermercados más económicos. Ahorro estimado: ${optimization.estimatedSavings.toFixed(2)} €.`
       );
       setOptimization(null);
-      setViewMode("grouped");
+      setSelectedStore("all");
     });
   };
 
-  // Render individual item row
-  const renderItemRow = (item: ShoppingItem) => {
+  // Render individual item row con diseño vertical mobile-first
+  const renderItemCard = (item: ShoppingItem) => {
     const st = item.store_id ? storeMap.get(item.store_id) : null;
     const author = item.added_by ? memberMap.get(item.added_by) : null;
     const isStaple = stapleNamesSet.has(item.name.trim().toLowerCase());
@@ -136,179 +149,209 @@ export function ShoppingModule({
         key={item.id}
         style={{
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0.65rem 0.85rem",
+          flexDirection: "column",
+          gap: "0.5rem",
+          padding: "0.75rem 0.9rem",
           background: item.checked
-            ? "transparent"
+            ? "rgba(255, 255, 255, 0.02)"
             : item.in_cart
             ? "rgba(52, 199, 89, 0.08)"
-            : "var(--apple-surface-secondary)",
+            : "var(--apple-surface)",
           borderRadius: "var(--radius-md)",
-          border: item.in_cart
+          border: item.checked
+            ? "1px solid rgba(255, 255, 255, 0.05)"
+            : item.in_cart
             ? "1px solid rgba(52, 199, 89, 0.35)"
             : "1px solid var(--apple-border)",
           opacity: item.checked ? 0.45 : 1,
-          transition: "all 0.15s ease",
-          gap: "0.5rem",
+          transition: "all 0.15s var(--ease-spring)",
         }}
       >
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem",
-            cursor: "pointer",
-            flex: 1,
-            minWidth: 0,
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={item.checked}
-            onChange={() => startTransition(() => toggleShoppingAction(item.id))}
+        {/* Fila superior: Checkbox grande táctil + Nombre completo (sin truncar) + Store Badge */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem", width: "100%" }}>
+          <button
+            type="button"
+            onClick={() => startTransition(() => toggleShoppingAction(item.id))}
             style={{
-              width: "20px",
-              height: "20px",
-              accentColor: "var(--apple-green)",
+              width: "26px",
+              height: "26px",
+              borderRadius: "50%",
+              border: item.checked
+                ? "2px solid var(--apple-green)"
+                : item.in_cart
+                ? "2px solid var(--apple-green)"
+                : "2px solid var(--apple-border-strong)",
+              background: item.checked ? "var(--apple-green)" : "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               cursor: "pointer",
-              borderRadius: "6px",
               flexShrink: 0,
+              marginTop: "2px",
+              transition: "all 0.15s ease",
             }}
-          />
-          <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+            title={item.checked ? "Desmarcar" : "Completar compra"}
+          >
+            {item.checked && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </button>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
             <span
               style={{
-                fontSize: "0.92rem",
+                fontSize: "0.96rem",
                 fontWeight: item.in_cart ? 600 : 500,
+                color: item.checked ? "var(--apple-text-tertiary)" : item.in_cart ? "var(--apple-green)" : "var(--apple-text)",
                 textDecoration: item.checked ? "line-through" : "none",
-                color: item.in_cart ? "var(--apple-green)" : "var(--apple-text)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
+                lineHeight: "1.35",
+                display: "block",
+                wordBreak: "break-word",
               }}
             >
               {item.name}
             </span>
-            {item.quantity && (
-              <span style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)" }}>
-                {item.quantity}
+            {item.quantity && item.quantity !== "1" && (
+              <span style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginTop: "0.15rem", display: "inline-block" }}>
+                Cantidad: {item.quantity}
               </span>
             )}
           </div>
-        </label>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexShrink: 0 }}>
-          {/* Toggle rápido de "En el carro" */}
-          {!item.checked && (
-            <button
-              type="button"
-              onClick={() => startTransition(() => toggleInCartAction(item.id))}
-              disabled={isPending}
-              title={item.in_cart ? "Quitar del carro" : "Añadir al carro físico"}
-              style={{
-                background: item.in_cart ? "var(--apple-green)" : "rgba(255, 255, 255, 0.05)",
-                color: item.in_cart ? "#fff" : "var(--apple-text-secondary)",
-                border: item.in_cart ? "1px solid var(--apple-green)" : "1px solid var(--apple-border)",
-                borderRadius: "var(--radius-full)",
-                padding: "0.22rem 0.55rem",
-                fontSize: "0.72rem",
-                fontWeight: 600,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.25rem",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <span>🛒</span>
-              <span>{item.in_cart ? "En el carro" : "+ Carro"}</span>
-            </button>
-          )}
-
-          {/* Badge de autor (Kike o Lara) */}
-          {author && (
-            <span
-              title={`Añadido por ${author.name}`}
-              style={{
-                fontSize: "0.72rem",
-                padding: "0.15rem 0.45rem",
-                borderRadius: "var(--radius-full)",
-                background: `${author.color}1a`,
-                color: author.color,
-                fontWeight: 500,
-                border: `1px solid ${author.color}33`,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.2rem",
-              }}
-            >
-              <span>{author.emoji}</span>
-              <span>{author.name}</span>
-            </span>
-          )}
-
-          {/* Toggle para indicar si es básico */}
-          <button
-            type="button"
-            onClick={() => handleToggleItemStaple(item)}
-            disabled={isPending}
-            className="btn-ghost"
-            title={isStaple ? "Quitar de básicos habituales" : "Guardar como básico habitual"}
-            style={{
-              padding: "0.2rem 0.4rem",
-              fontSize: "0.85rem",
-              color: isStaple ? "#f59e0b" : "var(--apple-text-tertiary)",
-            }}
-          >
-            {isStaple ? "⭐" : "☆"}
-          </button>
-
-          {/* Badge o selector de tienda */}
+          {/* Badge de Supermercado */}
           {st && (
             <span
               style={{
                 fontSize: "0.72rem",
-                padding: "0.15rem 0.55rem",
+                padding: "0.2rem 0.55rem",
                 borderRadius: "var(--radius-full)",
-                background: `${st.color}1a`,
+                background: `${st.color}18`,
                 color: st.color,
                 fontWeight: 600,
                 border: `1px solid ${st.color}33`,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
               }}
             >
               {st.name}
             </span>
           )}
-
-          <button
-            onClick={() => startTransition(() => deleteShoppingAction(item.id))}
-            className="btn-ghost"
-            style={{
-              padding: "0.25rem 0.5rem",
-              color: "var(--apple-text-tertiary)",
-              fontSize: "0.85rem",
-            }}
-            title="Eliminar producto"
-          >
-            ✕
-          </button>
         </div>
+
+        {/* Fila inferior de acciones: Botón "En el carro", Quién lo añadió, Favorito y Eliminar */}
+        {!item.checked && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingTop: "0.45rem",
+              borderTop: "1px solid var(--apple-border)",
+              marginTop: "0.15rem",
+              gap: "0.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
+              {/* Toggle de carro */}
+              <button
+                type="button"
+                onClick={() => startTransition(() => toggleInCartAction(item.id))}
+                disabled={isPending}
+                style={{
+                  background: item.in_cart ? "var(--apple-green)" : "rgba(255, 255, 255, 0.06)",
+                  color: item.in_cart ? "#fff" : "var(--apple-text-secondary)",
+                  border: item.in_cart ? "1px solid var(--apple-green)" : "1px solid var(--apple-border)",
+                  borderRadius: "var(--radius-full)",
+                  padding: "0.3rem 0.75rem",
+                  fontSize: "0.76rem",
+                  fontWeight: 600,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  cursor: "pointer",
+                  minHeight: "32px",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>🛒</span>
+                <span>{item.in_cart ? "En el carro" : "+ Carro"}</span>
+              </button>
+
+              {/* Badge autor */}
+              {author && (
+                <span
+                  style={{
+                    fontSize: "0.72rem",
+                    padding: "0.2rem 0.5rem",
+                    borderRadius: "var(--radius-full)",
+                    background: `${author.color}15`,
+                    color: author.color,
+                    fontWeight: 500,
+                    border: `1px solid ${author.color}30`,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                  }}
+                >
+                  <span>{author.emoji}</span>
+                  <span>{author.name}</span>
+                </span>
+              )}
+
+              {/* Favorito / Básico */}
+              <button
+                type="button"
+                onClick={() => handleToggleItemStaple(item)}
+                disabled={isPending}
+                className="btn-ghost"
+                title={isStaple ? "Quitar de básicos" : "Guardar como básico"}
+                style={{
+                  padding: "0.25rem 0.45rem",
+                  fontSize: "0.95rem",
+                  color: isStaple ? "#f59e0b" : "var(--apple-text-tertiary)",
+                  minHeight: "32px",
+                  minWidth: "32px",
+                }}
+              >
+                {isStaple ? "⭐" : "☆"}
+              </button>
+            </div>
+
+            {/* Eliminar con target táctil cómodo */}
+            <button
+              onClick={() => startTransition(() => deleteShoppingAction(item.id))}
+              className="btn-ghost"
+              style={{
+                color: "var(--apple-text-tertiary)",
+                fontSize: "0.85rem",
+                padding: "0.35rem 0.6rem",
+                borderRadius: "var(--radius-sm)",
+                minHeight: "32px",
+                minWidth: "32px",
+              }}
+              title="Eliminar producto"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
     );
   };
 
   return (
-    <div className="glass-card" style={{ padding: "1.35rem" }}>
-      {/* Header Apple Style */}
+    <div className="glass-card" style={{ padding: "1.1rem 0.95rem" }}>
+      {/* ── Cabecera Principal ── */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "1rem",
-          flexWrap: "wrap",
+          alignItems: "flex-start",
+          marginBottom: "0.95rem",
           gap: "0.75rem",
+          flexWrap: "wrap",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
@@ -317,35 +360,37 @@ export function ShoppingModule({
             style={{
               background: "var(--apple-blue-subtle)",
               color: "var(--apple-blue)",
+              width: "40px",
+              height: "40px",
+              borderRadius: "12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "1.2rem",
             }}
           >
             🛒
           </div>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
-              <h2 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <h2 style={{ fontSize: "1.15rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
                 Lista de la Compra
               </h2>
-              <span className="badge badge-emerald" style={{ fontSize: "0.72rem", padding: "0.15rem 0.55rem" }}>
+              <span
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.15rem 0.55rem",
+                  borderRadius: "var(--radius-full)",
+                  background: "var(--apple-green-subtle)",
+                  color: "var(--apple-green)",
+                  fontWeight: 600,
+                }}
+              >
                 {pendingCount} pendientes
               </span>
-              {inCartCount > 0 && (
-                <span
-                  style={{
-                    fontSize: "0.72rem",
-                    padding: "0.15rem 0.55rem",
-                    borderRadius: "var(--radius-full)",
-                    background: "rgba(52, 199, 89, 0.15)",
-                    color: "var(--apple-green)",
-                    fontWeight: 600,
-                  }}
-                >
-                  🛒 {inCartCount} en el carro
-                </span>
-              )}
             </div>
-            <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
-              Comparativa inteligente entre Mercadona, Carrefour, Lidl, Aldi y E.Leclerc
+            <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.15rem" }}>
+              Gestión inteligente por supermercados
             </p>
           </div>
         </div>
@@ -358,16 +403,17 @@ export function ShoppingModule({
             className="btn-secondary"
             style={{
               fontSize: "0.78rem",
-              padding: "0.4rem 0.85rem",
+              padding: "0.4rem 0.75rem",
               background: "rgba(59, 130, 246, 0.12)",
               color: "var(--apple-blue)",
               border: "1px solid rgba(59, 130, 246, 0.3)",
               fontWeight: 600,
+              borderRadius: "var(--radius-full)",
             }}
-            title="Analiza precios entre supermercados y organiza la lista para ahorrar al máximo"
+            title="Analiza precios entre supermercados y optimiza el ahorro"
           >
             <span>{isOptimizing ? "⏳" : "⚡"}</span>
-            <span>{isOptimizing ? "Comparando..." : "Optimizar por Súper"}</span>
+            <span>{isOptimizing ? "Calculando..." : "Optimizar Súper"}</span>
           </button>
 
           <button
@@ -380,40 +426,71 @@ export function ShoppingModule({
             className="btn-primary"
             style={{
               fontSize: "0.78rem",
-              padding: "0.4rem 0.85rem",
+              padding: "0.4rem 0.75rem",
               background: "var(--apple-green)",
               boxShadow: "0 3px 10px rgba(52, 199, 89, 0.3)",
+              borderRadius: "var(--radius-full)",
             }}
-            title="Añade ingredientes de las cenas de la semana, básicos y repone la despensa gastada para comprar el sábado"
+            title="Añade ingredientes de las cenas y básicos gastados para la compra del sábado"
           >
             <span>🧺</span>
             <span>Compra Sábado</span>
           </button>
-
-          {checkedCount > 0 && (
-            <button
-              onClick={() => startTransition(() => clearCheckedShoppingAction())}
-              disabled={isPending}
-              className="btn-ghost"
-              style={{ fontSize: "0.78rem", color: "var(--apple-red)" }}
-            >
-              Limpiar ({checkedCount})
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Banner de feedback si se aplicó optimización */}
+      {/* ── Barra de Progreso de Compra en el Súper ── */}
+      {pendingCount > 0 && (
+        <div
+          style={{
+            background: "var(--apple-surface-secondary)",
+            borderRadius: "var(--radius-md)",
+            padding: "0.65rem 0.85rem",
+            marginBottom: "0.95rem",
+            border: "1px solid var(--apple-border)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.76rem", marginBottom: "0.35rem" }}>
+            <span style={{ color: "var(--apple-text-secondary)" }}>
+              🛒 En el carro físico: <b>{inCartCount}</b> de {pendingCount}
+            </span>
+            <span style={{ fontWeight: 600, color: inCartCount > 0 ? "var(--apple-green)" : "var(--apple-text-secondary)" }}>
+              {Math.round((inCartCount / pendingCount) * 100)}%
+            </span>
+          </div>
+          <div
+            style={{
+              width: "100%",
+              height: "6px",
+              background: "rgba(255, 255, 255, 0.08)",
+              borderRadius: "3px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.round((inCartCount / pendingCount) * 100)}%`,
+                height: "100%",
+                background: "var(--apple-green)",
+                borderRadius: "3px",
+                transition: "width 0.3s ease",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Feedback de Optimización */}
       {optimizeFeedback && (
         <div
           style={{
-            padding: "0.75rem 1rem",
+            padding: "0.75rem 0.95rem",
             background: "rgba(52, 199, 89, 0.12)",
             border: "1px solid rgba(52, 199, 89, 0.3)",
             borderRadius: "var(--radius-md)",
             fontSize: "0.82rem",
             color: "var(--apple-green)",
-            marginBottom: "1rem",
+            marginBottom: "0.95rem",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -435,101 +512,176 @@ export function ShoppingModule({
       {optimization && (
         <div
           style={{
-            padding: "1rem",
+            padding: "0.95rem",
             background: "var(--apple-surface-secondary)",
             borderRadius: "var(--radius-lg)",
             border: "1px solid var(--apple-blue)",
-            marginBottom: "1.2rem",
+            marginBottom: "1rem",
             boxShadow: "0 8px 24px rgba(59, 130, 246, 0.12)",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-              <span style={{ fontSize: "1.2rem" }}>✨</span>
-              <h3 style={{ fontSize: "0.98rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
-                Cesta Optimizada Inteligente
-              </h3>
-            </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.65rem" }}>
+            <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
+              ✨ Distribución Económica Óptima
+            </h3>
             <button
-              type="button"
               onClick={() => setOptimization(null)}
               className="btn-ghost"
-              style={{ fontSize: "0.8rem", color: "var(--apple-text-secondary)" }}
+              style={{ fontSize: "0.8rem", padding: "0.2rem 0.45rem" }}
             >
-              ✕ Cerrar
+              ✕
             </button>
           </div>
-
-          <p style={{ fontSize: "0.82rem", color: "var(--apple-text-secondary)", margin: 0, marginBottom: "0.75rem" }}>
-            {optimization.summary}
+          <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.75rem" }}>
+            Ahorro potencial estimado:{" "}
+            <b style={{ color: "var(--apple-green)", fontSize: "0.92rem" }}>
+              {optimization.estimatedSavings.toFixed(2)} €
+            </b>{" "}
+            repartiendo la compra en {optimization.baskets.length} establecimientos.
           </p>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-              gap: "0.6rem",
-              marginBottom: "0.9rem",
-            }}
-          >
-            {optimization.baskets.map((b) => (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "0.85rem" }}>
+            {optimization.baskets.map((basket) => (
               <div
-                key={b.storeId}
+                key={basket.storeId}
                 style={{
-                  padding: "0.65rem 0.8rem",
-                  background: "var(--apple-surface)",
+                  padding: "0.55rem 0.75rem",
                   borderRadius: "var(--radius-md)",
-                  border: `1px solid ${b.storeColor}33`,
+                  background: "var(--apple-surface)",
+                  border: `1px solid ${basket.storeColor}44`,
+                  fontSize: "0.78rem",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginBottom: "0.3rem" }}>
-                  <span
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      background: b.storeColor,
-                    }}
-                  />
-                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--apple-text)" }}>
-                    {b.storeName}
-                  </span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, color: basket.storeColor }}>
+                  <span>{basket.storeName} ({basket.items.length} productos)</span>
+                  <span>{basket.estimatedTotal.toFixed(2)} €</span>
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)" }}>
-                  <strong>{b.itemCount}</strong> productos · ~{b.estimatedTotal.toFixed(2)} €
+                <div style={{ color: "var(--apple-text-secondary)", fontSize: "0.72rem", marginTop: "0.2rem" }}>
+                  {basket.items.map((i) => i.name).join(", ")}
                 </div>
               </div>
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-            <button
-              type="button"
-              onClick={() => setOptimization(null)}
-              className="btn-ghost"
-              style={{ fontSize: "0.78rem" }}
-            >
-              Descartar
-            </button>
-            <button
-              type="button"
-              onClick={handleApplyOptimization}
-              disabled={isPending}
-              className="btn-primary"
-              style={{
-                fontSize: "0.78rem",
-                padding: "0.4rem 0.95rem",
-                background: "var(--apple-blue)",
-              }}
-            >
-              ✓ Aplicar distribución a la lista
-            </button>
-          </div>
+          <button
+            onClick={handleApplyOptimization}
+            className="btn-primary"
+            style={{
+              width: "100%",
+              fontSize: "0.82rem",
+              padding: "0.5rem 1rem",
+              background: "var(--apple-blue)",
+              borderRadius: "var(--radius-md)",
+            }}
+          >
+            ✓ Aplicar distribución a la lista
+          </button>
         </div>
       )}
 
-      {/* Sección Básicos a 1 toque con Gestión Manual */}
-      <div style={{ marginBottom: "1.1rem" }}>
+      {/* ── Formulario Rápido Añadir Producto (Optimizado Pantallas Verticales) ── */}
+      <form
+        onSubmit={handleAddItem}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.45rem",
+          marginBottom: "1rem",
+          background: "var(--apple-surface-secondary)",
+          padding: "0.75rem",
+          borderRadius: "var(--radius-md)",
+          border: "1px solid var(--apple-border)",
+        }}
+      >
+        <div style={{ display: "flex", gap: "0.45rem" }}>
+          <input
+            type="text"
+            placeholder="Añadir producto (ej. Plátanos)..."
+            value={newItemName}
+            onChange={(e) => setNewItemName(e.target.value)}
+            className="input-field"
+            style={{
+              flex: 1,
+              padding: "0.6rem 0.85rem",
+              borderRadius: "var(--radius-sm)",
+              fontSize: "0.9rem",
+              background: "var(--apple-surface)",
+            }}
+          />
+          <button
+            type="submit"
+            disabled={isPending || !newItemName.trim()}
+            className="btn-primary"
+            style={{
+              width: "44px",
+              height: "44px",
+              padding: 0,
+              borderRadius: "var(--radius-sm)",
+              flexShrink: 0,
+              fontSize: "1.2rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            +
+          </button>
+        </div>
+
+        {/* Selector de tienda en chips horizontales rápidos */}
+        <div
+          style={{
+            display: "flex",
+            gap: "0.35rem",
+            overflowX: "auto",
+            scrollbarWidth: "none",
+            paddingTop: "0.2rem",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setNewItemStore("")}
+            style={{
+              fontSize: "0.72rem",
+              padding: "0.25rem 0.55rem",
+              borderRadius: "var(--radius-full)",
+              background: newItemStore === "" ? "var(--apple-blue)" : "var(--apple-surface)",
+              color: newItemStore === "" ? "#fff" : "var(--apple-text-secondary)",
+              border: "1px solid var(--apple-border)",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            Cualquiera
+          </button>
+          {stores.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setNewItemStore(String(s.id))}
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.25rem 0.55rem",
+                borderRadius: "var(--radius-full)",
+                background: newItemStore === String(s.id) ? `${s.color}25` : "var(--apple-surface)",
+                color: newItemStore === String(s.id) ? s.color : "var(--apple-text-secondary)",
+                border: newItemStore === String(s.id) ? `1px solid ${s.color}` : "1px solid var(--apple-border)",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}
+            >
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: s.color }} />
+              {s.name}
+            </button>
+          ))}
+        </div>
+      </form>
+
+      {/* ── Carrusel de Básicos Habituales a 1 Toque ── */}
+      <div style={{ marginBottom: "1rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
           <span
             style={{
@@ -548,12 +700,12 @@ export function ShoppingModule({
             className="btn-ghost"
             style={{
               fontSize: "0.74rem",
-              padding: "0.15rem 0.5rem",
+              padding: "0.15rem 0.45rem",
               color: isManagingStaples ? "var(--apple-blue)" : "var(--apple-text-secondary)",
               fontWeight: 600,
             }}
           >
-            {isManagingStaples ? "✓ Listo" : "⚙️ Gestionar básicos"}
+            {isManagingStaples ? "✓ Listo" : "⚙️ Gestionar"}
           </button>
         </div>
 
@@ -561,42 +713,35 @@ export function ShoppingModule({
         {isManagingStaples ? (
           <div
             style={{
-              padding: "0.85rem",
+              padding: "0.75rem",
               background: "var(--apple-surface-secondary)",
               borderRadius: "var(--radius-md)",
               border: "1px solid var(--apple-border)",
               marginBottom: "0.75rem",
             }}
           >
-            <div style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.65rem" }}>
-              Indica qué productos quieres tener como básicos para añadirlos con un solo toque o agrega nuevos:
-            </div>
-
-            <form
-              onSubmit={handleCreateStaple}
-              style={{ display: "flex", gap: "0.4rem", marginBottom: "0.75rem", flexWrap: "wrap" }}
-            >
+            <form onSubmit={handleCreateStaple} style={{ display: "flex", gap: "0.4rem", marginBottom: "0.65rem", flexWrap: "wrap" }}>
               <input
                 type="text"
                 placeholder="Emoji"
                 value={newStapleEmoji}
                 onChange={(e) => setNewStapleEmoji(e.target.value)}
                 className="input-field"
-                style={{ width: "55px", textAlign: "center", fontSize: "1rem", padding: "0.3rem" }}
+                style={{ width: "50px", textAlign: "center", fontSize: "1rem", padding: "0.3rem" }}
               />
               <input
                 type="text"
-                placeholder="Nombre del básico (ej. Aguacates)..."
+                placeholder="Nombre del básico..."
                 value={newStapleName}
                 onChange={(e) => setNewStapleName(e.target.value)}
                 className="input-field"
-                style={{ flex: 1, minWidth: "140px", fontSize: "0.82rem" }}
+                style={{ flex: 1, minWidth: "130px", fontSize: "0.82rem" }}
               />
               <select
                 value={newStapleStore}
                 onChange={(e) => setNewStapleStore(e.target.value)}
                 className="input-field"
-                style={{ width: "125px", fontSize: "0.8rem", cursor: "pointer" }}
+                style={{ width: "115px", fontSize: "0.8rem", cursor: "pointer" }}
               >
                 <option value="">Cualquier súper</option>
                 {stores.map((s) => (
@@ -609,56 +754,39 @@ export function ShoppingModule({
                 type="submit"
                 disabled={isPending || !newStapleName.trim()}
                 className="btn-primary"
-                style={{ fontSize: "0.78rem", padding: "0.35rem 0.75rem" }}
+                style={{ fontSize: "0.76rem", padding: "0.35rem 0.65rem" }}
               >
-                + Añadir básico
+                + Añadir
               </button>
             </form>
 
-            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", maxHeight: "160px", overflowY: "auto" }}>
-              {staples.map((st) => {
-                const store = st.store_id ? storeMap.get(st.store_id) : null;
-                return (
-                  <div
-                    key={st.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.35rem",
-                      padding: "0.3rem 0.6rem",
-                      borderRadius: "var(--radius-full)",
-                      background: "var(--apple-surface)",
-                      border: "1px solid var(--apple-border)",
-                      fontSize: "0.78rem",
-                    }}
+            <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", maxHeight: "140px", overflowY: "auto" }}>
+              {staples.map((st) => (
+                <div
+                  key={st.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    padding: "0.25rem 0.55rem",
+                    borderRadius: "var(--radius-full)",
+                    background: "var(--apple-surface)",
+                    border: "1px solid var(--apple-border)",
+                    fontSize: "0.76rem",
+                  }}
+                >
+                  <span>{st.emoji}</span>
+                  <span>{st.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => startTransition(() => deleteStapleAction(st.id))}
+                    className="btn-ghost"
+                    style={{ padding: 0, marginLeft: "0.2rem", color: "var(--apple-red)" }}
                   >
-                    <span>{st.emoji}</span>
-                    <span>{st.name}</span>
-                    {store && (
-                      <span
-                        style={{
-                          fontSize: "0.68rem",
-                          color: store.color,
-                          background: `${store.color}15`,
-                          padding: "0.1rem 0.35rem",
-                          borderRadius: "4px",
-                        }}
-                      >
-                        {store.name}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => startTransition(() => deleteStapleAction(st.id))}
-                      className="btn-ghost"
-                      style={{ padding: 0, marginLeft: "0.2rem", color: "var(--apple-red)" }}
-                      title="Eliminar de básicos"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                );
-              })}
+                    ✕
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         ) : (
@@ -667,7 +795,7 @@ export function ShoppingModule({
               display: "flex",
               gap: "0.4rem",
               overflowX: "auto",
-              paddingBottom: "0.35rem",
+              paddingBottom: "0.3rem",
               scrollbarWidth: "none",
             }}
           >
@@ -680,7 +808,7 @@ export function ShoppingModule({
                 className="btn-ghost"
                 style={{
                   fontSize: "0.78rem",
-                  padding: "0.32rem 0.75rem",
+                  padding: "0.35rem 0.75rem",
                   borderRadius: "var(--radius-full)",
                   background: "var(--apple-surface-secondary)",
                   border: "1px solid var(--apple-border)",
@@ -690,6 +818,7 @@ export function ShoppingModule({
                   gap: "0.35rem",
                   color: "var(--apple-text)",
                   flexShrink: 0,
+                  minHeight: "34px",
                 }}
               >
                 <span>{st.emoji}</span>
@@ -700,236 +829,152 @@ export function ShoppingModule({
         )}
       </div>
 
-      {/* Control de Vista: Por Supermercados (Grupos) vs Pestañas Individuales */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "0.85rem",
-          flexWrap: "wrap",
-          gap: "0.5rem",
-        }}
-      >
-        <div
-          style={{
-            display: "inline-flex",
-            background: "var(--apple-surface-secondary)",
-            padding: "2px",
-            borderRadius: "var(--radius-full)",
-            border: "1px solid var(--apple-border)",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setViewMode("grouped")}
-            className={`tab-btn ${viewMode === "grouped" ? "active" : ""}`}
-            style={{ padding: "0.28rem 0.75rem", fontSize: "0.76rem" }}
-          >
-            🛒 Por Supermercado
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("tabs")}
-            className={`tab-btn ${viewMode === "tabs" ? "active" : ""}`}
-            style={{ padding: "0.28rem 0.75rem", fontSize: "0.76rem" }}
-          >
-            📑 Filtro por Pestañas
-          </button>
-        </div>
-
-        {viewMode === "tabs" && (
-          <div
-            style={{
-              display: "flex",
-              gap: "0.3rem",
-              overflowX: "auto",
-              scrollbarWidth: "none",
-            }}
-          >
-            <button
-              onClick={() => setSelectedStore("all")}
-              className={`tab-btn ${selectedStore === "all" ? "active" : ""}`}
-              style={{ padding: "0.25rem 0.65rem", fontSize: "0.76rem" }}
-            >
-              Todas
-            </button>
-            {stores.map((s) => {
-              const count = items.filter((i) => !i.checked && i.store_id === s.id).length;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedStore(s.id)}
-                  className={`tab-btn ${selectedStore === s.id ? "active" : ""}`}
-                  style={{ padding: "0.25rem 0.65rem", fontSize: "0.76rem" }}
-                >
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: "7px",
-                      height: "7px",
-                      borderRadius: "50%",
-                      background: s.color,
-                      marginRight: "0.3rem",
-                    }}
-                  />
-                  {s.name} {count > 0 && `(${count})`}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Formulario añadir rápido estilo iOS Form */}
-      <form onSubmit={handleAddItem} style={{ display: "flex", gap: "0.5rem", marginBottom: "1.1rem" }}>
-        <input
-          type="text"
-          placeholder="Añadir producto (ej. Plátanos de Canarias)..."
-          value={newItemName}
-          onChange={(e) => setNewItemName(e.target.value)}
-          className="input-field"
-          style={{ flex: 1 }}
-        />
-        <select
-          value={newItemStore}
-          onChange={(e) => setNewItemStore(e.target.value)}
-          className="input-field"
-          style={{ width: "135px", cursor: "pointer" }}
-        >
-          <option value="">Tienda...</option>
-          {stores.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          disabled={isPending || !newItemName.trim()}
-          className="btn-primary"
-          style={{ width: "42px", height: "42px", padding: 0, borderRadius: "var(--radius-sm)", flexShrink: 0 }}
-        >
-          +
-        </button>
-      </form>
-
-      {/* Renderizado de la lista: Modo Agrupado por Supermercado o Modo Pestañas */}
-      {viewMode === "grouped" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {stores.map((store) => {
-            const storeItems = items.filter((i) => i.store_id === store.id);
-            const pendingStoreItems = storeItems.filter((i) => !i.checked);
-            const inCartStoreItems = pendingStoreItems.filter((i) => i.in_cart);
-
-            if (storeItems.length === 0) return null;
-
-            return (
-              <div
-                key={store.id}
-                style={{
-                  background: "var(--apple-surface-secondary)",
-                  borderRadius: "var(--radius-lg)",
-                  border: `1px solid ${store.color}33`,
-                  padding: "0.85rem",
-                }}
-              >
-                {/* Cabecera del Supermercado con indicador de en el carro */}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "0.65rem",
-                    paddingBottom: "0.45rem",
-                    borderBottom: "1px solid var(--apple-border)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                    <span
-                      style={{
-                        width: "10px",
-                        height: "10px",
-                        borderRadius: "50%",
-                        background: store.color,
-                        boxShadow: `0 0 8px ${store.color}88`,
-                      }}
-                    />
-                    <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
-                      {store.name}
-                    </h3>
-                    <span style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)" }}>
-                      ({pendingStoreItems.length} pendientes)
-                    </span>
-                  </div>
-
-                  {pendingStoreItems.length > 0 && (
-                    <span
-                      style={{
-                        fontSize: "0.72rem",
-                        fontWeight: 600,
-                        padding: "0.15rem 0.55rem",
-                        borderRadius: "var(--radius-full)",
-                        background: inCartStoreItems.length === pendingStoreItems.length && pendingStoreItems.length > 0
-                          ? "rgba(52, 199, 89, 0.2)"
-                          : "rgba(255, 255, 255, 0.05)",
-                        color: inCartStoreItems.length === pendingStoreItems.length && pendingStoreItems.length > 0
-                          ? "var(--apple-green)"
-                          : "var(--apple-text-secondary)",
-                      }}
-                    >
-                      🛒 {inCartStoreItems.length} / {pendingStoreItems.length} en el carro
-                    </span>
-                  )}
-                </div>
-
-                {/* Items de este supermercado */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                  {storeItems.map(renderItemRow)}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Sección para productos sin tienda asignada si los hay */}
-          {items.some((i) => !i.store_id) && (
-            <div
-              style={{
-                background: "var(--apple-surface-secondary)",
-                borderRadius: "var(--radius-lg)",
-                border: "1px solid var(--apple-border)",
-                padding: "0.85rem",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.65rem" }}>
-                <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--apple-text)" }}>
-                  🏪 Sin asignar a tienda
-                </span>
-                <span style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)" }}>
-                  ({items.filter((i) => !i.store_id && !i.checked).length} pendientes)
-                </span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                {items.filter((i) => !i.store_id).map(renderItemRow)}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Vista en Pestañas */
+      {/* ── Filtros por Supermercado (Chips Horizontales Táctiles) ── */}
+      <div style={{ marginBottom: "0.85rem" }}>
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
-            gap: "0.45rem",
-            maxHeight: "360px",
-            overflowY: "auto",
-            paddingRight: "0.25rem",
+            gap: "0.4rem",
+            overflowX: "auto",
+            scrollbarWidth: "none",
+            paddingBottom: "0.25rem",
           }}
         >
-          {items
-            .filter((i) => (selectedStore === "all" ? true : i.store_id === selectedStore))
-            .map(renderItemRow)}
+          {/* Chip Todos */}
+          <button
+            type="button"
+            onClick={() => setSelectedStore("all")}
+            style={{
+              fontSize: "0.78rem",
+              fontWeight: 600,
+              padding: "0.4rem 0.85rem",
+              borderRadius: "var(--radius-full)",
+              background: selectedStore === "all" ? "var(--apple-text)" : "var(--apple-surface-secondary)",
+              color: selectedStore === "all" ? "var(--apple-bg)" : "var(--apple-text-secondary)",
+              border: "1px solid var(--apple-border)",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            Todos ({pendingCount})
+          </button>
+
+          {/* Chips de cada Supermercado */}
+          {stores.map((s) => {
+            const count = pendingItems.filter((i) => i.store_id === s.id).length;
+            const isSelected = selectedStore === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSelectedStore(s.id)}
+                style={{
+                  fontSize: "0.78rem",
+                  fontWeight: 600,
+                  padding: "0.4rem 0.85rem",
+                  borderRadius: "var(--radius-full)",
+                  background: isSelected ? `${s.color}20` : "var(--apple-surface-secondary)",
+                  color: isSelected ? s.color : "var(--apple-text-secondary)",
+                  border: isSelected ? `1.5px solid ${s.color}` : "1px solid var(--apple-border)",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: s.color,
+                  }}
+                />
+                <span>{s.name}</span>
+                <span style={{ opacity: 0.85, fontSize: "0.72rem" }}>({count})</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Lista de Productos Pendientes ── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginBottom: "1.1rem" }}>
+        {filteredPendingItems.length === 0 ? (
+          <div
+            style={{
+              padding: "2rem 1rem",
+              textAlign: "center",
+              background: "var(--apple-surface-secondary)",
+              borderRadius: "var(--radius-lg)",
+              border: "1px dashed var(--apple-border)",
+            }}
+          >
+            <div style={{ fontSize: "2rem", marginBottom: "0.35rem" }}>🎉</div>
+            <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--apple-text)" }}>
+              {selectedStore === "all" ? "¡No hay nada pendiente para comprar!" : "No hay pendientes en esta tienda"}
+            </div>
+            <div style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
+              Añade productos con el botón superior o pídeselo a Pepe en Telegram.
+            </div>
+          </div>
+        ) : (
+          filteredPendingItems.map(renderItemCard)
+        )}
+      </div>
+
+      {/* ── Sección de Productos Comprados (Colapsable y Limpiable) ── */}
+      {checkedCount > 0 && (
+        <div
+          style={{
+            borderTop: "1px solid var(--apple-border)",
+            paddingTop: "0.85rem",
+            marginTop: "0.5rem",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <button
+              type="button"
+              onClick={() => setShowCompleted(!showCompleted)}
+              className="btn-ghost"
+              style={{
+                fontSize: "0.82rem",
+                fontWeight: 600,
+                color: "var(--apple-text-secondary)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+              }}
+            >
+              <span>{showCompleted ? "▼" : "▶"}</span>
+              <span>Comprados ({checkedCount})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => startTransition(() => clearCheckedShoppingAction())}
+              disabled={isPending}
+              className="btn-ghost"
+              style={{
+                fontSize: "0.76rem",
+                color: "var(--apple-red)",
+                padding: "0.2rem 0.55rem",
+              }}
+            >
+              Limpiar comprados
+            </button>
+          </div>
+
+          {showCompleted && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", marginTop: "0.45rem" }}>
+              {checkedItems.map(renderItemCard)}
+            </div>
+          )}
         </div>
       )}
     </div>
