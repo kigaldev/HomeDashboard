@@ -183,6 +183,15 @@ input, select, textarea, .input-field {
   border-color: var(--apple-border-strong);
 }
 
+.card-apple {
+  background: var(--apple-surface-secondary);
+  border: 1px solid var(--apple-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  color: var(--apple-text);
+  overflow: hidden;
+}
+
 /* ── Cabecera / Status Island Mobile-First ───────────────────── */
 .top-bar {
   padding: 0.5rem 0 1.25rem 0;

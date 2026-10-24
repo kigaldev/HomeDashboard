@@ -22,7 +22,6 @@ export function EnergyModule({
   todayWeather: DayWeather | null;
 }) {
   const [activeSubTab, setActiveSubTab] = useState<"ev" | "appliances" | "heating" | "tariffs">("ev");
-  const [batteryKwh, setBatteryKwh] = useState<number>(20);
   const [isEditingTariffs, setIsEditingTariffs] = useState(false);
   const [elecPriceInput, setElecPriceInput] = useState<string>("");
   const [gasPriceInput, setGasPriceInput] = useState<string>("");
@@ -37,10 +36,6 @@ export function EnergyModule({
 
   const elecKwhPrice = elecContract?.energy_price_kwh ?? 0.1230;
   const gasKwhPrice = gasContract?.energy_price_kwh ?? 0.0899;
-
-  // Calculadora dinámica de recarga de coche eléctrico
-  const evCalculatedCost = (batteryKwh * elecKwhPrice).toFixed(2);
-  const evCalculatedKm = Math.round(batteryKwh * 6.5); // ~15 kWh/100 km -> ~6.5 km por kWh
 
   const handleManualTariffSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +107,8 @@ export function EnergyModule({
       <div
         className="card-apple"
         style={{
-          background: "linear-gradient(135deg, var(--apple-surface) 0%, rgba(255, 255, 255, 0.95) 100%)",
+          background: "var(--apple-surface-secondary)",
+          border: "1px solid var(--apple-border)",
           borderLeft: `5px solid ${recs.periodInfo.period === "P2" ? "var(--apple-green)" : "var(--apple-orange)"}`,
           padding: "1.25rem",
         }}
@@ -159,7 +155,7 @@ export function EnergyModule({
             marginTop: "1rem",
             padding: "0.75rem 1rem",
             borderRadius: "var(--radius-md)",
-            background: "rgba(0, 0, 0, 0.025)",
+            background: "var(--apple-surface)",
             border: "1px solid var(--apple-border)",
             fontSize: "0.82rem",
             color: "var(--apple-text)",
@@ -342,52 +338,20 @@ export function EnergyModule({
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <div style={{ background: "var(--apple-surface-secondary)", padding: "0.85rem", borderRadius: "var(--radius-md)" }}>
-                <p style={{ margin: 0, fontSize: "0.82rem", fontWeight: 600, color: "var(--apple-text)" }}>
-                  ⏰ Ventana recomendada: <b>{recs.ev.bestHours}</b>
+              <div
+                style={{
+                  background: "var(--apple-surface)",
+                  padding: "0.95rem 1.1rem",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--apple-border)",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 700, color: "var(--apple-text)" }}>
+                  ⏰ Ventana recomendada: <span style={{ color: "var(--apple-green)" }}>{recs.ev.bestHours}</span>
                 </p>
-                <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: "var(--apple-text-secondary)", lineHeight: 1.4 }}>
+                <p style={{ margin: "0.45rem 0 0 0", fontSize: "0.82rem", color: "var(--apple-text-secondary)", lineHeight: 1.5 }}>
                   {recs.ev.tip}
                 </p>
-              </div>
-
-              {/* Calculadora Interactiva de Carga */}
-              <div style={{ borderTop: "1px solid var(--apple-border)", paddingTop: "0.85rem", marginTop: "0.25rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                  <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--apple-text)" }}>
-                    Calculadora de recarga rápida:
-                  </span>
-                  <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--apple-green)" }}>
-                    {evCalculatedCost} € ({batteryKwh} kWh · ~{evCalculatedKm} km)
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  {[
-                    { label: "Trayecto diario (10 kWh)", kwh: 10 },
-                    { label: "Uso habitual (20 kWh)", kwh: 20 },
-                    { label: "Fin de semana (35 kWh)", kwh: 35 },
-                    { label: "Carga 100% (50 kWh)", kwh: 50 },
-                  ].map((preset) => (
-                    <button
-                      key={preset.kwh}
-                      type="button"
-                      onClick={() => setBatteryKwh(preset.kwh)}
-                      style={{
-                        padding: "0.35rem 0.65rem",
-                        borderRadius: "var(--radius-sm)",
-                        border: batteryKwh === preset.kwh ? "1.5px solid var(--apple-green)" : "1px solid var(--apple-border)",
-                        background: batteryKwh === preset.kwh ? "var(--apple-green-subtle)" : "var(--apple-surface)",
-                        color: batteryKwh === preset.kwh ? "var(--apple-green)" : "var(--apple-text-secondary)",
-                        fontSize: "0.78rem",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
