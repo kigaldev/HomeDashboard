@@ -5,7 +5,7 @@ export type ChatMsg = { role: "system" | "user" | "assistant"; content: string }
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 const FALLBACK_MODELS = Array.from(
-  new Set([DEFAULT_MODEL, "gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.1-flash-lite", "gemini-3.8-flash"])
+  new Set([DEFAULT_MODEL, "gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"])
 );
 
 const LOCAL_BASE = (process.env.LLM_BASE_URL || "").replace(/\/$/, "");
@@ -120,9 +120,17 @@ export async function geminiVision(
   mimeType: string = "image/jpeg",
   opts: { json?: boolean } = {},
 ): Promise<string | null> {
-  if (!GEMINI_KEY) return null;
+  const apiKey = process.env.GEMINI_API_KEY || GEMINI_KEY;
+  if (!apiKey) {
+    console.warn("[geminiVision]: No se ha encontrado GEMINI_API_KEY en las variables de entorno.");
+    return null;
+  }
 
+  const safeMimeType = (mimeType && ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType.toLowerCase()))
+    ? mimeType.toLowerCase()
+    : "image/jpeg";
   const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+
   const body = {
     contents: [
       {
@@ -131,7 +139,7 @@ export async function geminiVision(
           { text: prompt },
           {
             inlineData: {
-              mimeType,
+              mimeType: safeMimeType,
               data: cleanBase64,
             },
           },
@@ -146,7 +154,7 @@ export async function geminiVision(
 
   for (const model of FALLBACK_MODELS) {
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -158,10 +166,7 @@ export async function geminiVision(
       if (!res.ok) {
         const err = await res.text();
         console.warn(`[Gemini Vision ${model} error ${res.status}]:`, err.slice(0, 160));
-        if (res.status === 503 || res.status === 429 || res.status === 404) {
-          continue;
-        }
-        return null;
+        continue;
       }
 
       const data = await res.json();
@@ -198,7 +203,8 @@ export async function llmStatus(): Promise<{ online: boolean; provider: string; 
 /** Extrae el primer objeto JSON de una respuesta de texto. */
 export function parseJson<T>(text: string | null): T | null {
   if (!text) return null;
-  const m = text.match(/\{[\s\S]*\}/);
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  const m = cleaned.match(/\{[\s\S]*\}/);
   if (!m) return null;
   try {
     return JSON.parse(m[0]) as T;

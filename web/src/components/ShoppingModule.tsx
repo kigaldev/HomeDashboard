@@ -18,6 +18,8 @@ import {
 } from "@/app/actions";
 import type { ShoppingItem, Store, Staple, Member } from "@/lib/repo";
 import type { BasketOptimizationResult } from "@/lib/pricesProvider";
+import { TicketManagerModal } from "./TicketManagerModal";
+import { IconCamera } from "./Icons";
 
 export function ShoppingModule({
   items = [],
@@ -35,6 +37,7 @@ export function ShoppingModule({
   const [selectedStore, setSelectedStore] = useState<number | "all">("all");
   const [viewMode, setViewMode] = useState<"store_chips" | "grouped">("store_chips");
   const [showCompleted, setShowCompleted] = useState(false);
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemStore, setNewItemStore] = useState<string>("");
   const [isManagingStaples, setIsManagingStaples] = useState(false);
@@ -435,6 +438,27 @@ export function ShoppingModule({
           >
             <span>🧺</span>
             <span>Compra Sábado</span>
+          </button>
+
+          <button
+            onClick={() => setIsTicketModalOpen(true)}
+            className="btn-secondary"
+            style={{
+              fontSize: "0.78rem",
+              padding: "0.4rem 0.75rem",
+              background: "var(--apple-blue-subtle)",
+              color: "var(--apple-blue)",
+              border: "1px solid var(--apple-blue)",
+              fontWeight: 600,
+              borderRadius: "var(--radius-full)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.3rem",
+            }}
+            title="Escanear ticket de compra para tachar lo comprado y actualizar despensa"
+          >
+            <IconCamera size={14} />
+            <span>Escanear Ticket</span>
           </button>
         </div>
       </div>
@@ -977,6 +1001,12 @@ export function ShoppingModule({
           )}
         </div>
       )}
+
+      {/* ── Modal Unificado de Gestión de Ticket (Cámara & Acciones) ── */}
+      <TicketManagerModal
+        isOpen={isTicketModalOpen}
+        onClose={() => setIsTicketModalOpen(false)}
+      />
     </div>
   );
 }

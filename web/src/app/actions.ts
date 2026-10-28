@@ -42,8 +42,19 @@ import { askAssistant, runAgentInstruction, type AgentActionResult } from "@/lib
 import { generateSaturdayShoppingList } from "@/lib/weeklyShopping";
 import { syncMontessoriMenu } from "@/lib/schoolMenu";
 import { syncGoogleCalendars } from "@/lib/gcal";
-import { parseReceiptText, parseReceiptImage, saveProcessedReceipt, type ParsedReceipt, type ReceiptReconciliationResult } from "@/lib/receipts";
 import { optimizeShoppingBasket, type BasketOptimizationResult } from "@/lib/pricesProvider";
+import {
+  parseReceiptText,
+  parseReceiptImage,
+  saveProcessedReceipt,
+  findMatchingShoppingItems,
+  executeReceiptActions,
+  type ParsedReceipt,
+  type ReceiptReconciliationResult,
+  type ParsedReceiptWithMatches,
+  type ReceiptActionConfig,
+  type ReceiptExecutionResult,
+} from "@/lib/receipts";
 import { markItemConsumed, ensureDemoReceipts, updateEnergyContract, upsertEnergyContract, type EnergyContract } from "@/lib/repo";
 import { parseEnergyBillText, parseEnergyBillImage } from "@/lib/energy";
 
@@ -369,11 +380,47 @@ export async function processReceiptAction(rawText: string): Promise<ParsedRecei
   return { ...parsed, reconciliation };
 }
 
-export async function processReceiptImageAction(base64Image: string, mimeType: string = "image/jpeg"): Promise<ParsedReceipt & { reconciliation: ReceiptReconciliationResult }> {
+export async function processReceiptImageAction(
+  base64Image: string,
+  mimeType: string = "image/jpeg"
+): Promise<ParsedReceipt & { reconciliation: ReceiptReconciliationResult }> {
   const parsed = await parseReceiptImage(base64Image, mimeType);
   const reconciliation = await saveProcessedReceipt(parsed, "[Ticket escaneado mediante Gemini Vision]");
   revalidatePath("/");
   return { ...parsed, reconciliation };
+}
+
+export async function scanTicketAction(data: {
+  text?: string;
+  imageBase64?: string;
+  mimeType?: string;
+}): Promise<ParsedReceiptWithMatches> {
+  let parsed: ParsedReceipt;
+
+  if (data.imageBase64) {
+    parsed = await parseReceiptImage(data.imageBase64, data.mimeType || "image/jpeg");
+  } else if (data.text) {
+    parsed = await parseReceiptText(data.text);
+  } else {
+    throw new Error("No se proporcionó ninguna imagen ni texto del ticket.");
+  }
+
+  const matchedShoppingItems = await findMatchingShoppingItems(parsed.items);
+
+  return {
+    ...parsed,
+    matchedShoppingItems,
+  };
+}
+
+export async function executeReceiptActionsAction(
+  parsed: ParsedReceipt,
+  config: ReceiptActionConfig,
+  rawText?: string
+): Promise<ReceiptExecutionResult> {
+  const result = await executeReceiptActions(parsed, config, rawText);
+  revalidatePath("/");
+  return result;
 }
 
 export async function markPerishableConsumedAction(id: number) {

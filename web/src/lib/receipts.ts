@@ -3,8 +3,40 @@ import { llm, geminiVision, parseJson } from "./llm";
 import { addDays, isoDate } from "./dates";
 import { findStoreId, recordReceipt, getStores } from "./repo";
 import { q } from "./db";
-export type { ParsedReceiptItem, ParsedReceipt, ReceiptReconciliationResult } from "./receiptShared";
-import type { ParsedReceiptItem, ParsedReceipt, ReceiptReconciliationResult } from "./receiptShared";
+export type {
+  ParsedReceiptItem,
+  ParsedReceipt,
+  ReceiptReconciliationResult,
+  MatchedShoppingItem,
+  ParsedReceiptWithMatches,
+  ReceiptActionConfig,
+  ReceiptExecutionResult,
+} from "./receiptShared";
+import type {
+  ParsedReceiptItem,
+  ParsedReceipt,
+  ReceiptReconciliationResult,
+  MatchedShoppingItem,
+  ReceiptActionConfig,
+  ReceiptExecutionResult,
+} from "./receiptShared";
+
+export function normalizeReceiptDate(raw?: string | null): string {
+  if (!raw) return isoDate();
+  const trimmed = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, "0");
+    const month = dmyMatch[2].padStart(2, "0");
+    let year = dmyMatch[3];
+    if (year.length === 2) year = `20${year}`;
+    return `${year}-${month}-${day}`;
+  }
+  return isoDate();
+}
 
 const PERISHABLE_SHELF_LIFE: Record<string, number> = {
   pescado: 2,
@@ -78,10 +110,12 @@ export async function parseReceiptText(rawText: string): Promise<ParsedReceipt> 
   const parsedAi = parseJson<ParsedReceipt>(aiResp);
 
   if (parsedAi && parsedAi.items && parsedAi.items.length > 0) {
+    const today = isoDate();
+    const finalDate = normalizeReceiptDate(parsedAi.date);
     return {
       storeName: parsedAi.storeName || detectStoreFromText(rawText),
-      date: parsedAi.date || today,
-      totalAmount: Number(parsedAi.totalAmount) || parsedAi.items.reduce((s, i) => s + (Number(i.totalPrice) || 0), 0),
+      date: finalDate,
+      totalAmount: Math.round((Number(parsedAi.totalAmount) || parsedAi.items.reduce((s, i) => s + (Number(i.totalPrice) || 0), 0)) * 100) / 100,
       items: parsedAi.items.map((i) => {
         const perish = estimatePerishable(i.name, i.category || "");
         return {
@@ -194,11 +228,11 @@ export async function parseReceiptImage(base64Image: string, mimeType: string = 
   const parsedAi = parseJson<ParsedReceipt>(aiResp);
 
   if (parsedAi && parsedAi.items && parsedAi.items.length > 0) {
-    const today = isoDate();
+    const finalDate = normalizeReceiptDate(parsedAi.date);
     return {
       storeName: parsedAi.storeName || "Otros",
-      date: parsedAi.date || today,
-      totalAmount: Number(parsedAi.totalAmount) || parsedAi.items.reduce((s, i) => s + (Number(i.totalPrice) || 0), 0),
+      date: finalDate,
+      totalAmount: Math.round((Number(parsedAi.totalAmount) || parsedAi.items.reduce((s, i) => s + (Number(i.totalPrice) || 0), 0)) * 100) / 100,
       items: parsedAi.items.map((i) => {
         const perish = estimatePerishable(i.name, i.category || "");
         return {
@@ -212,6 +246,14 @@ export async function parseReceiptImage(base64Image: string, mimeType: string = 
         };
       }),
     };
+  }
+
+  // Si falló el JSON pero Gemini Vision devolvió texto con líneas de productos
+  if (aiResp && aiResp.length > 20) {
+    const fallbackParsed = parseReceiptHeuristic(aiResp);
+    if (fallbackParsed.items.length > 0) {
+      return fallbackParsed;
+    }
   }
 
   return {
@@ -357,3 +399,183 @@ export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: stri
     summaryMessage,
   };
 }
+
+/**
+ * Busca de forma semántica los productos de la lista de la compra pendientes
+ * que coinciden con los artículos detectados en el ticket.
+ */
+export async function findMatchingShoppingItems(
+  items: { name: string }[]
+): Promise<MatchedShoppingItem[]> {
+  const pendingItems = await q<{ id: number; name: string }>(
+    "select id, name from shopping_items where not checked"
+  );
+  if (!pendingItems.length || !items.length) return [];
+
+  const receiptCleanNames = items.map((it) => ({
+    original: it.name,
+    clean: cleanProductName(it.name),
+  }));
+
+  const matches: MatchedShoppingItem[] = [];
+
+  for (const pending of pendingItems) {
+    const pendingClean = cleanProductName(pending.name);
+    if (!pendingClean) continue;
+
+    const matched = receiptCleanNames.find((r) => {
+      if (!r.clean) return false;
+      if (r.clean.includes(pendingClean) || pendingClean.includes(r.clean)) return true;
+      const pWords = pendingClean.split(" ").filter((w) => w.length > 2);
+      const rWords = r.clean.split(" ").filter((w) => w.length > 2);
+      return pWords.some((pw) => rWords.includes(pw));
+    });
+
+    if (matched) {
+      matches.push({
+        id: pending.id,
+        name: pending.name,
+        matchedWith: matched.original,
+      });
+    }
+  }
+
+  return matches;
+}
+
+/**
+ * Ejecuta en la base de datos únicamente las acciones que el usuario seleccionó
+ * en la ventana única de gestión de ticket.
+ */
+export async function executeReceiptActions(
+  parsed: ParsedReceipt,
+  config: ReceiptActionConfig,
+  rawText?: string
+): Promise<ReceiptExecutionResult> {
+  const receiptDate = normalizeReceiptDate(parsed.date);
+  let receiptId: number | undefined;
+
+  // 1. Guardar en Economía / Gastos si está seleccionado
+  if (config.saveExpense) {
+    const stores = await getStores();
+    const rawStore = (parsed.storeName || "Otros").trim();
+    const storeLower = rawStore.toLowerCase();
+
+    let matched = stores.find((s) => s.name.toLowerCase() === storeLower);
+    if (!matched && storeLower !== "otros") {
+      matched = stores.find((s) => storeLower.includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(storeLower));
+    }
+
+    const otrosStore = stores.find((s) => s.name.toLowerCase() === "otros") || { id: 5, name: "Otros" };
+    let storeId: number;
+    let companyName: string;
+
+    if (matched && matched.name.toLowerCase() !== "otros") {
+      storeId = matched.id;
+      companyName = matched.name;
+    } else {
+      storeId = otrosStore.id;
+      companyName = rawStore.toLowerCase() === "otros" ? "Otros" : (rawStore.charAt(0).toUpperCase() + rawStore.slice(1));
+    }
+
+    const items = parsed.items.map((i) => ({
+      name: i.name,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      totalPrice: Number(i.totalPrice) || 0,
+      category: i.category,
+      isPerishable: Boolean(i.isPerishable),
+      expiryDate: i.isPerishable && i.expiryDays ? addDays(receiptDate, i.expiryDays) : null,
+    }));
+
+    const recId = await recordReceipt({
+      storeId,
+      companyName,
+      date: receiptDate,
+      totalAmount: Math.round((Number(parsed.totalAmount) || 0) * 100) / 100,
+      rawText: rawText || JSON.stringify(parsed),
+      items,
+    });
+    if (recId) receiptId = recId;
+  }
+
+  // 2. Tachar de la lista de la compra los items seleccionados por el usuario
+  let checkedShoppingCount = 0;
+  const checkedShoppingNames: string[] = [];
+  if (config.shoppingItemIds && config.shoppingItemIds.length > 0) {
+    const itemsToMark = await q<{ id: number; name: string }>(
+      "select id, name from shopping_items where id = any($1)",
+      [config.shoppingItemIds]
+    );
+    if (itemsToMark.length > 0) {
+      await q(
+        "update shopping_items set checked = true, in_cart = false, checked_at = now() where id = any($1)",
+        [config.shoppingItemIds]
+      );
+      checkedShoppingCount = itemsToMark.length;
+      checkedShoppingNames.push(...itemsToMark.map((i) => i.name));
+    }
+  }
+
+  // 3. Actualizar despensa si está seleccionado
+  let pantryCount = 0;
+  if (config.updatePantry && parsed.items.length > 0) {
+    for (const item of parsed.items) {
+      await q(
+        `insert into pantry (name, status, updated_at)
+         values ($1, 'ok', now())
+         on conflict (name) do update set status = 'ok', updated_at = now()`,
+        [item.name.trim()]
+      );
+    }
+    pantryCount = parsed.items.length;
+  }
+
+  // 4. Registro de garantía opcional si se especificó
+  let warrantyCreated = false;
+  if (config.registerWarranty && config.registerWarranty.itemName) {
+    await q(
+      `insert into warranties (item_name, store_name, purchase_date, warranty_years, price, status, notes)
+       values ($1, $2, $3, $4, $5, 'vigente', $6)`,
+      [
+        config.registerWarranty.itemName,
+        parsed.storeName || "Otros",
+        receiptDate,
+        config.registerWarranty.warrantyYears || 3,
+        config.registerWarranty.price || parsed.totalAmount,
+        `Registrado automáticamente desde ticket`,
+      ]
+    );
+    warrantyCreated = true;
+  }
+
+  const parts: string[] = [];
+  if (config.saveExpense) {
+    parts.push(`Gasto de ${parsed.storeName} (${parsed.totalAmount.toFixed(2)} €) registrado en Economía`);
+  }
+  if (checkedShoppingCount > 0) {
+    parts.push(`${checkedShoppingCount} productos tachados de la lista de compra (${checkedShoppingNames.join(", ")})`);
+  }
+  if (pantryCount > 0) {
+    parts.push(`Despensa y nevera actualizadas (${pantryCount} artículos puestos a OK)`);
+  }
+  if (warrantyCreated) {
+    parts.push(`Garantía de ${config.registerWarranty?.itemName} archivada (3 años)`);
+  }
+
+  const summaryMessage = parts.length > 0
+    ? `✅ ¡Acciones completadas! ${parts.join(" · ")}.`
+    : "Ticket procesado sin acciones seleccionadas.";
+
+  return {
+    receiptId,
+    expensesSaved: Boolean(config.saveExpense),
+    checkedShoppingCount,
+    checkedShoppingNames,
+    pantryCount,
+    perishablesCount: parsed.items.filter((i) => i.isPerishable).length,
+    warrantyCreated,
+    summaryMessage,
+  };
+}
+

@@ -37,6 +37,7 @@ import {
   IconClock,
   IconPieChart,
 } from "./Icons";
+import { TicketManagerModal } from "./TicketManagerModal";
 
 export function EconomyModule({
   receipts = [],
@@ -73,6 +74,7 @@ export function EconomyModule({
   const [isPending, startTransition] = useTransition();
 
   // Estados para Escáner de Tickets
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [rawInput, setRawInput] = useState("");
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
@@ -232,10 +234,7 @@ export function EconomyModule({
 
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <button
-              onClick={() => {
-                setActiveTab("scan");
-                setShowScanner(true);
-              }}
+              onClick={() => setIsTicketModalOpen(true)}
               className="btn-primary"
               style={{ fontSize: "0.82rem", padding: "0.45rem 0.95rem", gap: "0.4rem" }}
             >
@@ -934,12 +933,12 @@ export function EconomyModule({
                 </p>
               </div>
               <button
-                onClick={() => setShowScanner(!showScanner)}
+                onClick={() => setIsTicketModalOpen(true)}
                 className="btn-primary"
                 style={{ fontSize: "0.8rem", padding: "0.4rem 0.85rem", gap: "0.35rem" }}
               >
                 <IconCamera size={14} />
-                <span>{showScanner ? "Ocultar" : "Nuevo Ticket"}</span>
+                <span>📷 Nuevo Ticket con Cámara</span>
               </button>
             </div>
 
@@ -982,11 +981,15 @@ export function EconomyModule({
                   gap: "0.85rem",
                 }}
               >
-                <label className="btn-secondary" style={{ alignSelf: "flex-start", cursor: "pointer", fontSize: "0.8rem", gap: "0.4rem" }}>
-                  <IconCamera size={14} />
-                  <span>Subir Foto del Ticket</span>
-                  <input type="file" accept="image/*" onChange={handleTicketImageUpload} style={{ display: "none" }} />
-                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsTicketModalOpen(true)}
+                  className="btn-primary"
+                  style={{ alignSelf: "flex-start", cursor: "pointer", fontSize: "0.85rem", gap: "0.45rem", padding: "0.5rem 1rem" }}
+                >
+                  <IconCamera size={16} />
+                  <span>📸 Abrir Gestor de Ticket con Cámara en Vivo</span>
+                </button>
 
                 <textarea
                   rows={3}
@@ -1118,6 +1121,12 @@ export function EconomyModule({
           </div>
         </div>
       )}
+
+      {/* ── Modal Unificado de Gestión de Ticket (Cámara & Acciones) ── */}
+      <TicketManagerModal
+        isOpen={isTicketModalOpen}
+        onClose={() => setIsTicketModalOpen(false)}
+      />
     </div>
   );
 }
