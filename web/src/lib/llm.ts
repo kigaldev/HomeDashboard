@@ -5,7 +5,7 @@ export type ChatMsg = { role: "system" | "user" | "assistant"; content: string }
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 const FALLBACK_MODELS = Array.from(
-  new Set([DEFAULT_MODEL, "gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"])
+  new Set([DEFAULT_MODEL, "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.8-flash"])
 );
 
 const LOCAL_BASE = (process.env.LLM_BASE_URL || "").replace(/\/$/, "");
@@ -123,8 +123,10 @@ export async function geminiVision(
 ): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY || GEMINI_KEY;
   if (!apiKey) {
-    console.warn("[geminiVision]: No se ha encontrado GEMINI_API_KEY en las variables de entorno.");
-    return null;
+    console.error("[geminiVision]: GEMINI_API_KEY no está configurada en las variables de entorno.");
+    throw new Error(
+      "GEMINI_API_KEY no está configurada en las variables de entorno del servidor (Vercel). Añade GEMINI_API_KEY en Vercel > Settings > Environment Variables."
+    );
   }
 
   const safeMimeType = (mimeType && ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType.toLowerCase()))
@@ -159,7 +161,7 @@ export async function geminiVision(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(18_000),
         cache: "no-store",
       });
 

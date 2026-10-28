@@ -1,3 +1,5 @@
+export const maxDuration = 60;
+
 import { isoDate, longDate, greeting, addDays } from "@/lib/dates";
 import {
   getMembers,

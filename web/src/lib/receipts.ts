@@ -287,16 +287,19 @@ export async function parseReceiptImage(base64Image: string, mimeType: string = 
     }
   }
 
-  if (normalized) {
+  if (normalized && (normalized.items.length > 0 || normalized.totalAmount > 0)) {
     return normalized;
   }
 
-  return {
-    storeName: "Otros",
-    date: isoDate(),
-    totalAmount: 0,
-    items: [],
-  };
+  if (!aiResp) {
+    throw new Error(
+      "No se pudo procesar la foto con el analizador de visión IA. Comprueba que el ticket esté bien iluminado y enfocado."
+    );
+  }
+
+  throw new Error(
+    "No se han detectado importes ni productos claros en la imagen. Intenta repetir la foto con mayor nitidez o introduce el texto."
+  );
 }
 
 /**

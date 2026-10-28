@@ -16,8 +16,43 @@ interface TicketManagerModalProps {
   initialMode?: "camera" | "upload" | "text";
 }
 
-/** Redimensiona y comprime cualquier foto en el navegador a JPEG max 1600px */
+/** Redimensiona y comprime cualquier foto en el navegador a JPEG max 1400px para OCR óptimo */
 async function compressImage(fileOrBlob: Blob): Promise<{ base64: string; mimeType: string }> {
+  const MAX_DIM = 1400;
+
+  // 1. Intento nativo con createImageBitmap (decodifica formatos de móvil como HEIC en iOS)
+  if (typeof window !== "undefined" && typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(fileOrBlob);
+      let width = bitmap.width;
+      let height = bitmap.height;
+
+      if (width > MAX_DIM || height > MAX_DIM) {
+        if (width > height) {
+          height = Math.round((height * MAX_DIM) / width);
+          width = MAX_DIM;
+        } else {
+          width = Math.round((width * MAX_DIM) / height);
+          height = MAX_DIM;
+        }
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(bitmap, 0, 0, width, height);
+        bitmap.close();
+        const base64 = canvas.toDataURL("image/jpeg", 0.85);
+        return { base64, mimeType: "image/jpeg" };
+      }
+    } catch {
+      // continuar a fallback
+    }
+  }
+
+  // 2. Fallback estándar con FileReader + HTMLImageElement
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onerror = () => {
@@ -27,11 +62,10 @@ async function compressImage(fileOrBlob: Blob): Promise<{ base64: string; mimeTy
       const originalResult = (reader.result as string) || "";
       const img = new Image();
       img.onerror = () => {
-        resolve({ base64: originalResult, mimeType: (fileOrBlob as File).type || "image/jpeg" });
+        resolve({ base64: originalResult, mimeType: "image/jpeg" });
       };
       img.onload = () => {
         try {
-          const MAX_DIM = 1600;
           let width = img.width || 800;
           let height = img.height || 600;
 
@@ -229,9 +263,15 @@ export function TicketManagerModal({
 
     try {
       const result = await scanTicketAction(params);
+      if (!result || ((!result.items || result.items.length === 0) && (!result.totalAmount || result.totalAmount <= 0))) {
+        throw new Error(
+          "No se han detectado datos ni importes en la imagen. Por favor, asegúrate de enfocar el ticket con buena luz o prueba a subirlo de nuevo."
+        );
+      }
+
       if (!result.items || result.items.length === 0) {
         setErrorMessage(
-          "⚠️ No se han detectado productos claros en el ticket. Puedes revisar la foto, editar los datos o pegar el texto."
+          "⚠️ Se detectó el total pero no los productos individuales. Puedes añadir productos manualmente o continuar."
         );
       }
 
@@ -241,7 +281,7 @@ export function TicketManagerModal({
       setStep("review");
     } catch (err: any) {
       console.error("Error analizando ticket:", err);
-      setErrorMessage("Error al analizar el ticket. Comprueba que el texto o imagen sea legible.");
+      setErrorMessage(err?.message || "Error al analizar el ticket. Comprueba que el texto o imagen sea legible.");
     } finally {
       setIsScanning(false);
       setScanStatusText("");
@@ -532,7 +572,7 @@ TOTAL 16.50 €`;
             <input
               ref={fileInputNativeCameraRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
               capture="environment"
               onChange={handleFileSelected}
               style={{ display: "none" }}
@@ -542,7 +582,7 @@ TOTAL 16.50 €`;
             <input
               ref={fileInputGalleryRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
               onChange={handleFileSelected}
               style={{ display: "none" }}
             />
@@ -865,7 +905,7 @@ TOTAL 16.50 €`;
                   <span>Examinar Galería / Archivos</span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
                     onChange={handleFileSelected}
                     style={{ display: "none" }}
                   />
@@ -1402,13 +1442,16 @@ TOTAL 16.50 €`;
               <button
                 type="button"
                 onClick={handleConfirmAndApply}
-                disabled={isPending}
+                disabled={isPending || !parsedData || (parsedData.totalAmount <= 0 && parsedData.items.length === 0)}
+                title={parsedData && parsedData.totalAmount <= 0 && parsedData.items.length === 0 ? "Introduce un importe o añade productos antes de guardar" : undefined}
                 className="btn-primary"
                 style={{
                   fontSize: "0.9rem",
                   padding: "0.6rem 1.4rem",
                   fontWeight: 800,
                   boxShadow: "var(--shadow-glow)",
+                  opacity: (!parsedData || (parsedData.totalAmount <= 0 && parsedData.items.length === 0)) ? 0.5 : 1,
+                  cursor: (!parsedData || (parsedData.totalAmount <= 0 && parsedData.items.length === 0)) ? "not-allowed" : "pointer",
                 }}
               >
                 {isPending ? "Aplicando acciones..." : "✅ Confirmar y Aplicar Acciones"}
