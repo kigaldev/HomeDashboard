@@ -1221,6 +1221,27 @@ TOTAL 16.50 €`;
                 </button>
               </div>
 
+              {parsedData.items.length === 0 && (
+                <div
+                  style={{
+                    padding: "0.85rem 1rem",
+                    borderRadius: "var(--radius-md)",
+                    background: "var(--apple-orange-subtle)",
+                    border: "1px solid var(--apple-orange)",
+                    color: "var(--apple-orange)",
+                    fontSize: "0.82rem",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: "0.2rem" }}>
+                    ⚠️ No se han detectado productos individuales en la foto
+                  </div>
+                  <div>
+                    Se guardará únicamente el gasto general ({parsedData.totalAmount.toFixed(2)} €), pero no se desglosarán artículos en despensa ni historial. Puedes añadir productos manualmente con el botón <strong>&ldquo;+ Añadir producto&rdquo;</strong> o pulsar en <em>&ldquo;← Repetir / Otra foto&rdquo;</em> para enfocar mejor el ticket.
+                  </div>
+                </div>
+              )}
+
               {/* Formulario rápido para añadir producto extra */}
               {isAddingItem && (
                 <div

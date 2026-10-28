@@ -82,57 +82,100 @@ export function estimatePerishable(name: string, category: string): { isPerishab
   return { isPerishable: false, expiryDays: 30 };
 }
 
+function parseFlexibleNumber(val: any): number {
+  if (typeof val === "number") return isNaN(val) ? 0 : val;
+  if (!val) return 0;
+  const str = String(val).replace(/[^0-9.,]/g, "").replace(",", ".");
+  const num = parseFloat(str);
+  return isNaN(num) ? 0 : num;
+}
+
+function normalizeParsedAiReceipt(rawAi: any, defaultStore: string = "Otros"): ParsedReceipt | null {
+  if (!rawAi || typeof rawAi !== "object") return null;
+  const root = rawAi.ticket || rawAi.receipt || rawAi;
+  const rawItems: any[] =
+    root.items ||
+    root.productos ||
+    root.articulos ||
+    root.products ||
+    root.line_items ||
+    root.lineItems ||
+    [];
+
+  const storeName = (root.storeName || root.tienda || root.comercio || root.supermercado || defaultStore || "Otros").trim();
+  const date = normalizeReceiptDate(root.date || root.fecha);
+
+  const items: ParsedReceiptItem[] = [];
+  for (const i of rawItems) {
+    const name = (i.name || i.nombre || i.producto || i.articulo || i.description || i.descripcion || "").trim();
+    if (!name) continue;
+    const totalPrice = parseFlexibleNumber(i.totalPrice ?? i.price ?? i.precio ?? i.total ?? i.importe);
+    const unitPrice = i.unitPrice != null ? parseFlexibleNumber(i.unitPrice) : undefined;
+    const category = i.category || i.categoria || "Despensa";
+    const perish = estimatePerishable(name, category);
+
+    items.push({
+      name,
+      quantity: i.quantity ? String(i.quantity) : undefined,
+      unitPrice,
+      totalPrice,
+      category,
+      isPerishable: i.isPerishable != null ? Boolean(i.isPerishable) : perish.isPerishable,
+      expiryDays: i.expiryDays ? Number(i.expiryDays) : perish.expiryDays,
+    });
+  }
+
+  const rawTotal = parseFlexibleNumber(root.totalAmount ?? root.total ?? root.importeTotal ?? root.importe_total);
+  const itemsTotal = items.reduce((s, it) => s + it.totalPrice, 0);
+  const totalAmount = Math.round((rawTotal > 0 ? rawTotal : itemsTotal) * 100) / 100;
+
+  if (items.length > 0 || totalAmount > 0 || (storeName && storeName.toLowerCase() !== "otros")) {
+    return {
+      storeName: storeName || "Otros",
+      date,
+      totalAmount,
+      items,
+    };
+  }
+
+  return null;
+}
+
 /**
  * Parsea el texto escaneado de un ticket (Mercadona, Carrefour, Lidl)
  * usando IA o heurística inteligente con formato español.
  */
 export async function parseReceiptText(rawText: string): Promise<ParsedReceipt> {
-  const today = isoDate();
-
-  // Intento con LLM local si está disponible
   const prompt = [
     {
       role: "system" as const,
       content:
-        "Eres un analizador OCR experto de tickets de compra de supermercados españoles (Mercadona, Carrefour, Lidl). " +
+        "Eres un analizador OCR experto de tickets de compra de supermercados españoles (Mercadona, Carrefour, Lidl, Dia, Alcampo). " +
         "Extrae en JSON válido la tienda ('Mercadona', 'Carrefour', 'Lidl' u 'Otros'), la fecha (YYYY-MM-DD), el importe total numérico, " +
-        "y la lista de productos con: 'name' (nombre limpio y claro en español), 'quantity' (opcional), 'unitPrice' (numérico), " +
+        "y la lista 'items' con: 'name' (nombre limpio y claro en español), 'quantity' (opcional), 'unitPrice' (numérico), " +
         "'totalPrice' (numérico), 'category' ('Fruta y Verdura', 'Carnicería', 'Pescadería', 'Lácteos', 'Huevos', 'Panadería', 'Despensa', 'Bebé / Higiene', 'Limpieza'), " +
         "'isPerishable' (true si es fresco que caduca en menos de 10 días), 'expiryDays' (días estimados hasta caducar, ej. 2 para pescado, 3 para pollo, 4 para fruta, 6 para leche).",
     },
     {
       role: "user" as const,
-      content: `Analiza este texto de ticket y responde SOLO con JSON:\n\n${rawText}`,
+      content: `Analiza este texto de ticket y responde ÚNICAMENTE con un objeto JSON válido:\n\n${rawText}`,
     },
   ];
 
   const aiResp = await llm(prompt, { timeoutMs: 30_000, json: true });
-  const parsedAi = parseJson<ParsedReceipt>(aiResp);
+  const parsedAi = parseJson<any>(aiResp);
+  const normalized = normalizeParsedAiReceipt(parsedAi, detectStoreFromText(rawText));
 
-  if (parsedAi && parsedAi.items && parsedAi.items.length > 0) {
-    const today = isoDate();
-    const finalDate = normalizeReceiptDate(parsedAi.date);
-    return {
-      storeName: parsedAi.storeName || detectStoreFromText(rawText),
-      date: finalDate,
-      totalAmount: Math.round((Number(parsedAi.totalAmount) || parsedAi.items.reduce((s, i) => s + (Number(i.totalPrice) || 0), 0)) * 100) / 100,
-      items: parsedAi.items.map((i) => {
-        const perish = estimatePerishable(i.name, i.category || "");
-        return {
-          name: i.name,
-          quantity: i.quantity,
-          unitPrice: i.unitPrice ? Number(i.unitPrice) : undefined,
-          totalPrice: Number(i.totalPrice) || 0,
-          category: i.category || "Despensa",
-          isPerishable: i.isPerishable ?? perish.isPerishable,
-          expiryDays: i.expiryDays ?? perish.expiryDays,
-        };
-      }),
-    };
+  if (normalized && normalized.items.length > 0) {
+    return normalized;
   }
 
-  // Heurística de fallback si la IA no está disponible
-  return parseReceiptHeuristic(rawText);
+  // Heurística de fallback si la IA no está disponible o no detectó items
+  const heuristic = parseReceiptHeuristic(rawText);
+  if (normalized && normalized.totalAmount > 0 && heuristic.items.length === 0) {
+    return normalized;
+  }
+  return heuristic;
 }
 
 function detectStoreFromText(text: string): string {
@@ -225,35 +268,27 @@ export async function parseReceiptImage(base64Image: string, mimeType: string = 
     "Devuelve ÚNICAMENTE el objeto JSON sin texto adicional ni formato markdown.";
 
   const aiResp = await geminiVision(prompt, base64Image, mimeType, { json: true });
-  const parsedAi = parseJson<ParsedReceipt>(aiResp);
+  const parsedAi = parseJson<any>(aiResp);
+  const normalized = normalizeParsedAiReceipt(parsedAi);
 
-  if (parsedAi && parsedAi.items && parsedAi.items.length > 0) {
-    const finalDate = normalizeReceiptDate(parsedAi.date);
-    return {
-      storeName: parsedAi.storeName || "Otros",
-      date: finalDate,
-      totalAmount: Math.round((Number(parsedAi.totalAmount) || parsedAi.items.reduce((s, i) => s + (Number(i.totalPrice) || 0), 0)) * 100) / 100,
-      items: parsedAi.items.map((i) => {
-        const perish = estimatePerishable(i.name, i.category || "");
-        return {
-          name: i.name,
-          quantity: i.quantity,
-          unitPrice: i.unitPrice ? Number(i.unitPrice) : undefined,
-          totalPrice: Number(i.totalPrice) || 0,
-          category: i.category || "Despensa",
-          isPerishable: i.isPerishable ?? perish.isPerishable,
-          expiryDays: i.expiryDays ?? perish.expiryDays,
-        };
-      }),
-    };
+  if (normalized && normalized.items.length > 0) {
+    return normalized;
   }
 
   // Si falló el JSON pero Gemini Vision devolvió texto con líneas de productos
   if (aiResp && aiResp.length > 20) {
     const fallbackParsed = parseReceiptHeuristic(aiResp);
     if (fallbackParsed.items.length > 0) {
-      return fallbackParsed;
+      return {
+        ...fallbackParsed,
+        storeName: normalized?.storeName !== "Otros" ? (normalized?.storeName || fallbackParsed.storeName) : fallbackParsed.storeName,
+        totalAmount: normalized?.totalAmount || fallbackParsed.totalAmount,
+      };
     }
+  }
+
+  if (normalized) {
+    return normalized;
   }
 
   return {

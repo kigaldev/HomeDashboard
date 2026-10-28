@@ -5,7 +5,7 @@ export type ChatMsg = { role: "system" | "user" | "assistant"; content: string }
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 const FALLBACK_MODELS = Array.from(
-  new Set([DEFAULT_MODEL, "gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"])
+  new Set([DEFAULT_MODEL, "gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"])
 );
 
 const LOCAL_BASE = (process.env.LLM_BASE_URL || "").replace(/\/$/, "");
@@ -19,8 +19,10 @@ export async function llm(
   messages: ChatMsg[],
   opts: { timeoutMs?: number; temperature?: number; json?: boolean } = {},
 ): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY || GEMINI_KEY;
+
   // 1. Prioridad: Google Gemini API (Rápido, oficial, multimodal)
-  if (GEMINI_KEY) {
+  if (apiKey) {
     const systemMsg = messages.find((m) => m.role === "system");
     const conversationMsgs = messages.filter((m) => m.role !== "system");
 
@@ -36,8 +38,7 @@ export async function llm(
     const body: any = {
       contents,
       generationConfig: {
-        temperature: opts.temperature ?? 0.4,
-        ...(opts.json ? { responseMimeType: "application/json" } : {}),
+        temperature: opts.temperature ?? 0.3,
       },
     };
 
@@ -49,7 +50,7 @@ export async function llm(
 
     for (const model of FALLBACK_MODELS) {
       try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const res = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -147,8 +148,7 @@ export async function geminiVision(
       },
     ],
     generationConfig: {
-      temperature: 0.2,
-      ...(opts.json ? { responseMimeType: "application/json" } : {}),
+      temperature: 0.1,
     },
   };
 
