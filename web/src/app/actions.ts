@@ -1,7 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import {
+  getActiveMemberId, setActiveMemberCookie, clearActiveMemberCookie, grantPinProof, hasPinProof,
+} from "@/lib/session";
+import {
+  parse, formObject, id as idSchema, shoppingForm, taskForm, shortText, longText, imageB64, mime,
+  assignments, pinSchema, optionalPinSchema,
+} from "@/lib/validation";
+import { z } from "zod";
 import {
   addShopping,
   toggleShopping,
@@ -34,7 +41,6 @@ import {
   setMemberPin,
   verifyMemberPin,
   type PantryItem,
-  type Task,
 } from "@/lib/repo";
 import { ensureDinnerPlans } from "@/lib/dinners";
 import { generateBriefing, type BriefingKind } from "@/lib/briefing";
@@ -59,44 +65,33 @@ import { markItemConsumed, ensureDemoReceipts, updateEnergyContract, upsertEnerg
 import { parseEnergyBillText, parseEnergyBillImage } from "@/lib/energy";
 
 export async function addShoppingAction(formData: FormData) {
-  const name = formData.get("name") as string;
-  const storeIdStr = formData.get("storeId") as string;
-  const quantity = formData.get("quantity") as string;
-  const byStr = formData.get("by") as string;
-  const storeId = storeIdStr ? parseInt(storeIdStr, 10) : null;
-
-  let by: number | null = byStr ? parseInt(byStr, 10) : null;
-  if (!by) {
-    const cookieStore = await cookies();
-    const activeMember = cookieStore.get("hd_active_member")?.value;
-    if (activeMember) by = parseInt(activeMember, 10);
-  }
-
-  if (name?.trim()) {
-    await addShopping(name, { storeId, quantity: quantity?.trim() || null, by });
-    revalidatePath("/");
-  }
+  const v = parse(shoppingForm, formObject(formData));
+  const by = v.by ?? (await getActiveMemberId());
+  await addShopping(v.name, { storeId: v.storeId, quantity: v.quantity, by });
+  revalidatePath("/");
 }
 
 export async function quickAddStapleAction(name: string, storeId: number | null) {
-  const cookieStore = await cookies();
-  const activeMember = cookieStore.get("hd_active_member")?.value;
-  const by = activeMember ? parseInt(activeMember, 10) : null;
-  await addShopping(name, { storeId, by });
+  const v = parse(z.object({ name: z.string().trim().min(1).max(120), storeId: idSchema.nullable() }), { name, storeId });
+  const by = await getActiveMemberId();
+  await addShopping(v.name, { storeId: v.storeId, by });
   revalidatePath("/");
 }
 
 export async function toggleShoppingAction(id: number) {
+  id = parse(idSchema, id);
   await toggleShopping(id);
   revalidatePath("/");
 }
 
 export async function toggleInCartAction(id: number) {
+  id = parse(idSchema, id);
   await toggleInCart(id);
   revalidatePath("/");
 }
 
 export async function setShoppingItemStoreAction(id: number, storeId: number | null) {
+  ({ id, storeId } = parse(z.object({ id: idSchema, storeId: idSchema.nullable() }), { id, storeId }));
   await setShoppingItemStore(id, storeId);
   revalidatePath("/");
 }
@@ -107,12 +102,13 @@ export async function optimizeShoppingBasketAction(): Promise<BasketOptimization
   return await optimizeShoppingBasket(items, stores);
 }
 
-export async function applyBasketOptimizationAction(assignments: { id: number; storeId: number }[]) {
-  await batchUpdateShoppingStores(assignments);
+export async function applyBasketOptimizationAction(items: { id: number; storeId: number }[]) {
+  await batchUpdateShoppingStores(parse(assignments, items));
   revalidatePath("/");
 }
 
 export async function deleteShoppingAction(id: number) {
+  id = parse(idSchema, id);
   await deleteShopping(id);
   revalidatePath("/");
 }
@@ -123,29 +119,25 @@ export async function clearCheckedShoppingAction() {
 }
 
 export async function setPantryStatusAction(name: string, status: PantryItem["status"]) {
+  name = parse(z.string().trim().min(1).max(120), name);
   await setPantry(name, status);
   revalidatePath("/");
 }
 
 export async function addTaskAction(formData: FormData) {
-  const title = formData.get("title") as string;
-  const assigneeIdStr = formData.get("assigneeId") as string;
-  const dueDate = (formData.get("dueDate") as string) || null;
-  const recurrence = (formData.get("recurrence") as Task["recurrence"]) || null;
-  const assigneeId = assigneeIdStr ? parseInt(assigneeIdStr, 10) : null;
-
-  if (title?.trim()) {
-    await addTask(title, assigneeId, dueDate, recurrence);
-    revalidatePath("/");
-  }
+  const v = parse(taskForm, formObject(formData));
+  await addTask(v.title, v.assigneeId, v.dueDate, v.recurrence);
+  revalidatePath("/");
 }
 
 export async function toggleTaskAction(id: number) {
+  id = parse(idSchema, id);
   await toggleTask(id);
   revalidatePath("/");
 }
 
 export async function deleteTaskAction(id: number) {
+  id = parse(idSchema, id);
   await deleteTask(id);
   revalidatePath("/");
 }
@@ -217,6 +209,7 @@ export async function generateBriefingAction(kind: BriefingKind) {
 }
 
 export async function askAssistantAction(question: string) {
+  question = parse(z.string().trim().min(1).max(2000), question);
   return await askAssistant(question);
 }
 
@@ -366,6 +359,8 @@ export async function verifyTelegramIntegrationAction(targetUserId?: string) {
 }
 
 export async function runAgentInstructionAction(instruction: string, history: any[] = []): Promise<AgentActionResult> {
+  instruction = parse(z.string().trim().min(1).max(4000), instruction);
+  history = parse(z.array(z.any()).max(50), history);
   const result = await runAgentInstruction(instruction, history);
   if (result.actionExecuted) {
     revalidatePath("/");
@@ -374,6 +369,7 @@ export async function runAgentInstructionAction(instruction: string, history: an
 }
 
 export async function processReceiptAction(rawText: string): Promise<ParsedReceipt & { reconciliation: ReceiptReconciliationResult }> {
+  rawText = parse(longText.min(1), rawText);
   const parsed = await parseReceiptText(rawText);
   const reconciliation = await saveProcessedReceipt(parsed, rawText);
   revalidatePath("/");
@@ -384,6 +380,8 @@ export async function processReceiptImageAction(
   base64Image: string,
   mimeType: string = "image/jpeg"
 ): Promise<ParsedReceipt & { reconciliation: ReceiptReconciliationResult }> {
+  base64Image = parse(imageB64.min(1), base64Image);
+  mimeType = parse(mime, mimeType);
   const parsed = await parseReceiptImage(base64Image, mimeType);
   const reconciliation = await saveProcessedReceipt(parsed, "[Ticket escaneado mediante Gemini Vision]");
   revalidatePath("/");
@@ -395,6 +393,7 @@ export async function scanTicketAction(data: {
   imageBase64?: string;
   mimeType?: string;
 }): Promise<ParsedReceiptWithMatches> {
+  data = parse(z.object({ text: longText.optional(), imageBase64: imageB64.optional(), mimeType: mime.optional() }), data);
   let parsed: ParsedReceipt;
 
   if (data.imageBase64) {
@@ -418,12 +417,14 @@ export async function executeReceiptActionsAction(
   config: ReceiptActionConfig,
   rawText?: string
 ): Promise<ReceiptExecutionResult> {
+  rawText = parse(longText.optional(), rawText);
   const result = await executeReceiptActions(parsed, config, rawText);
   revalidatePath("/");
   return result;
 }
 
 export async function markPerishableConsumedAction(id: number) {
+  id = parse(idSchema, id);
   await markItemConsumed(id);
   revalidatePath("/");
 }
@@ -452,33 +453,45 @@ export async function toggleStapleAction(name: string, emoji: string = "🛒", s
 
 // ── Zona de Login y Perfiles (Kike y Lara) ─────────────────
 export async function setActiveProfileCookieAction(memberId: number) {
-  const cookieStore = await cookies();
-  cookieStore.set("hd_active_member", memberId.toString(), {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-    sameSite: "lax",
-  });
+  memberId = parse(idSchema, memberId);
+  const member = (await getMembers()).find((m) => m.id === memberId);
+  if (!member) throw new Error("Perfil no encontrado.");
+  // Si tiene PIN, hace falta una verificación reciente (cookie firmada de 2 min)
+  if (member.pin && !(await hasPinProof(memberId))) throw new Error("PIN requerido.");
+  await setActiveMemberCookie(memberId);
   revalidatePath("/");
 }
 
 export async function clearActiveProfileCookieAction() {
-  const cookieStore = await cookies();
-  cookieStore.delete("hd_active_member");
+  await clearActiveMemberCookie();
   revalidatePath("/");
 }
 
 export async function updateProfilePreferenceAction(memberId: number, preferredTab: string) {
+  ({ memberId, preferredTab } = parse(z.object({ memberId: idSchema, preferredTab: z.string().trim().min(1).max(40) }), { memberId, preferredTab }));
   await updateMemberPreference(memberId, preferredTab);
   revalidatePath("/");
 }
 
 export async function setProfilePinAction(memberId: number, pin: string) {
+  memberId = parse(idSchema, memberId);
+  pin = parse(optionalPinSchema, pin);
+  const member = (await getMembers()).find((m) => m.id === memberId);
+  if (!member) throw new Error("Perfil no encontrado.");
+  // Cambiar un PIN existente exige ser ese miembro (sesión firmada) o PIN recién verificado
+  if (member.pin && (await getActiveMemberId()) !== memberId && !(await hasPinProof(memberId))) {
+    throw new Error("No autorizado.");
+  }
   await setMemberPin(memberId, pin);
   revalidatePath("/");
 }
 
 export async function verifyProfilePinAction(memberId: number, pin: string): Promise<boolean> {
-  return await verifyMemberPin(memberId, pin);
+  const v = z.object({ memberId: idSchema, pin: pinSchema }).safeParse({ memberId, pin });
+  if (!v.success) return false;
+  const ok = await verifyMemberPin(v.data.memberId, v.data.pin);
+  if (ok) await grantPinProof(v.data.memberId);
+  return ok;
 }
 
 // ── Optimización Energética y Memoria de Tarifas (Naturgy) ─
@@ -558,4 +571,21 @@ export async function deleteWarrantyAction(id: number) {
   await deleteWarranty(id);
   revalidatePath("/");
 }
+
+// ── Recetas & Cenas (Inspirado en Mealie / schema.org) ──────────
+export async function scrapeRecipeUrlAction(url: string) {
+  const { scrapeRecipeUrl } = await import("@/lib/recipeScraper");
+  return await scrapeRecipeUrl(url);
+}
+
+export async function addRecipeIngredientsToShoppingAction(ingredients: string[]) {
+  const { addShopping } = await import("@/lib/repo");
+  for (const ing of ingredients) {
+    if (ing && ing.trim()) {
+      await addShopping(ing.trim());
+    }
+  }
+  revalidatePath("/");
+}
+
 

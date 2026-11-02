@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import type { Member } from "@/lib/repo";
 import {
   setActiveProfileCookieAction,
@@ -99,7 +100,9 @@ export function ProfileLoginModal({
   };
 
   return (
-    <div
+    <Dialog.Root open onOpenChange={(open: boolean) => { if (!open) onClose(); }}>
+    <Dialog.Portal>
+    <Dialog.Overlay
       style={{
         position: "fixed",
         inset: 0,
@@ -113,9 +116,9 @@ export function ProfileLoginModal({
         padding: "1rem",
         animation: "fadeIn 0.2s ease-out",
       }}
-      onClick={onClose}
     >
-      <div
+      <Dialog.Content
+        aria-describedby={undefined}
         style={{
           background: "var(--apple-surface-elevated, #1c1c1e)",
           border: "1px solid var(--apple-border, rgba(255, 255, 255, 0.14))",
@@ -126,16 +129,15 @@ export function ProfileLoginModal({
           boxShadow: "0 24px 60px rgba(0, 0, 0, 0.6)",
           position: "relative",
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecera del modal */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <span style={{ fontSize: "1.3rem" }}>👤</span>
-              <h2 style={{ fontSize: "1.2rem", fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
+              <Dialog.Title style={{ fontSize: "1.2rem", fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
                 Perfil del Hogar
-              </h2>
+              </Dialog.Title>
             </div>
             <p style={{ fontSize: "0.82rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.25rem" }}>
               {activeMember
@@ -414,7 +416,9 @@ export function ProfileLoginModal({
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </Dialog.Content>
+    </Dialog.Overlay>
+    </Dialog.Portal>
+    </Dialog.Root>
   );
 }

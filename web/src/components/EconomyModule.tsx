@@ -38,6 +38,7 @@ import {
   IconPieChart,
 } from "./Icons";
 import { TicketManagerModal } from "./TicketManagerModal";
+import { CategoryDonutChart, MonthCompareChart } from "./ChartsLazy";
 
 export function EconomyModule({
   receipts = [],
@@ -464,6 +465,13 @@ export function EconomyModule({
               <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
                 Distribución por Categoría de Consumo
               </h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "1rem" }}>
+                <CategoryDonutChart data={monthlyExpenses.by_category} />
+                <MonthCompareChart
+                  last={monthlyExpenses.last_month_total}
+                  current={monthlyExpenses.current_month_total}
+                />
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem" }}>
                 {monthlyExpenses.by_category.map((cat) => (
                   <div

@@ -456,6 +456,7 @@ TOTAL 16.50 €`;
     <dialog
       ref={dialogRef}
       onClose={handleCloseModal}
+      aria-label="Gestor de tickets"
       style={{
         maxWidth: "760px",
         width: "92vw",

@@ -76,13 +76,22 @@ export async function updateMemberPreference(memberId: number, preferredTab: str
 }
 
 export async function setMemberPin(memberId: number, pin: string) {
-  await q("update members set pin = $2 where id = $1", [memberId, pin]);
+  const { hashPin } = await import("./session");
+  await q("update members set pin = $2 where id = $1", [memberId, pin ? hashPin(pin) : null]);
 }
 
 export async function verifyMemberPin(memberId: number, pin: string): Promise<boolean> {
+  const { checkPin, isRateLimited, recordFailure, resetFailures, hashPin } = await import("./session");
+  const key = `pin:${memberId}`;
+  if (isRateLimited(key)) return false;
   const rows = await q<{ pin: string | null }>("select pin from members where id = $1", [memberId]);
-  if (!rows[0] || !rows[0].pin) return true;
-  return rows[0].pin === pin;
+  if (!rows[0]) return false;
+  if (!rows[0].pin) return true;
+  const { ok, legacy } = checkPin(rows[0].pin, pin);
+  if (!ok) { recordFailure(key); return false; }
+  resetFailures(key);
+  if (legacy) await q("update members set pin = $2 where id = $1", [memberId, hashPin(pin)]);
+  return true;
 }
 
 // ── Compra ────────────────────────────────────────────────
@@ -217,7 +226,20 @@ export async function toggleTask(id: number) {
     // Recurrente: se marca hecha y se crea la siguiente ocurrencia
     const base = t.due_date ?? isoDate();
     const next = t.recurrence === "daily" ? addDays(base, 1) : t.recurrence === "weekly" ? addDays(base, 7) : addDays(base, 30);
-    await addTask(t.title, t.assignee_id, next, t.recurrence);
+
+    // Rotación automática entre adultos del hogar (inspirado en Donetick/Grocy)
+    let nextAssignee = t.assignee_id;
+    if (t.assignee_id) {
+      const adults = await q<{ id: number }>("select id from members where role = 'adult' order by id");
+      if (adults.length > 1) {
+        const currentIdx = adults.findIndex((a) => a.id === t.assignee_id);
+        if (currentIdx !== -1) {
+          nextAssignee = adults[(currentIdx + 1) % adults.length].id;
+        }
+      }
+    }
+
+    await addTask(t.title, nextAssignee, next, t.recurrence);
   }
   await q("update tasks set done = not done, done_at = case when done then null else now() end where id=$1", [id]);
 }

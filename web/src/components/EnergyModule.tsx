@@ -14,6 +14,8 @@ import {
   ingestEnergyBillImageAction,
 } from "@/app/actions";
 
+import { EnergyCostChart } from "./ChartsLazy";
+
 export function EnergyModule({
   contracts = [],
   todayWeather = null,
@@ -361,6 +363,18 @@ export function EnergyModule({
       {/* ── Pestaña 2: Lavadora & Electrodomésticos ── */}
       {activeSubTab === "appliances" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div className="card-apple" style={{ padding: "1.25rem" }}>
+            <h3 style={{ fontSize: "1rem", fontWeight: 700, margin: 0, marginBottom: "0.5rem" }}>
+              Coste estimado por uso ({elecKwhPrice} €/kWh)
+            </h3>
+            <EnergyCostChart
+              data={[
+                { name: "Recarga EV (20 kWh)", cost: 20 * elecKwhPrice },
+                { name: "Colada (1,5 kWh)", cost: 1.5 * elecKwhPrice },
+                { name: "Lavavajillas (1,2 kWh)", cost: 1.2 * elecKwhPrice },
+              ]}
+            />
+          </div>
           {/* Tarjeta Lavadora */}
           <div className="card-apple" style={{ padding: "1.25rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem" }}>
