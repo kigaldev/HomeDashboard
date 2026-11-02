@@ -5,7 +5,7 @@ export type ChatMsg = { role: "system" | "user" | "assistant"; content: string }
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 const FALLBACK_MODELS = Array.from(
-  new Set([DEFAULT_MODEL, "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.8-flash"])
+  new Set([DEFAULT_MODEL, "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"])
 );
 
 const LOCAL_BASE = (process.env.LLM_BASE_URL || "").replace(/\/$/, "");
@@ -129,10 +129,12 @@ export async function geminiVision(
     );
   }
 
-  const safeMimeType = (mimeType && ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType.toLowerCase()))
+  const safeMimeType = (mimeType && ["image/jpeg", "image/png", "image/webp"].includes(mimeType.toLowerCase()))
     ? mimeType.toLowerCase()
     : "image/jpeg";
-  const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+  const cleanBase64 = (imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64)
+    .trim()
+    .replace(/\s+/g, "");
 
   const body = {
     contents: [
@@ -176,7 +178,14 @@ export async function geminiVision(
       if (!text) continue;
 
       if (opts.json) {
-        return text.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+        const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (jsonBlockMatch) {
+          return jsonBlockMatch[1].trim();
+        }
+        const bracketMatch = text.match(/\{[\s\S]*\}/);
+        if (bracketMatch) {
+          return bracketMatch[0].trim();
+        }
       }
       return text.trim();
     } catch (err: any) {

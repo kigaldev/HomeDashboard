@@ -16,88 +16,79 @@ interface TicketManagerModalProps {
   initialMode?: "camera" | "upload" | "text";
 }
 
-/** Redimensiona y comprime cualquier foto en el navegador a JPEG max 1400px para OCR óptimo */
+/** Redimensiona y comprime cualquier foto en el navegador a JPEG max 1200px para OCR óptimo (<400KB) */
 async function compressImage(fileOrBlob: Blob): Promise<{ base64: string; mimeType: string }> {
-  const MAX_DIM = 1400;
+  const MAX_DIM = 1200;
 
-  // 1. Intento nativo con createImageBitmap (decodifica formatos de móvil como HEIC en iOS)
-  if (typeof window !== "undefined" && typeof createImageBitmap === "function") {
-    try {
-      const bitmap = await createImageBitmap(fileOrBlob);
-      let width = bitmap.width;
-      let height = bitmap.height;
-
-      if (width > MAX_DIM || height > MAX_DIM) {
-        if (width > height) {
-          height = Math.round((height * MAX_DIM) / width);
-          width = MAX_DIM;
-        } else {
-          width = Math.round((width * MAX_DIM) / height);
-          height = MAX_DIM;
-        }
-      }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(bitmap, 0, 0, width, height);
-        bitmap.close();
-        const base64 = canvas.toDataURL("image/jpeg", 0.85);
-        return { base64, mimeType: "image/jpeg" };
-      }
-    } catch {
-      // continuar a fallback
+  return new Promise((resolve, reject) => {
+    if (!fileOrBlob || typeof fileOrBlob.slice !== "function") {
+      reject(new Error("No se ha seleccionado un archivo de imagen válido."));
+      return;
     }
-  }
 
-  // 2. Fallback estándar con FileReader + HTMLImageElement
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onerror = () => {
-      resolve({ base64: "", mimeType: "image/jpeg" });
-    };
-    reader.onload = () => {
-      const originalResult = (reader.result as string) || "";
-      const img = new Image();
-      img.onerror = () => {
-        resolve({ base64: originalResult, mimeType: "image/jpeg" });
-      };
-      img.onload = () => {
-        try {
-          let width = img.width || 800;
-          let height = img.height || 600;
+    const objectUrl = URL.createObjectURL(fileOrBlob);
+    const img = new Image();
 
-          if (width > MAX_DIM || height > MAX_DIM) {
-            if (width > height) {
-              height = Math.round((height * MAX_DIM) / width);
-              width = MAX_DIM;
-            } else {
-              width = Math.round((width * MAX_DIM) / height);
-              height = MAX_DIM;
-            }
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      try {
+        let width = img.naturalWidth || img.width || 800;
+        let height = img.naturalHeight || img.height || 600;
+
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          } else {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
           }
-
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            resolve({ base64: originalResult, mimeType: "image/jpeg" });
-            return;
-          }
-
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL("image/jpeg", 0.85);
-          resolve({ base64: compressedBase64, mimeType: "image/jpeg" });
-        } catch {
-          resolve({ base64: originalResult, mimeType: "image/jpeg" });
         }
-      };
-      img.src = originalResult;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("No se pudo inicializar el procesador gráfico del navegador."));
+          return;
+        }
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let quality = 0.75;
+        let base64 = canvas.toDataURL("image/jpeg", quality);
+
+        // Si supera 1.2MB, recomprime a calidad 0.55
+        if (base64.length > 1_200_000) {
+          base64 = canvas.toDataURL("image/jpeg", 0.55);
+        }
+
+        resolve({ base64, mimeType: "image/jpeg" });
+      } catch (err: any) {
+        reject(new Error("Error al optimizar la imagen: " + (err?.message || "error desconocido")));
+      }
     };
-    reader.readAsDataURL(fileOrBlob);
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      // Fallback con FileReader
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        if (!result) {
+          reject(new Error("No se pudo leer la imagen seleccionada."));
+          return;
+        }
+        resolve({ base64: result, mimeType: "image/jpeg" });
+      };
+      reader.onerror = () => reject(new Error("Error al leer el archivo en el navegador."));
+      reader.readAsDataURL(fileOrBlob);
+    };
+
+    img.src = objectUrl;
   });
 }
 
@@ -108,8 +99,6 @@ export function TicketManagerModal({
 }: TicketManagerModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const fileInputNativeCameraRef = useRef<HTMLInputElement>(null);
-  const fileInputGalleryRef = useRef<HTMLInputElement>(null);
 
   // Estados del flujo
   const [step, setStep] = useState<"capture" | "review" | "success">("capture");
@@ -241,6 +230,8 @@ export function TicketManagerModal({
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Permitir volver a seleccionar el mismo fichero si fuera necesario
+    e.target.value = "";
     setErrorMessage(null);
     setIsScanning(true);
     setScanStatusText("📸 Optimizando foto del ticket...");
@@ -568,25 +559,6 @@ TOTAL 16.50 €`;
         {/* ═════════════════════════════════════════════════════════════ */}
         {step === "capture" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
-            {/* Input oculto para CÁMARA NATIVA RÁPIDA (capture="environment") */}
-            <input
-              ref={fileInputNativeCameraRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
-              capture="environment"
-              onChange={handleFileSelected}
-              style={{ display: "none" }}
-            />
-
-            {/* Input oculto para GALERÍA / ARCHIVOS */}
-            <input
-              ref={fileInputGalleryRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
-              onChange={handleFileSelected}
-              style={{ display: "none" }}
-            />
-
             {/* Selector de modo de entrada */}
             <div
               style={{
@@ -724,6 +696,7 @@ TOTAL 16.50 €`;
 
                   <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap", justifyContent: "center" }}>
                     <label
+                      htmlFor="ticket-native-camera-input"
                       className="btn-primary"
                       style={{
                         padding: "0.6rem 1.25rem",
@@ -738,14 +711,27 @@ TOTAL 16.50 €`;
                     >
                       <IconCamera size={18} />
                       <span>📸 Tomar Foto con la Cámara</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handleFileSelected}
-                        style={{ display: "none" }}
-                      />
                     </label>
+                    <input
+                      id="ticket-native-camera-input"
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      capture="environment"
+                      onChange={handleFileSelected}
+                      style={{
+                        position: "absolute",
+                        width: "1px",
+                        height: "1px",
+                        padding: 0,
+                        margin: "-1px",
+                        overflow: "hidden",
+                        clip: "rect(0, 0, 0, 0)",
+                        whiteSpace: "nowrap",
+                        border: 0,
+                        opacity: 0,
+                        pointerEvents: "none",
+                      }}
+                    />
 
                     <button
                       type="button"
@@ -892,6 +878,7 @@ TOTAL 16.50 €`;
                 </p>
 
                 <label
+                  htmlFor="ticket-gallery-input"
                   className="btn-primary"
                   style={{
                     marginTop: "0.4rem",
@@ -903,13 +890,26 @@ TOTAL 16.50 €`;
                   }}
                 >
                   <span>Examinar Galería / Archivos</span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
-                    onChange={handleFileSelected}
-                    style={{ display: "none" }}
-                  />
                 </label>
+                <input
+                  id="ticket-gallery-input"
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  onChange={handleFileSelected}
+                  style={{
+                    position: "absolute",
+                    width: "1px",
+                    height: "1px",
+                    padding: 0,
+                    margin: "-1px",
+                    overflow: "hidden",
+                    clip: "rect(0, 0, 0, 0)",
+                    whiteSpace: "nowrap",
+                    border: 0,
+                    opacity: 0,
+                    pointerEvents: "none",
+                  }}
+                />
               </div>
             )}
 
