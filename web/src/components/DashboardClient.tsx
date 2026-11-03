@@ -243,40 +243,22 @@ export function DashboardClient({
               }}
               type="button"
               onClick={() => goToCard(idx)}
-              className={`deck-nav-btn ${activeCardIndex === idx ? "active" : ""}`}
+              className={`deck-nav-btn touch-target ${activeCardIndex === idx ? "active" : ""}`}
             >
-              <span style={{ display: "inline-flex", alignItems: "center" }}>{card.icon(15)}</span>
-              <span>{card.label}</span>
-              {card.id === "economia" && urgentPerishablesCount > 0 && (
-                <span
-                  style={{
-                    marginLeft: "0.2rem",
-                    padding: "0.1rem 0.4rem",
-                    borderRadius: "var(--radius-full)",
-                    background: "var(--apple-orange)",
-                    color: "#ffffff",
-                    fontSize: "0.68rem",
-                    fontWeight: 700,
-                  }}
-                >
-                  {urgentPerishablesCount}
-                </span>
-              )}
-              {card.id === "familia" && pendingTasksCount > 0 && (
-                <span
-                  style={{
-                    marginLeft: "0.2rem",
-                    padding: "0.1rem 0.4rem",
-                    borderRadius: "var(--radius-full)",
-                    background: "var(--apple-surface-tertiary)",
-                    color: "var(--apple-text-secondary)",
-                    fontSize: "0.68rem",
-                    fontWeight: 700,
-                  }}
-                >
-                  {pendingTasksCount}
-                </span>
-              )}
+              <div className="deck-nav-icon-box">
+                {card.icon(18)}
+                {card.id === "economia" && urgentPerishablesCount > 0 && (
+                  <span className="deck-badge-counter deck-badge-amber">
+                    {urgentPerishablesCount}
+                  </span>
+                )}
+                {card.id === "familia" && pendingTasksCount > 0 && (
+                  <span className="deck-badge-counter deck-badge-gray">
+                    {pendingTasksCount}
+                  </span>
+                )}
+              </div>
+              <span className="deck-nav-label">{card.label}</span>
             </button>
           ))}
         </nav>
@@ -302,10 +284,11 @@ export function DashboardClient({
       >
         {/* 🃏 Tarjeta 1: Hoy (Centro de Mando) */}
         <div className="deck-slide">
-          <div className="deck-card">
+          <div className="deck-card wall-kiosk-card">
             {urgentPerishablesCount > 0 && (
               <div
                 onClick={() => goToCard(2)}
+                className="wall-alert-banner touch-target"
                 style={{
                   cursor: "pointer",
                   padding: "0.85rem 1.25rem",
@@ -318,6 +301,7 @@ export function DashboardClient({
                   alignItems: "center",
                   flexWrap: "wrap",
                   gap: "0.75rem",
+                  minHeight: "48px",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
@@ -337,249 +321,262 @@ export function DashboardClient({
               </div>
             )}
 
-            <BriefingCard
-              initialContent={latestBriefing}
-              todayWeather={todayWeather}
-            />
+            <div className="wall-dashboard-grid">
+              {/* Columna Izquierda: Briefing + Agenda de Hoy compacta */}
+              <div className="wall-grid-col wall-grid-col-left">
+                <BriefingCard
+                  initialContent={latestBriefing}
+                  todayWeather={todayWeather}
+                />
 
-            {/* Widget Rápido: Economía & Suministros Naturgy */}
-            <div
-              onClick={() => goToCard(2)}
-              style={{
-                cursor: "pointer",
-                padding: "0.95rem 1.25rem",
-                borderRadius: "var(--radius-lg)",
-                background: "var(--apple-surface-secondary)",
-                borderLeft: "4px solid var(--apple-green)",
-                boxShadow: "var(--shadow-sm)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "0.75rem",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
+                {/* Widget Rápido: Agenda de Hoy */}
                 <div
+                  className="glass-card wall-agenda-widget"
                   style={{
-                    width: "28px",
-                    height: "28px",
-                    borderRadius: "50%",
-                    background: "rgba(52, 199, 89, 0.15)",
-                    color: "var(--apple-green)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
+                    padding: "1rem 1.25rem",
+                    borderRadius: "var(--radius-lg)",
+                    background: "var(--apple-surface-secondary)",
+                    boxShadow: "var(--shadow-sm)",
+                    border: "1px solid var(--apple-border)",
                   }}
                 >
-                  <IconEnergy size={15} />
-                </div>
-                <div>
-                  <p style={{ fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
-                    Economía Familiar & Suministros Naturgy
-                  </p>
-                  <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: "0.15rem 0 0 0" }}>
-                    Luz fija 24h a 0.123 €/kWh · Carga recomendada de VE en Valle P2 (00:00–07:30)
-                  </p>
-                </div>
-              </div>
-              <span className="badge badge-blue" style={{ fontSize: "0.76rem" }}>
-                Ver Módulo Economía →
-              </span>
-            </div>
-
-            {/* Widget Rápido: Agenda de Hoy */}
-            <div
-              className="glass-card"
-              style={{
-                padding: "1rem 1.25rem",
-                borderRadius: "var(--radius-lg)",
-                background: "var(--apple-surface-secondary)",
-                boxShadow: "var(--shadow-sm)",
-                border: "1px solid var(--apple-border)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "0.75rem",
-                  flexWrap: "wrap",
-                  gap: "0.5rem",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                   <div
                     style={{
-                      width: "28px",
-                      height: "28px",
-                      borderRadius: "50%",
-                      background: "rgba(0, 113, 227, 0.15)",
-                      color: "var(--apple-blue)",
                       display: "flex",
+                      justifyContent: "space-between",
                       alignItems: "center",
-                      justifyContent: "center",
+                      marginBottom: "0.75rem",
+                      flexWrap: "wrap",
+                      gap: "0.5rem",
                     }}
                   >
-                    <IconCalendar size={15} />
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                    <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
-                      📅 Agenda de Hoy
-                    </h3>
-                    <span
-                      style={{
-                        fontSize: "0.7rem",
-                        padding: "0.1rem 0.5rem",
-                        borderRadius: "var(--radius-full)",
-                        background: todayEvents.length > 0 ? "rgba(0, 113, 227, 0.12)" : "var(--apple-surface)",
-                        color: todayEvents.length > 0 ? "var(--apple-blue)" : "var(--apple-text-secondary)",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {todayEvents.length} {todayEvents.length === 1 ? "evento" : "eventos"}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={openFamilyAgenda}
-                  className="btn-ghost"
-                  style={{
-                    fontSize: "0.76rem",
-                    color: "var(--apple-blue)",
-                    fontWeight: 600,
-                    padding: "0.2rem 0.45rem",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.25rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  Ver agenda completa →
-                </button>
-              </div>
-
-              {todayEvents.length === 0 ? (
-                <div
-                  style={{
-                    padding: "0.85rem 1rem",
-                    textAlign: "center",
-                    borderRadius: "var(--radius-md)",
-                    background: "var(--apple-surface)",
-                    color: "var(--apple-text-secondary)",
-                    fontSize: "0.82rem",
-                    border: "1px dashed var(--apple-border)",
-                  }}
-                >
-                  Sin eventos programados para hoy ✨
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                  {todayEvents.map((ev) => {
-                    const member = ev.member_id ? memberMap.get(ev.member_id) : null;
-                    const accent = member?.color || "var(--apple-blue)";
-                    return (
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                       <div
-                        key={ev.id}
-                        onClick={openFamilyAgenda}
                         style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "50%",
+                          background: "rgba(0, 113, 227, 0.15)",
+                          color: "var(--apple-blue)",
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "0.6rem 0.85rem",
-                          borderRadius: "var(--radius-md)",
-                          background: "var(--apple-surface)",
-                          border: "1px solid var(--apple-border)",
-                          borderLeft: `3px solid ${accent}`,
-                          cursor: "pointer",
-                          gap: "0.65rem",
-                          transition: "all 0.15s ease",
+                          justifyContent: "center",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flex: 1, minWidth: 0 }}>
+                        <IconCalendar size={16} />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                        <h3 style={{ fontSize: "0.98rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
+                          📅 Agenda de Hoy
+                        </h3>
+                        <span
+                          style={{
+                            fontSize: "0.72rem",
+                            padding: "0.12rem 0.5rem",
+                            borderRadius: "var(--radius-full)",
+                            background: todayEvents.length > 0 ? "rgba(0, 113, 227, 0.12)" : "var(--apple-surface)",
+                            color: todayEvents.length > 0 ? "var(--apple-blue)" : "var(--apple-text-secondary)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {todayEvents.length} {todayEvents.length === 1 ? "evento" : "eventos"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={openFamilyAgenda}
+                      className="btn-ghost touch-target"
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "var(--apple-blue)",
+                        fontWeight: 600,
+                        padding: "0.35rem 0.6rem",
+                        minHeight: "44px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Ver agenda completa →
+                    </button>
+                  </div>
+
+                  {todayEvents.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "0.85rem 1rem",
+                        textAlign: "center",
+                        borderRadius: "var(--radius-md)",
+                        background: "var(--apple-surface)",
+                        color: "var(--apple-text-secondary)",
+                        fontSize: "0.85rem",
+                        border: "1px dashed var(--apple-border)",
+                      }}
+                    >
+                      Sin eventos programados para hoy ✨
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                      {todayEvents.map((ev) => {
+                        const member = ev.member_id ? memberMap.get(ev.member_id) : null;
+                        const accent = member?.color || "var(--apple-blue)";
+                        return (
                           <div
+                            key={ev.id}
+                            onClick={openFamilyAgenda}
+                            className="touch-target"
                             style={{
                               display: "flex",
                               alignItems: "center",
-                              gap: "0.25rem",
-                              fontSize: "0.76rem",
-                              fontWeight: 700,
-                              color: accent,
-                              flexShrink: 0,
-                              minWidth: "62px",
+                              justifyContent: "space-between",
+                              padding: "0.65rem 0.85rem",
+                              borderRadius: "var(--radius-md)",
+                              background: "var(--apple-surface)",
+                              border: "1px solid var(--apple-border)",
+                              borderLeft: `3px solid ${accent}`,
+                              cursor: "pointer",
+                              gap: "0.65rem",
+                              minHeight: "44px",
+                              transition: "all 0.15s ease",
                             }}
                           >
-                            <IconClock size={12} />
-                            <span>{ev.all_day ? "Todo el día" : timeOf(ev.starts_at)}</span>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <span
-                              style={{
-                                fontSize: "0.86rem",
-                                fontWeight: 600,
-                                color: "var(--apple-text)",
-                                display: "block",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              }}
-                            >
-                              {ev.title}
-                            </span>
-                            {ev.location && (
-                              <span
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flex: 1, minWidth: 0 }}>
+                              <div
                                 style={{
-                                  fontSize: "0.72rem",
-                                  color: "var(--apple-text-secondary)",
-                                  display: "inline-flex",
+                                  display: "flex",
                                   alignItems: "center",
-                                  gap: "0.2rem",
-                                  marginTop: "0.1rem",
+                                  gap: "0.25rem",
+                                  fontSize: "0.78rem",
+                                  fontWeight: 700,
+                                  color: accent,
+                                  flexShrink: 0,
+                                  minWidth: "64px",
                                 }}
                               >
-                                <IconLocation size={11} />
-                                <span>{ev.location}</span>
+                                <IconClock size={12} />
+                                <span>{ev.all_day ? "Todo el día" : timeOf(ev.starts_at)}</span>
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <span
+                                  style={{
+                                    fontSize: "0.88rem",
+                                    fontWeight: 600,
+                                    color: "var(--apple-text)",
+                                    display: "block",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                  }}
+                                >
+                                  {ev.title}
+                                </span>
+                                {ev.location && (
+                                  <span
+                                    style={{
+                                      fontSize: "0.74rem",
+                                      color: "var(--apple-text-secondary)",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "0.2rem",
+                                      marginTop: "0.1rem",
+                                    }}
+                                  >
+                                    <IconLocation size={11} />
+                                    <span>{ev.location}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {member && (
+                              <span
+                                style={{
+                                  fontSize: "0.74rem",
+                                  padding: "0.15rem 0.5rem",
+                                  borderRadius: "var(--radius-full)",
+                                  background: `${member.color}15`,
+                                  color: member.color,
+                                  fontWeight: 600,
+                                  border: `1px solid ${member.color}30`,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.25rem",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <span>{member.emoji}</span>
+                                <span>{member.name}</span>
                               </span>
                             )}
                           </div>
-                        </div>
-
-                        {member && (
-                          <span
-                            style={{
-                              fontSize: "0.72rem",
-                              padding: "0.15rem 0.5rem",
-                              borderRadius: "var(--radius-full)",
-                              background: `${member.color}15`,
-                              color: member.color,
-                              fontWeight: 600,
-                              border: `1px solid ${member.color}30`,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "0.25rem",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <span>{member.emoji}</span>
-                            <span>{member.name}</span>
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
 
-            <DinnerCard
-              date={today}
-              initialPlans={dinners}
-              schoolLunch={schoolLunch}
-              schoolDinnerRec={schoolDinnerRec}
-            />
+              {/* Columna Derecha: Cena de Hoy + Widget de Suministros/Economía */}
+              <div className="wall-grid-col wall-grid-col-right">
+                <DinnerCard
+                  date={today}
+                  initialPlans={dinners}
+                  schoolLunch={schoolLunch}
+                  schoolDinnerRec={schoolDinnerRec}
+                />
+
+                {/* Widget Rápido: Economía & Suministros Naturgy */}
+                <div
+                  onClick={() => goToCard(2)}
+                  className="wall-card-quick-eco touch-target"
+                  style={{
+                    cursor: "pointer",
+                    padding: "0.95rem 1.25rem",
+                    borderRadius: "var(--radius-lg)",
+                    background: "var(--apple-surface-secondary)",
+                    borderLeft: "4px solid var(--apple-green)",
+                    boxShadow: "var(--shadow-sm)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "0.75rem",
+                    minHeight: "56px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
+                    <div
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        background: "rgba(52, 199, 89, 0.15)",
+                        color: "var(--apple-green)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <IconEnergy size={16} />
+                    </div>
+                    <div>
+                      <p style={{ fontWeight: 700, margin: 0, color: "var(--apple-text)", fontSize: "0.92rem" }}>
+                        Economía Familiar & Suministros Naturgy
+                      </p>
+                      <p style={{ fontSize: "0.8rem", color: "var(--apple-text-secondary)", margin: "0.15rem 0 0 0" }}>
+                        Luz fija 24h a 0.123 €/kWh · Carga recomendada de VE en Valle P2 (00:00–07:30)
+                      </p>
+                    </div>
+                  </div>
+                  <span className="badge badge-blue" style={{ fontSize: "0.78rem" }}>
+                    Ver Módulo Economía →
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

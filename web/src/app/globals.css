@@ -124,10 +124,32 @@ button {
   border: none;
   background: none;
   transition: transform 0.15s var(--ease-spring), opacity 0.15s ease;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 
 button:active {
   transform: scale(0.975);
+}
+
+[role="button"],
+.touch-target,
+.deck-nav-btn,
+.family-avatar-item,
+.btn-settings-header,
+.fab-apple-ai,
+.badge,
+.squircle-icon {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.touch-target {
+  min-height: 44px;
 }
 
 :root {
@@ -152,13 +174,13 @@ input, select, textarea, .input-field {
   margin: 0 auto;
   overflow-x: hidden;
   box-sizing: border-box;
-  padding: max(0.85rem, var(--safe-top)) 1rem calc(6.5rem + var(--safe-bottom)) 1rem;
+  padding: max(0.85rem, var(--safe-top)) 1rem calc(5.5rem + var(--safe-bottom)) 1rem;
 }
 
 @media (min-width: 768px) {
   .container {
-    max-width: 1240px;
-    padding: max(1.25rem, var(--safe-top)) 1.5rem calc(6.5rem + var(--safe-bottom)) 1.5rem;
+    max-width: 1280px;
+    padding: max(1.1rem, var(--safe-top)) 1.5rem 2.25rem 1.5rem;
   }
 }
 
@@ -326,10 +348,10 @@ input, select, textarea, .input-field {
 }
 
 .btn-settings-header {
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
-  min-height: 38px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -338,7 +360,7 @@ input, select, textarea, .input-field {
   border: 1px solid var(--apple-border);
   padding: 0;
   box-shadow: var(--shadow-sm);
-  font-size: 1.05rem;
+  font-size: 1.1rem;
 }
 
 @media (max-width: 768px) {
@@ -357,16 +379,17 @@ input, select, textarea, .input-field {
   -webkit-backdrop-filter: blur(24px);
   padding: 0.35rem 0 0.55rem 0;
   margin-bottom: 1rem;
+  transition: all 0.25s var(--ease-spring);
 }
 
 .deck-top-nav {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  padding: 4px;
+  padding: 5px;
   background: light-dark(rgba(118, 118, 128, 0.12), rgba(118, 118, 128, 0.24));
   border-radius: var(--radius-full);
   width: 100%;
@@ -380,10 +403,12 @@ input, select, textarea, .input-field {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.45rem 1rem;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.15rem;
+  min-height: 44px;
   border-radius: var(--radius-full);
-  font-size: 0.84rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: var(--apple-text-secondary);
   background: transparent;
@@ -392,6 +417,9 @@ input, select, textarea, .input-field {
   white-space: nowrap;
   transition: all 0.22s var(--ease-spring);
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
 }
 
 .deck-nav-btn:hover {
@@ -402,7 +430,37 @@ input, select, textarea, .input-field {
   background: var(--apple-surface-elevated);
   color: var(--apple-text);
   font-weight: 600;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.deck-nav-icon-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deck-badge-counter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 0.35rem;
+  margin-left: 0.25rem;
+}
+
+.deck-badge-amber {
+  background: var(--apple-orange);
+  color: #ffffff;
+}
+
+.deck-badge-gray {
+  background: var(--apple-surface-tertiary);
+  color: var(--apple-text-secondary);
 }
 
 .deck-dots-bar {
@@ -420,12 +478,192 @@ input, select, textarea, .input-field {
   background: var(--apple-border-strong);
   cursor: pointer;
   transition: all 0.25s var(--ease-spring);
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .deck-dot.active {
   width: 20px;
   border-radius: 4px;
   background: var(--apple-blue);
+}
+
+/* ── Mobile-First Smartphone Navigation (UITabBar thumb dock) ── */
+@media (max-width: 768px) {
+  .deck-sticky-header {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 990;
+    background: light-dark(rgba(255, 255, 255, 0.92), rgba(28, 28, 30, 0.92));
+    backdrop-filter: blur(30px) saturate(200%);
+    -webkit-backdrop-filter: blur(30px) saturate(200%);
+    border-top: 1px solid var(--apple-border);
+    padding: 0.35rem 0.5rem calc(0.45rem + var(--safe-bottom)) 0.5rem;
+    margin-bottom: 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  .deck-top-nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: transparent;
+    padding: 0;
+    gap: 0.25rem;
+    width: 100%;
+  }
+
+  .deck-nav-btn {
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.35rem 0.2rem;
+    min-height: 48px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+  }
+
+  .deck-nav-icon-box {
+    width: 26px;
+    height: 24px;
+  }
+
+  .deck-badge-counter {
+    position: absolute;
+    top: -4px;
+    right: -10px;
+    margin-left: 0;
+    font-size: 0.62rem;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 0.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+
+  .deck-nav-btn.active {
+    background: light-dark(rgba(0, 113, 227, 0.12), rgba(10, 132, 255, 0.2));
+    color: var(--apple-blue);
+    box-shadow: none;
+  }
+
+  .deck-dots-bar {
+    display: none;
+  }
+
+  .fab-apple-ai {
+    bottom: calc(5.2rem + var(--safe-bottom));
+    right: 1rem;
+    padding: 0.65rem 1rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* ── Wall Kiosk / Horizontal Display Bento Grid ──────────────── */
+.wall-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.wall-grid-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.wall-grid-col-left,
+.wall-grid-col-right {
+  width: 100%;
+}
+
+.wall-alert-banner {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Optimización para Pantallas de Pared (1280x800, 1920x1080) en Horizontal / Kiosk */
+@media (min-width: 900px) and (orientation: landscape), (min-width: 960px) {
+  .wall-dashboard-grid {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .wall-alert-banner {
+    grid-column: 1 / -1;
+  }
+
+  /* Barra de navegación superior amplia y táctil para marco de pared */
+  .deck-sticky-header {
+    padding: 0.6rem 0 0.85rem 0;
+    margin-bottom: 1.25rem;
+  }
+
+  .deck-top-nav {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 6px;
+    gap: 0.6rem;
+    background: light-dark(rgba(118, 118, 128, 0.16), rgba(118, 118, 128, 0.3));
+    box-shadow: var(--shadow-sm);
+  }
+
+  .deck-nav-btn {
+    min-height: 48px;
+    padding: 0.65rem 1.45rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    gap: 0.65rem;
+  }
+
+  .deck-nav-btn svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .deck-dot {
+    width: 8px;
+    height: 8px;
+  }
+
+  .deck-dot.active {
+    width: 28px;
+  }
+
+  /* Tipografías y contraste reforzados para lectura cómoda a 1-2 metros */
+  .wall-kiosk-card {
+    padding: 1.6rem;
+    gap: 1.4rem;
+  }
+
+  .wall-kiosk-card h2 {
+    font-size: 1.22rem !important;
+    letter-spacing: -0.025em;
+  }
+
+  .wall-kiosk-card h3 {
+    font-size: 1.08rem !important;
+  }
+
+  .wall-agenda-widget,
+  .wall-card-quick-eco {
+    font-size: 0.95rem;
+  }
+
+  /* Evitar desbordamiento vertical innecesario en pantallas de 800px de altura */
+  .deck-card {
+    min-height: calc(100vh - 160px);
+  }
 }
 
 /* El viewport horizontal que contiene las 6 tarjetas y permite Swipe */
@@ -845,122 +1083,6 @@ dialog::backdrop {
   to {
     transform: translateY(0);
     opacity: 1;
-  }
-}
-
-/* ── Barra de Navegación Inferior Nativa iOS para Móvil (UITabBar) ── */
-.mobile-bottom-bar {
-  display: none;
-}
-
-@media (max-width: 768px) {
-  .mobile-bottom-bar {
-    display: flex;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 999;
-    background: light-dark(rgba(255, 255, 255, 0.88), rgba(28, 28, 30, 0.88));
-    backdrop-filter: blur(30px) saturate(200%);
-    -webkit-backdrop-filter: blur(30px) saturate(200%);
-    border-top: 1px solid var(--apple-border);
-    padding: 0.35rem 0.65rem calc(0.45rem + var(--safe-bottom)) 0.65rem;
-    justify-content: space-around;
-    align-items: center;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
-  }
-
-  .mobile-tab-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    min-height: 44px;
-    padding: 0.2rem 0;
-    border-radius: var(--radius-sm);
-    color: var(--apple-text-secondary);
-    transition: all 0.15s ease;
-    cursor: pointer;
-  }
-
-  .mobile-tab-item.active {
-    color: var(--apple-blue);
-  }
-
-  .mobile-tab-icon {
-    font-size: 1.25rem;
-    line-height: 1;
-    margin-bottom: 0.15rem;
-    transition: transform 0.15s var(--ease-spring);
-  }
-
-  .mobile-tab-item.active .mobile-tab-icon {
-    transform: scale(1.12);
-  }
-
-  .mobile-tab-label {
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  .mobile-tab-badge {
-    position: absolute;
-    top: 2px;
-    right: calc(50% - 18px);
-    background: var(--apple-orange);
-    color: #ffffff;
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 0.1rem 0.35rem;
-    border-radius: var(--radius-full);
-    min-width: 16px;
-    text-align: center;
-    box-shadow: 0 2px 4px rgba(255, 149, 0, 0.4);
-  }
-
-  /* Botón central Apple Intelligence (Asistente) */
-  .mobile-tab-center-ai {
-    position: relative;
-    width: 48px;
-    height: 48px;
-    margin: -14px 0.25rem 0 0.25rem;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #FF2D55 0%, #AF52DE 35%, #0071E3 70%, #34C759 100%);
-    padding: 2.5px;
-    box-shadow: 0 6px 18px rgba(175, 82, 222, 0.45);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: transform 0.2s var(--ease-spring);
-  }
-
-  .mobile-tab-center-ai:active {
-    transform: scale(0.92);
-  }
-
-  .mobile-tab-center-inner {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: light-dark(#ffffff, #1c1c1e);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .mobile-tab-center-glow {
-    position: absolute;
-    inset: -3px;
-    border-radius: 50%;
-    background: inherit;
-    filter: blur(8px);
-    opacity: 0.4;
-    z-index: -1;
   }
 }
 
