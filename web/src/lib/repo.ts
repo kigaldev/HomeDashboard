@@ -290,6 +290,17 @@ export async function toggleShopping(id: number) {
 export const deleteShopping = (id: number) => q("delete from shopping_items where id=$1", [id]);
 export const clearChecked = () => q("delete from shopping_items where checked");
 
+export async function checkShoppingItemByName(name: string): Promise<{ matched: boolean; item?: ShoppingItem }> {
+  const items = await getShopping();
+  const clean = name.trim().toLowerCase();
+  const match = items.find((i) => !i.checked && (i.name.toLowerCase().includes(clean) || clean.includes(i.name.toLowerCase())));
+  if (match) {
+    await toggleShopping(match.id);
+    return { matched: true, item: match };
+  }
+  return { matched: false };
+}
+
 // ── Despensa ──────────────────────────────────────────────
 export const getPantry = () => q<PantryItem>("select id,name,status from pantry order by status desc, name");
 export async function setPantry(name: string, status: PantryItem["status"]) {
@@ -342,6 +353,34 @@ export async function toggleTask(id: number) {
 }
 export const deleteTask = (id: number) => q("delete from tasks where id=$1", [id]);
 
+export async function findTasksByQuery(query: string): Promise<Task[]> {
+  return q<Task>(
+    `select id,title,assignee_id,due_date::text,recurrence,done,done_at::text,created_at::text
+     from tasks
+     where title ilike $1
+     order by done asc, due_date asc nulls last limit 10`,
+    [`%${query.trim()}%`],
+  );
+}
+
+export async function completeTaskByQuery(query: string): Promise<{ success: boolean; task?: Task }> {
+  const matches = await findTasksByQuery(query);
+  const pending = matches.find((t) => !t.done) || matches[0];
+  if (!pending) return { success: false };
+  if (!pending.done) {
+    await toggleTask(pending.id);
+  }
+  return { success: true, task: pending };
+}
+
+export async function deleteTaskByQuery(query: string): Promise<{ success: boolean; task?: Task }> {
+  const matches = await findTasksByQuery(query);
+  if (matches.length === 0) return { success: false };
+  const target = matches[0];
+  await deleteTask(target.id);
+  return { success: true, task: target };
+}
+
 // ── Agenda ────────────────────────────────────────────────
 export const getEventsBetween = (fromIso: string, toIso: string) =>
   q<CalEvent>(
@@ -376,6 +415,65 @@ export async function upsertExternalEvents(
   }
 }
 export const deleteEvent = (id: number) => q("delete from events where id=$1 and source='manual'", [id]);
+
+export async function findEventsByQuery(query: string, fromDate?: string): Promise<CalEvent[]> {
+  const cleanQ = query.trim();
+  const dateConstraint = fromDate ? "and starts_at >= ($2::date)::timestamp at time zone 'Europe/Madrid'" : "";
+  const params: any[] = [`%${cleanQ}%`];
+  if (fromDate) params.push(fromDate);
+  return q<CalEvent>(
+    `select id,title,starts_at::text,ends_at::text,all_day,member_id,location,source from events
+     where title ilike $1 ${dateConstraint}
+     order by starts_at asc limit 10`,
+    params,
+  );
+}
+
+export async function updateEvent(
+  id: number,
+  fields: {
+    title?: string;
+    date?: string;
+    time?: string | null;
+    memberId?: number | null;
+    location?: string | null;
+  },
+): Promise<boolean> {
+  const updates: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (fields.title !== undefined) {
+    updates.push(`title = $${idx++}`);
+    values.push(fields.title);
+  }
+  if (fields.date !== undefined) {
+    const timeVal = fields.time !== undefined ? fields.time : null;
+    updates.push(`starts_at = ($${idx++}::date + coalesce($${idx++}::time, '00:00'))::timestamp at time zone 'Europe/Madrid'`);
+    values.push(fields.date, timeVal);
+    updates.push(`all_day = $${idx++}`);
+    values.push(!timeVal);
+  } else if (fields.time !== undefined) {
+    updates.push(`starts_at = (starts_at::date + coalesce($${idx++}::time, '00:00'))::timestamp at time zone 'Europe/Madrid'`);
+    values.push(fields.time);
+    updates.push(`all_day = $${idx++}`);
+    values.push(!fields.time);
+  }
+
+  if (fields.memberId !== undefined) {
+    updates.push(`member_id = $${idx++}`);
+    values.push(fields.memberId);
+  }
+  if (fields.location !== undefined) {
+    updates.push(`location = $${idx++}`);
+    values.push(fields.location);
+  }
+
+  if (updates.length === 0) return false;
+  values.push(id);
+  await q(`update events set ${updates.join(", ")} where id = $${idx}`, values);
+  return true;
+}
 
 // ── Cole ──────────────────────────────────────────────────
 export async function getSchoolRun(date: string): Promise<SchoolRun | null> {

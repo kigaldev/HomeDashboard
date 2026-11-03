@@ -144,12 +144,13 @@ export function AiAssistantModal({
   };
 
   const actionPrompts = [
+    "📅 Apuntar dentista para Lara el viernes a las 17:30",
     "🛒 Añadir leche y huevos a Mercadona",
+    "✅ Tarea para Kike: Pedir cita pediatra para Bruno",
     "📦 Se ha terminado el aceite en la despensa",
     "🏫 Mañana Kike lleva a Fabio y Lara lo recoge",
     "🍲 Cenamos la opción Cecotec Mambo",
-    "✅ Tarea para Kike: Pedir cita pediatra para Bruno",
-    "❓ ¿Qué ropa les pongo hoy a los niños?",
+    "🚗 ¿A qué hora cargo el coche eléctrico hoy?",
   ];
 
   return (
@@ -199,14 +200,14 @@ export function AiAssistantModal({
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
               <h2 id="assistant-title" style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
-                Asistente Inteligente
+                JARVIS · Asistente del Hogar
               </h2>
               <span className="badge badge-purple" style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem" }}>
-                Agente Activo
+                Tool Calling Activo
               </span>
             </div>
             <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
-              Control por voz & texto · Modifica el dashboard en tiempo real
+              Agenda, Tareas, Compras y Hogar sincronizados en tiempo real
             </p>
           </div>
         </div>

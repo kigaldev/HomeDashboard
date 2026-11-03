@@ -41,11 +41,11 @@ describe("handleBotMessage", () => {
 
   it("responde a comandos informativos directamente (/start)", async () => {
     const res = await handleBotMessage("/start", "123");
-    expect(res).toContain("Soy Pepe, tu asistente de hogar");
+    expect(res).toContain("Soy Pepe (JARVIS), tu asistente de hogar");
     expect(res).toContain("123");
   });
 
-  it("delega en runAgentInstruction cuando no coincide ninguna regex y formatea acción ejecutada", async () => {
+  it("delega en runAgentInstruction cuando no coincide ninguna regex y formatea acción ejecutada con feedback [OK]", async () => {
     runAgentMock.mockResolvedValueOnce({
       message: "He añadido **leche y huevos** a la lista.",
       actionExecuted: {
@@ -56,8 +56,25 @@ describe("handleBotMessage", () => {
 
     const res = await handleBotMessage("¿puedes apuntar leche y huevos porfa?", "123");
     expect(runAgentMock).toHaveBeenCalledWith("¿puedes apuntar leche y huevos porfa?");
+    expect(res).toContain("✅ <b>[OK — Procesado en la App]</b>");
     expect(res).toContain("🛒 <i>Acción realizada:</i> Añadido a la compra: leche y huevos (Mercadona)");
     expect(res).toContain("He añadido <b>leche y huevos</b> a la lista.");
+    expect(res).toContain("Visible en tiempo real en tu pantalla táctil y dashboard.");
+  });
+
+  it("procesa eventos de la agenda a través del asistente JARVIS", async () => {
+    runAgentMock.mockResolvedValueOnce({
+      message: "Cita con el pediatra guardada para Fabio el viernes a las 11:30.",
+      actionExecuted: {
+        type: "calendar",
+        description: "Agenda: Pediatra Fabio (2026-11-06 11:30) para Fabio",
+      },
+    });
+
+    const res = await handleBotMessage("Apunta dentista para Lara el viernes", "123");
+    expect(res).toContain("✅ <b>[OK — Procesado en la App]</b>");
+    expect(res).toContain("📅 <i>Acción realizada:</i>");
+    expect(res).toContain("Cita con el pediatra guardada");
   });
 
   it("devuelve la respuesta normal cuando runAgentInstruction no ejecuta acción", async () => {

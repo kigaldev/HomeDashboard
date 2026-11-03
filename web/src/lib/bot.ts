@@ -106,7 +106,7 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
 
   // ── Compra en Línea Simple: "añade leche, huevos y pan [en mercadona]"
   let m = low.match(/^(?:añade|añadir|apunta|compra|comprar|pon)\s+(.+)$/i);
-  if (m) {
+  if (m && !/(?:agenda|calendario|cita|médico|medico|dentista|pediatra|reunión|reunion|evento|tarea|recordar|cole)/i.test(m[1])) {
     const stores = await getStores();
     let rest = t.slice(t.length - m[1].length);
     const storeId = await findStoreId(rest);
@@ -120,7 +120,15 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
       const targetStore = storeId || inferStoreId(it, stores);
       await addShopping(it, { storeId: targetStore, by: me?.id });
     }
-    return `🛒 Añadido a la compra: <b>${items.map(escapeHtml).join(", ")}</b>`;
+    const storeLabel = storeId ? ` (${stores.find((s) => s.id === storeId)?.name})` : "";
+    return [
+      `✅ <b>[OK — Procesado en la App]</b>`,
+      `🛒 <i>Acción realizada:</i> Añadido a la compra: ${escapeHtml(items.join(", "))}${storeLabel}`,
+      ``,
+      `🛒 Añadido a la lista de la compra: <b>${items.map(escapeHtml).join(", ")}</b>`,
+      ``,
+      `📱 <i>Visible en tiempo real en tu pantalla táctil y dashboard.</i>`,
+    ].join("\n");
   }
 
   // ── Despensa: "se acaba el aceite" / "no queda leche"
@@ -128,13 +136,51 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
   if (m) {
     const out = /no queda|terminó|ha acabado/.test(low);
     for (const it of splitItems(m[1])) await setPantry(it, out ? "out" : "low");
-    return `📦 Anotado en despensa y añadido a la compra: <b>${escapeHtml(m[1])}</b>`;
+    return [
+      `✅ <b>[OK — Procesado en la App]</b>`,
+      `📦 <i>Acción realizada:</i> Despensa: ${escapeHtml(m[1])} marcado como ${out ? "agotado" : "quedando poco"}`,
+      ``,
+      `📦 Anotado en despensa y añadido a la compra: <b>${escapeHtml(m[1])}</b>`,
+      ``,
+      `📱 <i>Visible en tiempo real en tu pantalla táctil y dashboard.</i>`,
+    ].join("\n");
+  }
+
+  // ── Marcar comprado / tachar de la lista: "ya he comprado la leche" / "tachado el pan"
+  m = low.match(/^(?:ya he comprado|comprado|comprada|tachad[oa]|marca(?:r)? como comprad[oa])\s+(.+)$/i);
+  if (m) {
+    const rawItems = splitItems(m[1]);
+    const marked: string[] = [];
+    for (const item of rawItems) {
+      const res = await (await import("./repo")).checkShoppingItemByName(item);
+      if (res.matched && res.item) {
+        marked.push(res.item.name);
+      }
+    }
+    if (marked.length > 0) {
+      return (
+        `✅ <b>[OK — Procesado en la App]</b>\n` +
+        `🛒 <i>Acción realizada:</i> Marcado como comprado en la app: ${escapeHtml(marked.join(", "))}\n\n` +
+        `✓ Tachado(s) de la lista de la compra y stock de despensa restaurado a OK.\n\n` +
+        `📱 <i>Visible en tiempo real en tu pantalla táctil y dashboard.</i>`
+      );
+    }
+    return `ℹ️ No encontré ningún producto pendiente en la lista que coincida con: <b>${escapeHtml(rawItems.join(", "))}</b>.`;
   }
 
   // ── Ver lista
   if (/^(lista|compra|qué hay que comprar|que hay que comprar)\??$/.test(low)) {
     const items = (await getShopping()).filter((i) => !i.checked);
     return items.length ? `🛒 <b>Lista (${items.length})</b>\n` + items.map((i) => `• ${escapeHtml(i.name)}`).join("\n") : "🛒 La lista está vacía 🎉";
+  }
+
+  // ── Ver Agenda
+  if (/^(agenda|calendario|eventos|qué tenemos hoy|que tenemos hoy|planes)\??$/.test(low)) {
+    const today = isoDate();
+    const events = await (await import("./repo")).getEventsBetween(today, (await import("./dates")).addDays(today, 7));
+    if (events.length === 0) return "📅 No hay eventos previstos para los próximos 7 días en la agenda familiar.";
+    const list = events.map((e) => `• <b>${e.starts_at.slice(0, 10)}</b>${e.all_day ? "" : ` ${e.starts_at.slice(11, 16)}`}: ${escapeHtml(e.title)}`).join("\n");
+    return `📅 <b>Agenda familiar próximos 7 días:</b>\n\n${list}`;
   }
 
   // ── Tareas: "tarea llamar al pediatra para Mamá mañana"
@@ -146,7 +192,16 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
     const due = parseRelativeDay(title);
     title = title.replace(/\s*(pasado mañana|mañana|hoy|el (lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo))\b/i, "").trim();
     await addTask(title, who?.id ?? me?.id ?? null, due ?? isoDate());
-    return `✅ Tarea creada: <b>${escapeHtml(title)}</b>${who ? ` para ${escapeHtml(who.name)}` : ""}${due ? ` (${due})` : ""}`;
+    const assignText = who ? ` para ${escapeHtml(who.name)}` : "";
+    const dueText = due ? ` (${due})` : "";
+    return [
+      `✅ <b>[OK — Procesado en la App]</b>`,
+      `✅ <i>Acción realizada:</i> Tarea creada: ${escapeHtml(title)}${assignText}${dueText}`,
+      ``,
+      `✅ Tarea creada: <b>${escapeHtml(title)}</b>${assignText}${dueText}`,
+      ``,
+      `📱 <i>Visible en tiempo real en tu pantalla táctil y dashboard.</i>`,
+    ].join("\n");
   }
 
   if (/^tareas\??$/.test(low)) {
@@ -160,21 +215,41 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
 
   if (/^(\/start|\/help|ayuda)$/.test(low))
     return [
-      "👋 <b>Soy Pepe, tu asistente de hogar.</b> Puedes decirme:",
-      "• <i>añade leche, huevos y pan en Mercadona</i>",
-      "• Pegar listas completas de la compra directamente",
-      "• <i>se acaba el aceite</i>",
-      "• <i>lista</i> · <i>tareas</i>",
-      "• <i>tarea llamar al pediatra para Mamá mañana</i>",
-      "• <i>briefing</i> · <i>mañana</i>",
-      "• O pregúntame cualquier duda familiar o de la casa.",
-      `\nTu ID de Telegram es <code>${escapeHtml(telegramUserId ?? "?")}</code>.`,
+      "👋 <b>Soy Pepe (JARVIS), tu asistente de hogar.</b>",
+      "Estoy conectado a la aplicación del hogar y ejecuto cambios en tiempo real:",
+      "",
+      "📅 <b>Agenda familiar:</b>",
+      "• <i>Apunta dentista para Lara el viernes a las 17:30</i>",
+      "• <i>Pasa la reunión del cole al lunes a las 16:00</i>",
+      "• <i>¿Qué tenemos en la agenda esta semana?</i>",
+      "",
+      "🛒 <b>Lista de la compra y despensa:</b>",
+      "• <i>Añade leche y plátanos a Mercadona</i>",
+      "• <i>Se ha acabado el aceite en la despensa</i>",
+      "• <i>Ya he comprado la leche y los huevos</i>",
+      "• <i>¿Qué hay que comprar?</i>",
+      "",
+      "✅ <b>Tareas del hogar:</b>",
+      "• <i>Tarea para Kike: llamar al seguro mañana</i>",
+      "• <i>Marca como hecha la tarea de la lavadora</i>",
+      "• <i>tareas</i>",
+      "",
+      "🏫 <b>Colegio y Cenas:</b>",
+      "• <i>Mañana Kike lleva a Fabio y Lara lo recoge</i>",
+      "• <i>Cenamos la opción Cecotec Mambo</i>",
+      "",
+      "⚡ <b>Energía:</b>",
+      "• <i>¿A qué hora cargo el coche eléctrico?</i>",
+      "• <i>¿Cuándo pongo la lavadora?</i>",
+      "",
+      `Tu ID de Telegram es <code>${escapeHtml(telegramUserId ?? "?")}</code>.`,
     ].join("\n");
 
-  // ── Cualquier otra cosa: consulta al Asistente Inteligente con capacidad de acción
+  // ── Cualquier otra cosa: consulta al Agente JARVIS con Function Calling nativo
   const result = await runAgentInstruction(t);
   if (result.actionExecuted) {
     const icon = {
+      calendar: "📅",
       shopping: "🛒",
       pantry: "📦",
       task: "✅",
@@ -182,8 +257,16 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
       dinner: "🍲",
       energy: "⚡",
       info: "ℹ️",
-    }[result.actionExecuted.type] || "🛒";
-    return `${icon} <i>Acción realizada:</i> ${escapeHtml(result.actionExecuted.description)}\n\n${formatTelegramHtml(result.message)}`;
+    }[result.actionExecuted.type] || "✅";
+
+    return [
+      `✅ <b>[OK — Procesado en la App]</b>`,
+      `${icon} <i>Acción realizada:</i> ${escapeHtml(result.actionExecuted.description)}`,
+      ``,
+      formatTelegramHtml(result.message),
+      ``,
+      `📱 <i>Visible en tiempo real en tu pantalla táctil y dashboard.</i>`,
+    ].join("\n");
   }
 
   return formatTelegramHtml(result.message);
