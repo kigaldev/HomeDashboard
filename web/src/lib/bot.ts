@@ -318,6 +318,7 @@ export async function handleBotPhoto(
     const totalStr = parsed.totalAmount != null ? `${parsed.totalAmount.toFixed(2)} €` : "0.00 €";
 
     const lines: string[] = [
+      `✅ <b>[OK — Ticket incorporado a la App]</b>`,
       `🧾 <b>Ticket de ${escapeHtml(storeName)}</b>`,
       `📅 <b>Fecha:</b> ${escapeHtml(dateStr)} · <b>Total:</b> ${escapeHtml(totalStr)}`,
     ];
@@ -353,9 +354,92 @@ export async function handleBotPhoto(
       lines.push(`\n${extra.join("\n")}`);
     }
 
+    lines.push(`\n📱 <i>Disponible en tiempo real en la pantalla táctil, módulo de Economía y Despensa de la app.</i>`);
+
     return lines.join("\n");
   } catch (err: any) {
     console.error("[bot] Error procesando ticket:", err);
     return `❌ <b>Error al procesar el ticket:</b> ${escapeHtml(err?.message || "No se ha podido leer la imagen.")}\n\n<i>Asegúrate de que la foto esté bien iluminada y enfocada.</i>`;
+  }
+}
+
+/**
+ * Procesa un archivo o documento (Ticket en PDF o imagen sin comprimir) recibido por Telegram.
+ */
+export async function handleBotDocument(
+  fileUrlOrBuffer: Buffer | string,
+  fileName: string = "ticket.pdf",
+  mimeType: string = "application/pdf",
+  caption?: string,
+  telegramUserId?: string,
+): Promise<string> {
+  try {
+    const isPdf = mimeType.toLowerCase().includes("pdf") || fileName.toLowerCase().endsWith(".pdf");
+
+    if (isPdf) {
+      let buf: Buffer;
+      if (Buffer.isBuffer(fileUrlOrBuffer)) {
+        buf = fileUrlOrBuffer;
+      } else if (typeof fileUrlOrBuffer === "string") {
+        if (fileUrlOrBuffer.startsWith("http://") || fileUrlOrBuffer.startsWith("https://")) {
+          const resp = await fetch(fileUrlOrBuffer);
+          if (!resp.ok) throw new Error(`Error descargando el PDF de Telegram (${resp.status})`);
+          buf = Buffer.from(await resp.arrayBuffer());
+        } else {
+          const fs = await import("fs/promises");
+          buf = await fs.readFile(fileUrlOrBuffer);
+        }
+      } else {
+        throw new Error("Formato de documento inválido");
+      }
+
+      const { PDFParse } = await import("pdf-parse");
+      const parser = new PDFParse({ data: buf });
+      const parsedPdf = await parser.getText();
+      const text = (parsedPdf.text || "").trim();
+
+      if (text.length < 15) {
+        throw new Error("El PDF no contiene texto digital legible. Si es un ticket escaneado como imagen dentro del PDF, prueba a enviarlo como foto normal.");
+      }
+
+      const { parseReceiptText } = await import("./receipts");
+      const parsed = await parseReceiptText(text);
+      const result = await saveProcessedReceipt(parsed, caption || `[Ticket PDF: ${fileName}]`);
+
+      const storeName = result.storeName || parsed.storeName || "Comercio";
+      const dateStr = parsed.date || isoDate();
+      const totalStr = parsed.totalAmount != null ? `${parsed.totalAmount.toFixed(2)} €` : "0.00 €";
+
+      const lines: string[] = [
+        `✅ <b>[OK — Ticket PDF incorporado a la App]</b>`,
+        `🧾 <b>Ticket de ${escapeHtml(storeName)}</b>`,
+        `📅 <b>Fecha:</b> ${escapeHtml(dateStr)} · <b>Total:</b> ${escapeHtml(totalStr)}`,
+      ];
+
+      if (parsed.items && parsed.items.length > 0) {
+        lines.push(`\n🛒 <b>Artículos procesados (${parsed.items.length}):</b>`);
+        const limit = 25;
+        for (const item of parsed.items.slice(0, limit)) {
+          const priceStr = item.totalPrice > 0 ? ` — ${item.totalPrice.toFixed(2)} €` : "";
+          lines.push(`• ${escapeHtml(item.name)}${priceStr}`);
+        }
+      }
+
+      if (result.matchedCount > 0) {
+        lines.push(`\n✅ <b>Lista de la compra:</b> ${result.matchedCount} productos tachados.`);
+      }
+      if (result.pantryUpdatedCount > 0) {
+        lines.push(`📦 <b>Despensa:</b> ${result.pantryUpdatedCount} productos actualizados a OK.`);
+      }
+
+      lines.push(`\n📱 <i>Incorporado al control de gastos y visible en la pantalla táctil del hogar.</i>`);
+      return lines.join("\n");
+    }
+
+    // Si es un documento de tipo imagen (ej. subido sin comprimir como archivo)
+    return await handleBotPhoto(fileUrlOrBuffer, mimeType, caption, telegramUserId);
+  } catch (err: any) {
+    console.error("[bot] Error procesando documento:", err);
+    return `❌ <b>Error al procesar el archivo:</b> ${escapeHtml(err?.message || "No se ha podido procesar el ticket.")}`;
   }
 }

@@ -32,7 +32,7 @@ vi.mock("./repo", () => ({
   setPantry: vi.fn(),
 }));
 
-import { handleBotMessage, handleBotPhoto } from "./bot";
+import { handleBotMessage, handleBotPhoto, handleBotDocument } from "./bot";
 
 describe("handleBotMessage", () => {
   beforeEach(() => {
@@ -168,5 +168,28 @@ describe("handleBotPhoto", () => {
     const reply = await handleBotPhoto(Buffer.from("blur"), "image/jpeg");
     expect(reply).toContain("❌ <b>Error al procesar el ticket:</b> Imagen borrosa no legible");
     expect(reply).toContain("Asegúrate de que la foto esté bien iluminada y enfocada.");
+  });
+
+  it("handleBotDocument delega en handleBotPhoto si el documento es una imagen", async () => {
+    parseReceiptImageMock.mockResolvedValueOnce({
+      storeName: "Carrefour",
+      date: "2026-11-03",
+      totalAmount: 14.5,
+      items: [{ name: "Plátanos", totalPrice: 2.5 }],
+    });
+    saveProcessedReceiptMock.mockResolvedValueOnce({
+      receiptId: 105,
+      storeName: "Carrefour",
+      totalAmount: 14.5,
+      matchedCount: 1,
+      matchedNames: ["Plátanos"],
+      pendingRemainingCount: 0,
+      pantryUpdatedCount: 1,
+    });
+
+    const reply = await handleBotDocument(Buffer.from("fake-doc"), "ticket_carrefour.png", "image/png");
+    expect(reply).toContain("Ticket de Carrefour");
+    expect(reply).toContain("14.50 €");
+    expect(reply).toContain("Lista de la compra:");
   });
 });

@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { generateBriefing } from "./lib/briefing";
-import { handleBotMessage, handleBotPhoto } from "./lib/bot";
+import { handleBotMessage, handleBotPhoto, handleBotDocument } from "./lib/bot";
 import { syncMontessoriMenu } from "./lib/schoolMenu";
 import { syncGoogleCalendars } from "./lib/gcal";
 
@@ -163,6 +163,35 @@ async function pollTelegram() {
                 await tgSend(
                   msg.chat.id,
                   `❌ <b>Error al procesar la foto del ticket:</b> ${err?.message || "Error desconocido"}`
+                );
+              }
+            } else if (msg.document) {
+              console.log(`[worker] [Telegram] Documento recibido de ${msg.from?.first_name || fromId} (${fromId}): ${msg.document.file_name}`);
+              try {
+                await tgSendAction(msg.chat.id, "typing");
+                const fileId = msg.document.file_id;
+                const fileName = msg.document.file_name || "documento.pdf";
+                const docMime = msg.document.mime_type || "application/pdf";
+
+                const fileRes = await fetch(`https://api.telegram.org/bot${TOKEN}/getFile?file_id=${fileId}`);
+                if (!fileRes.ok) throw new Error(`Telegram getFile falló con status ${fileRes.status}`);
+                const fileJson = await fileRes.json();
+                const filePath = fileJson.result?.file_path;
+                if (!filePath) throw new Error("No se pudo obtener la ruta del documento");
+
+                const downloadUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
+                const docRes = await fetch(downloadUrl);
+                if (!docRes.ok) throw new Error(`Error descargando el documento (${docRes.status})`);
+                const buffer = Buffer.from(await docRes.arrayBuffer());
+
+                const reply = await handleBotDocument(buffer, fileName, docMime, msg.caption, fromId);
+                await tgSend(msg.chat.id, reply);
+                console.log(`[worker] [Telegram] Documento/Ticket PDF procesado con éxito.`);
+              } catch (err: any) {
+                console.error("[worker] [Telegram] Error procesando documento:", err);
+                await tgSend(
+                  msg.chat.id,
+                  `❌ <b>Error al procesar el archivo/ticket:</b> ${err?.message || "Error desconocido"}`
                 );
               }
             } else if (msg.text) {
