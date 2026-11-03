@@ -19,7 +19,7 @@ import {
 import type { ShoppingItem, Store, Staple, Member } from "@/lib/repo";
 import type { BasketOptimizationResult } from "@/lib/pricesProvider";
 import { TicketManagerModal } from "./TicketManagerModal";
-import { IconCamera } from "./Icons";
+import { IconCamera, IconChevronDown, IconChevronRight } from "./Icons";
 
 export function ShoppingModule({
   items = [],
@@ -45,6 +45,12 @@ export function ShoppingModule({
   const [newStapleEmoji, setNewStapleEmoji] = useState("🛒");
   const [newStapleStore, setNewStapleStore] = useState<string>("");
   const [isPending, startTransition] = useTransition();
+
+  // Estados colapsables para ahorrar espacio vertical
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [showStoreFilters, setShowStoreFilters] = useState(false);
+  const [showStaples, setShowStaples] = useState(false);
+  const [showPendingList, setShowPendingList] = useState(true);
 
   // Optimización de cesta
   const [optimization, setOptimization] = useState<BasketOptimizationResult | null>(null);
@@ -603,352 +609,574 @@ export function ShoppingModule({
         </div>
       )}
 
-      {/* ── Formulario Rápido Añadir Producto (Optimizado Pantallas Verticales) ── */}
-      <form
-        onSubmit={handleAddItem}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.45rem",
-          marginBottom: "1rem",
-          background: "var(--apple-surface-secondary)",
-          padding: "0.75rem",
-          borderRadius: "var(--radius-md)",
-          border: "1px solid var(--apple-border)",
-        }}
-      >
-        <div style={{ display: "flex", gap: "0.45rem" }}>
-          <input
-            type="text"
-            placeholder="Añadir producto (ej. Plátanos)..."
-            value={newItemName}
-            onChange={(e) => setNewItemName(e.target.value)}
-            className="input-field"
-            style={{
-              flex: 1,
-              padding: "0.6rem 0.85rem",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "0.9rem",
-              background: "var(--apple-surface)",
-            }}
-          />
-          <button
-            type="submit"
-            disabled={isPending || !newItemName.trim()}
-            className="btn-primary"
-            style={{
-              width: "44px",
-              height: "44px",
-              padding: 0,
-              borderRadius: "var(--radius-sm)",
-              flexShrink: 0,
-              fontSize: "1.2rem",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            +
-          </button>
-        </div>
-
-        {/* Selector de tienda en chips horizontales rápidos */}
-        <div
+      {/* ── Formulario Rápido Añadir Producto (Colapsable / Compacto) ── */}
+      <div style={{ marginBottom: "0.85rem" }}>
+        <button
+          type="button"
+          onClick={() => setShowAddForm(!showAddForm)}
+          aria-expanded={showAddForm}
           style={{
+            width: "100%",
             display: "flex",
-            gap: "0.35rem",
-            overflowX: "auto",
-            scrollbarWidth: "none",
-            paddingTop: "0.2rem",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0.65rem 0.95rem",
+            borderRadius: "var(--radius-md)",
+            background: "var(--apple-surface-secondary)",
+            border: "1px solid var(--apple-border)",
+            color: "var(--apple-text)",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
           }}
         >
-          <button
-            type="button"
-            onClick={() => setNewItemStore("")}
-            style={{
-              fontSize: "0.72rem",
-              padding: "0.25rem 0.55rem",
-              borderRadius: "var(--radius-full)",
-              background: newItemStore === "" ? "var(--apple-blue)" : "var(--apple-surface)",
-              color: newItemStore === "" ? "#fff" : "var(--apple-text-secondary)",
-              border: "1px solid var(--apple-border)",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
-          >
-            Cualquiera
-          </button>
-          {stores.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setNewItemStore(String(s.id))}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <span
               style={{
-                fontSize: "0.72rem",
-                padding: "0.25rem 0.55rem",
-                borderRadius: "var(--radius-full)",
-                background: newItemStore === String(s.id) ? `${s.color}25` : "var(--apple-surface)",
-                color: newItemStore === String(s.id) ? s.color : "var(--apple-text-secondary)",
-                border: newItemStore === String(s.id) ? `1px solid ${s.color}` : "1px solid var(--apple-border)",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
+                width: "24px",
+                height: "24px",
+                borderRadius: "50%",
+                background: "var(--apple-blue-subtle)",
+                color: "var(--apple-blue)",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "0.3rem",
+                justifyContent: "center",
+                fontSize: "0.9rem",
+                fontWeight: 700,
               }}
             >
-              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: s.color }} />
-              {s.name}
-            </button>
-          ))}
-        </div>
-      </form>
-
-      {/* ── Carrusel de Básicos Habituales a 1 Toque ── */}
-      <div style={{ marginBottom: "1rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
-          <span
-            style={{
-              fontSize: "0.72rem",
-              fontWeight: 700,
-              color: "var(--apple-text-secondary)",
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-            }}
-          >
-            Básicos Habituales ({staples.length})
-          </span>
-          <button
-            type="button"
-            onClick={() => setIsManagingStaples(!isManagingStaples)}
-            className="btn-ghost"
-            style={{
-              fontSize: "0.74rem",
-              padding: "0.15rem 0.45rem",
-              color: isManagingStaples ? "var(--apple-blue)" : "var(--apple-text-secondary)",
-              fontWeight: 600,
-            }}
-          >
-            {isManagingStaples ? "✓ Listo" : "⚙️ Gestionar"}
-          </button>
-        </div>
-
-        {/* Panel de Gestión de Básicos */}
-        {isManagingStaples ? (
-          <div
-            style={{
-              padding: "0.75rem",
-              background: "var(--apple-surface-secondary)",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--apple-border)",
-              marginBottom: "0.75rem",
-            }}
-          >
-            <form onSubmit={handleCreateStaple} style={{ display: "flex", gap: "0.4rem", marginBottom: "0.65rem", flexWrap: "wrap" }}>
-              <input
-                type="text"
-                placeholder="Emoji"
-                value={newStapleEmoji}
-                onChange={(e) => setNewStapleEmoji(e.target.value)}
-                className="input-field"
-                style={{ width: "50px", textAlign: "center", fontSize: "1rem", padding: "0.3rem" }}
-              />
-              <input
-                type="text"
-                placeholder="Nombre del básico..."
-                value={newStapleName}
-                onChange={(e) => setNewStapleName(e.target.value)}
-                className="input-field"
-                style={{ flex: 1, minWidth: "130px", fontSize: "0.82rem" }}
-              />
-              <select
-                value={newStapleStore}
-                onChange={(e) => setNewStapleStore(e.target.value)}
-                className="input-field"
-                style={{ width: "115px", fontSize: "0.8rem", cursor: "pointer" }}
-              >
-                <option value="">Cualquier súper</option>
-                {stores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                disabled={isPending || !newStapleName.trim()}
-                className="btn-primary"
-                style={{ fontSize: "0.76rem", padding: "0.35rem 0.65rem" }}
-              >
-                + Añadir
-              </button>
-            </form>
-
-            <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", maxHeight: "140px", overflowY: "auto" }}>
-              {staples.map((st) => (
-                <div
-                  key={st.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.35rem",
-                    padding: "0.25rem 0.55rem",
-                    borderRadius: "var(--radius-full)",
-                    background: "var(--apple-surface)",
-                    border: "1px solid var(--apple-border)",
-                    fontSize: "0.76rem",
-                  }}
-                >
-                  <span>{st.emoji}</span>
-                  <span>{st.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => startTransition(() => deleteStapleAction(st.id))}
-                    className="btn-ghost"
-                    style={{ padding: 0, marginLeft: "0.2rem", color: "var(--apple-red)" }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
+              +
+            </span>
+            <span style={{ fontSize: "0.86rem", fontWeight: 600 }}>
+              {showAddForm ? "Añadir producto a la lista" : "Añadir nuevo producto..."}
+            </span>
           </div>
-        ) : (
           <div
             style={{
               display: "flex",
-              gap: "0.4rem",
-              overflowX: "auto",
-              paddingBottom: "0.3rem",
-              scrollbarWidth: "none",
+              alignItems: "center",
+              color: "var(--apple-text-secondary)",
             }}
           >
-            {staples.map((st) => (
-              <button
-                key={st.id}
-                type="button"
-                onClick={() => handleQuickAdd(st)}
-                disabled={isPending}
-                className="btn-ghost"
+            {showAddForm ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+          </div>
+        </button>
+
+        {showAddForm && (
+          <form
+            onSubmit={(e) => {
+              handleAddItem(e);
+            }}
+            style={{
+              marginTop: "0.5rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.45rem",
+              background: "var(--apple-surface-secondary)",
+              padding: "0.75rem",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--apple-border)",
+            }}
+          >
+            <div style={{ display: "flex", gap: "0.45rem" }}>
+              <input
+                type="text"
+                placeholder="Nombre del producto (ej. Plátanos)..."
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                autoFocus
+                className="input-field"
                 style={{
-                  fontSize: "0.78rem",
-                  padding: "0.35rem 0.75rem",
-                  borderRadius: "var(--radius-full)",
-                  background: "var(--apple-surface-secondary)",
-                  border: "1px solid var(--apple-border)",
-                  whiteSpace: "nowrap",
+                  flex: 1,
+                  padding: "0.6rem 0.85rem",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "0.9rem",
+                  background: "var(--apple-surface)",
+                }}
+              />
+              <button
+                type="submit"
+                disabled={isPending || !newItemName.trim()}
+                className="btn-primary"
+                style={{
+                  width: "44px",
+                  height: "44px",
+                  padding: 0,
+                  borderRadius: "var(--radius-sm)",
+                  flexShrink: 0,
+                  fontSize: "1.2rem",
                   display: "flex",
                   alignItems: "center",
-                  gap: "0.35rem",
-                  color: "var(--apple-text)",
-                  flexShrink: 0,
-                  minHeight: "34px",
+                  justifyContent: "center",
                 }}
               >
-                <span>{st.emoji}</span>
-                <span>+ {st.name}</span>
+                +
               </button>
-            ))}
+            </div>
+
+            {/* Selector de tienda en chips horizontales rápidos */}
+            <div
+              style={{
+                display: "flex",
+                gap: "0.35rem",
+                overflowX: "auto",
+                scrollbarWidth: "none",
+                paddingTop: "0.2rem",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setNewItemStore("")}
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.25rem 0.55rem",
+                  borderRadius: "var(--radius-full)",
+                  background: newItemStore === "" ? "var(--apple-blue)" : "var(--apple-surface)",
+                  color: newItemStore === "" ? "#fff" : "var(--apple-text-secondary)",
+                  border: "1px solid var(--apple-border)",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                Cualquiera
+              </button>
+              {stores.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setNewItemStore(String(s.id))}
+                  style={{
+                    fontSize: "0.72rem",
+                    padding: "0.25rem 0.55rem",
+                    borderRadius: "var(--radius-full)",
+                    background: newItemStore === String(s.id) ? `${s.color}25` : "var(--apple-surface)",
+                    color: newItemStore === String(s.id) ? s.color : "var(--apple-text-secondary)",
+                    border: newItemStore === String(s.id) ? `1px solid ${s.color}` : "1px solid var(--apple-border)",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.3rem",
+                  }}
+                >
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: s.color }} />
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </form>
+        )}
+      </div>
+
+      {/* ── Carrusel de Básicos Habituales a 1 Toque (Colapsable con Chevron) ── */}
+      <div style={{ marginBottom: "0.85rem" }}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setShowStaples(!showStaples)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setShowStaples(!showStaples);
+            }
+          }}
+          aria-expanded={showStaples}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "0.65rem 0.95rem",
+            borderRadius: "var(--radius-md)",
+            background: "var(--apple-surface-secondary)",
+            border: "1px solid var(--apple-border)",
+            cursor: "pointer",
+            userSelect: "none",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+            <span style={{ fontSize: "1rem" }}>⭐</span>
+            <span style={{ fontSize: "0.86rem", fontWeight: 700, color: "var(--apple-text)" }}>
+              Básicos Habituales
+            </span>
+            <span
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.15rem 0.5rem",
+                borderRadius: "var(--radius-full)",
+                background: "rgba(245, 158, 11, 0.12)",
+                color: "#f59e0b",
+                fontWeight: 600,
+              }}
+            >
+              {staples.length}
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {showStaples && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsManagingStaples(!isManagingStaples);
+                }}
+                className="btn-ghost"
+                style={{
+                  fontSize: "0.74rem",
+                  padding: "0.15rem 0.45rem",
+                  color: isManagingStaples ? "var(--apple-blue)" : "var(--apple-text-secondary)",
+                  fontWeight: 600,
+                }}
+              >
+                {isManagingStaples ? "✓ Listo" : "⚙️ Gestionar"}
+              </button>
+            )}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                color: "var(--apple-text-secondary)",
+              }}
+            >
+              {showStaples ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+            </div>
+          </div>
+        </div>
+
+        {/* Panel de Gestión de Básicos o Carrusel (desplegable) */}
+        {showStaples && (
+          <div style={{ marginTop: "0.5rem" }}>
+            {isManagingStaples ? (
+              <div
+                style={{
+                  padding: "0.75rem",
+                  background: "var(--apple-surface-secondary)",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--apple-border)",
+                }}
+              >
+                <form onSubmit={handleCreateStaple} style={{ display: "flex", gap: "0.4rem", marginBottom: "0.65rem", flexWrap: "wrap" }}>
+                  <input
+                    type="text"
+                    placeholder="Emoji"
+                    value={newStapleEmoji}
+                    onChange={(e) => setNewStapleEmoji(e.target.value)}
+                    className="input-field"
+                    style={{ width: "50px", textAlign: "center", fontSize: "1rem", padding: "0.3rem" }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Nombre del básico..."
+                    value={newStapleName}
+                    onChange={(e) => setNewStapleName(e.target.value)}
+                    className="input-field"
+                    style={{ flex: 1, minWidth: "130px", fontSize: "0.82rem" }}
+                  />
+                  <select
+                    value={newStapleStore}
+                    onChange={(e) => setNewStapleStore(e.target.value)}
+                    className="input-field"
+                    style={{ width: "115px", fontSize: "0.8rem", cursor: "pointer" }}
+                  >
+                    <option value="">Cualquier súper</option>
+                    {stores.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="submit"
+                    disabled={isPending || !newStapleName.trim()}
+                    className="btn-primary"
+                    style={{ fontSize: "0.76rem", padding: "0.35rem 0.65rem" }}
+                  >
+                    + Añadir
+                  </button>
+                </form>
+
+                <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", maxHeight: "140px", overflowY: "auto" }}>
+                  {staples.map((st) => (
+                    <div
+                      key={st.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        padding: "0.25rem 0.55rem",
+                        borderRadius: "var(--radius-full)",
+                        background: "var(--apple-surface)",
+                        border: "1px solid var(--apple-border)",
+                        fontSize: "0.76rem",
+                      }}
+                    >
+                      <span>{st.emoji}</span>
+                      <span>{st.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => startTransition(() => deleteStapleAction(st.id))}
+                        className="btn-ghost"
+                        style={{ padding: 0, marginLeft: "0.2rem", color: "var(--apple-red)" }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  gap: "0.4rem",
+                  overflowX: "auto",
+                  paddingBottom: "0.3rem",
+                  scrollbarWidth: "none",
+                }}
+              >
+                {staples.map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => handleQuickAdd(st)}
+                    disabled={isPending}
+                    className="btn-ghost"
+                    style={{
+                      fontSize: "0.78rem",
+                      padding: "0.35rem 0.75rem",
+                      borderRadius: "var(--radius-full)",
+                      background: "var(--apple-surface-secondary)",
+                      border: "1px solid var(--apple-border)",
+                      whiteSpace: "nowrap",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                      color: "var(--apple-text)",
+                      flexShrink: 0,
+                      minHeight: "34px",
+                    }}
+                  >
+                    <span>{st.emoji}</span>
+                    <span>+ {st.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* ── Filtros por Supermercado (Chips Horizontales Táctiles) ── */}
+      {/* ── Filtros por Supermercado (Colapsable / Compacto con Chevron) ── */}
       <div style={{ marginBottom: "0.85rem" }}>
-        <div
+        <button
+          type="button"
+          onClick={() => setShowStoreFilters(!showStoreFilters)}
+          aria-expanded={showStoreFilters}
           style={{
+            width: "100%",
             display: "flex",
-            gap: "0.4rem",
-            overflowX: "auto",
-            scrollbarWidth: "none",
-            paddingBottom: "0.25rem",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0.65rem 0.95rem",
+            borderRadius: "var(--radius-md)",
+            background: "var(--apple-surface-secondary)",
+            border: "1px solid var(--apple-border)",
+            color: "var(--apple-text)",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
           }}
         >
-          {/* Chip Todos */}
-          <button
-            type="button"
-            onClick={() => setSelectedStore("all")}
-            style={{
-              fontSize: "0.78rem",
-              fontWeight: 600,
-              padding: "0.4rem 0.85rem",
-              borderRadius: "var(--radius-full)",
-              background: selectedStore === "all" ? "var(--apple-text)" : "var(--apple-surface-secondary)",
-              color: selectedStore === "all" ? "var(--apple-bg)" : "var(--apple-text-secondary)",
-              border: "1px solid var(--apple-border)",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-          >
-            Todos ({pendingCount})
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+            <span style={{ fontSize: "1rem" }}>🏷️</span>
+            <span style={{ fontSize: "0.86rem", fontWeight: 700 }}>
+              Tiendas & Filtros
+            </span>
+            <span
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.15rem 0.55rem",
+                borderRadius: "var(--radius-full)",
+                background:
+                  selectedStore === "all"
+                    ? "var(--apple-surface)"
+                    : `${storeMap.get(selectedStore as number)?.color}22`,
+                color:
+                  selectedStore === "all"
+                    ? "var(--apple-text-secondary)"
+                    : storeMap.get(selectedStore as number)?.color,
+                fontWeight: 600,
+                border: "1px solid var(--apple-border)",
+              }}
+            >
+              {selectedStore === "all" ? "Todos los súper" : storeMap.get(selectedStore as number)?.name}
+            </span>
+          </div>
 
-          {/* Chips de cada Supermercado */}
-          {stores.map((s) => {
-            const count = pendingItems.filter((i) => i.store_id === s.id).length;
-            const isSelected = selectedStore === s.id;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setSelectedStore(s.id)}
-                style={{
-                  fontSize: "0.78rem",
-                  fontWeight: 600,
-                  padding: "0.4rem 0.85rem",
-                  borderRadius: "var(--radius-full)",
-                  background: isSelected ? `${s.color}20` : "var(--apple-surface-secondary)",
-                  color: isSelected ? s.color : "var(--apple-text-secondary)",
-                  border: isSelected ? `1.5px solid ${s.color}` : "1px solid var(--apple-border)",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                <span
-                  style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "50%",
-                    background: s.color,
-                  }}
-                />
-                <span>{s.name}</span>
-                <span style={{ opacity: 0.85, fontSize: "0.72rem" }}>({count})</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Lista de Productos Pendientes ── */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginBottom: "1.1rem" }}>
-        {filteredPendingItems.length === 0 ? (
           <div
             style={{
-              padding: "2rem 1rem",
-              textAlign: "center",
-              background: "var(--apple-surface-secondary)",
-              borderRadius: "var(--radius-lg)",
-              border: "1px dashed var(--apple-border)",
+              display: "flex",
+              alignItems: "center",
+              color: "var(--apple-text-secondary)",
             }}
           >
-            <div style={{ fontSize: "2rem", marginBottom: "0.35rem" }}>🎉</div>
-            <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--apple-text)" }}>
-              {selectedStore === "all" ? "¡No hay nada pendiente para comprar!" : "No hay pendientes en esta tienda"}
-            </div>
-            <div style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
-              Añade productos con el botón superior o pídeselo a Pepe en Telegram.
-            </div>
+            {showStoreFilters ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
           </div>
-        ) : (
-          filteredPendingItems.map(renderItemCard)
+        </button>
+
+        {showStoreFilters && (
+          <div
+            style={{
+              marginTop: "0.5rem",
+              display: "flex",
+              gap: "0.4rem",
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              paddingBottom: "0.25rem",
+            }}
+          >
+            {/* Chip Todos */}
+            <button
+              type="button"
+              onClick={() => setSelectedStore("all")}
+              style={{
+                fontSize: "0.78rem",
+                fontWeight: 600,
+                padding: "0.4rem 0.85rem",
+                borderRadius: "var(--radius-full)",
+                background: selectedStore === "all" ? "var(--apple-text)" : "var(--apple-surface-secondary)",
+                color: selectedStore === "all" ? "var(--apple-bg)" : "var(--apple-text-secondary)",
+                border: "1px solid var(--apple-border)",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              Todos ({pendingCount})
+            </button>
+
+            {/* Chips de cada Supermercado */}
+            {stores.map((s) => {
+              const count = pendingItems.filter((i) => i.store_id === s.id).length;
+              const isSelected = selectedStore === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSelectedStore(s.id)}
+                  style={{
+                    fontSize: "0.78rem",
+                    fontWeight: 600,
+                    padding: "0.4rem 0.85rem",
+                    borderRadius: "var(--radius-full)",
+                    background: isSelected ? `${s.color}20` : "var(--apple-surface-secondary)",
+                    color: isSelected ? s.color : "var(--apple-text-secondary)",
+                    border: isSelected ? `1.5px solid ${s.color}` : "1px solid var(--apple-border)",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      background: s.color,
+                    }}
+                  />
+                  <span>{s.name}</span>
+                  <span style={{ opacity: 0.85, fontSize: "0.72rem" }}>({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Lista de Productos Pendientes (Cabecera Colapsable con Chevron) ── */}
+      <div style={{ marginBottom: "1.1rem" }}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setShowPendingList(!showPendingList)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setShowPendingList(!showPendingList);
+            }
+          }}
+          aria-expanded={showPendingList}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "0.65rem 0.95rem",
+            borderRadius: "var(--radius-md)",
+            background: "var(--apple-surface-secondary)",
+            border: "1px solid var(--apple-border)",
+            cursor: "pointer",
+            userSelect: "none",
+            marginBottom: showPendingList ? "0.65rem" : "0",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+            <span style={{ fontSize: "1rem" }}>📋</span>
+            <span style={{ fontSize: "0.86rem", fontWeight: 700, color: "var(--apple-text)" }}>
+              Lista de Productos
+            </span>
+            <span
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.15rem 0.55rem",
+                borderRadius: "var(--radius-full)",
+                background: filteredPendingItems.length > 0 ? "var(--apple-green-subtle)" : "var(--apple-surface)",
+                color: filteredPendingItems.length > 0 ? "var(--apple-green)" : "var(--apple-text-secondary)",
+                fontWeight: 600,
+              }}
+            >
+              {filteredPendingItems.length} {filteredPendingItems.length === 1 ? "pendiente" : "pendientes"}
+            </span>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              color: "var(--apple-text-secondary)",
+            }}
+          >
+            {showPendingList ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+          </div>
+        </div>
+
+        {showPendingList && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+            {filteredPendingItems.length === 0 ? (
+              <div
+                style={{
+                  padding: "2rem 1rem",
+                  textAlign: "center",
+                  background: "var(--apple-surface-secondary)",
+                  borderRadius: "var(--radius-lg)",
+                  border: "1px dashed var(--apple-border)",
+                }}
+              >
+                <div style={{ fontSize: "2rem", marginBottom: "0.35rem" }}>🎉</div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--apple-text)" }}>
+                  {selectedStore === "all" ? "¡No hay nada pendiente para comprar!" : "No hay pendientes en esta tienda"}
+                </div>
+                <div style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
+                  Añade productos con el botón superior o pídeselo a Pepe en Telegram.
+                </div>
+              </div>
+            ) : (
+              filteredPendingItems.map(renderItemCard)
+            )}
+          </div>
         )}
       </div>
 

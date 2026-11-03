@@ -592,6 +592,36 @@ export async function markItemConsumed(id: number) {
   await q("update receipt_items set consumed = true where id = $1", [id]);
 }
 
+export type ReceiptItemMonthly = {
+  id: number;
+  receipt_id: number;
+  name: string;
+  quantity: string | null;
+  unit_price: number | null;
+  total_price: number;
+  category: string;
+  store_name?: string | null;
+  date?: string;
+};
+
+export async function getCurrentMonthReceiptItems(): Promise<ReceiptItemMonthly[]> {
+  return q<ReceiptItemMonthly>(
+    `select ri.id, ri.receipt_id, ri.name, ri.quantity, ri.unit_price::float as unit_price,
+            ri.total_price::float as total_price, ri.category,
+            coalesce(s.name, 'Supermercado') as store_name, r.date::text as date
+     from receipt_items ri
+     join receipts r on r.id = ri.receipt_id
+     left join stores s on s.id = r.store_id
+     where r.date >= date_trunc('month', current_date)
+     order by ri.total_price desc, ri.name asc`,
+  );
+}
+
+export async function updateReceiptItemCategory(itemId: number, newCategory: string) {
+  await q("update receipt_items set category = $1 where id = $2", [newCategory.trim(), itemId]);
+  return getMonthlyExpenses();
+}
+
 export async function getMonthlyExpenses() {
   const byStore = await q<{ store_name: string; color: string; total: number; count: number }>(
     `select coalesce(s.name, 'Otros') as store_name, coalesce(s.color, '#64748b') as color,
@@ -622,6 +652,17 @@ export async function getMonthlyExpenses() {
        and date < date_trunc('month', current_date)`,
   );
 
+  const items = await q<ReceiptItemMonthly>(
+    `select ri.id, ri.receipt_id, ri.name, ri.quantity, ri.unit_price::float as unit_price,
+            ri.total_price::float as total_price, ri.category,
+            coalesce(s.name, 'Supermercado') as store_name, r.date::text as date
+     from receipt_items ri
+     join receipts r on r.id = ri.receipt_id
+     left join stores s on s.id = r.store_id
+     where r.date >= date_trunc('month', current_date)
+     order by ri.total_price desc, ri.name asc`,
+  );
+
   const currentTotal = currentMonth?.total ?? 0;
   const categoriesWithPercent = byCategory.map((c) => ({
     ...c,
@@ -633,6 +674,7 @@ export async function getMonthlyExpenses() {
     last_month_total: lastMonth?.total ?? 0,
     by_store: byStore,
     by_category: categoriesWithPercent,
+    items,
   };
 }
 

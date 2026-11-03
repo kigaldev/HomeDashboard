@@ -61,7 +61,7 @@ import {
   type ReceiptActionConfig,
   type ReceiptExecutionResult,
 } from "@/lib/receipts";
-import { markItemConsumed, ensureDemoReceipts, updateEnergyContract, upsertEnergyContract, type EnergyContract, syncFrequentStaples } from "@/lib/repo";
+import { markItemConsumed, ensureDemoReceipts, updateEnergyContract, upsertEnergyContract, type EnergyContract, syncFrequentStaples, updateReceiptItemCategory } from "@/lib/repo";
 import { parseEnergyBillText, parseEnergyBillImage } from "@/lib/energy";
 
 export async function addShoppingAction(formData: FormData) {
@@ -435,6 +435,19 @@ export async function markPerishableConsumedAction(id: number) {
   id = parse(idSchema, id);
   await markItemConsumed(id);
   revalidatePath("/");
+}
+
+export async function updateReceiptItemCategoryAction(itemId: number, newCategory: string) {
+  const v = parse(
+    z.object({
+      itemId: idSchema,
+      newCategory: z.string().trim().min(1).max(60),
+    }),
+    { itemId, newCategory }
+  );
+  const result = await updateReceiptItemCategory(v.itemId, v.newCategory);
+  revalidatePath("/");
+  return result;
 }
 
 export async function seedDemoReceiptsAction() {

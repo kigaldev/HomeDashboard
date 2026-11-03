@@ -22,7 +22,11 @@ import {
   IconSparkles,
   IconClock,
   IconEnergy,
+  IconLocation,
+  IconChevronDown,
+  IconChevronRight,
 } from "./Icons";
+import { timeOf } from "@/lib/dates";
 import type {
   Member,
   ShoppingItem,
@@ -49,7 +53,6 @@ const CARDS = [
   { id: "compra", label: "Compra", icon: (s = 16) => <IconCart size={s} /> },
   { id: "economia", label: "Economía", icon: (s = 16) => <IconEconomy size={s} /> },
   { id: "familia", label: "Familia", icon: (s = 16) => <IconFamily size={s} /> },
-  { id: "agenda", label: "Agenda", icon: (s = 16) => <IconCalendar size={s} /> },
 ] as const;
 
 export function DashboardClient({
@@ -130,8 +133,29 @@ export function DashboardClient({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+  // Estados colapsables para los módulos de la pestaña Familia
+  const [familyKidsOpen, setFamilyKidsOpen] = useState(true);
+  const [familyTasksOpen, setFamilyTasksOpen] = useState(true);
+  const [familyAgendaOpen, setFamilyAgendaOpen] = useState(false);
+  const agendaSectionRef = useRef<HTMLDivElement>(null);
+
   const urgentPerishablesCount = (perishables || []).filter((p) => p.days_left <= 3).length;
   const pendingTasksCount = (tasks || []).filter((t) => !t.done).length;
+
+  const memberMap = new Map((members || []).map((m) => [m.id, m]));
+
+  const todayEvents = (events || [])
+    .filter((ev) => ev.starts_at && ev.starts_at.slice(0, 10) === today)
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+
+  // Abrir la sección de Agenda dentro de Familia
+  const openFamilyAgenda = () => {
+    setFamilyAgendaOpen(true);
+    goToCard(3);
+    setTimeout(() => {
+      agendaSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 450);
+  };
 
   // Desplazamiento suave hacia la tarjeta seleccionada
   const goToCard = (index: number) => {
@@ -176,13 +200,17 @@ export function DashboardClient({
   useEffect(() => {
     const pref = activeMember?.preferred_tab;
     if (pref) {
+      if (pref === "agenda") {
+        setFamilyAgendaOpen(true);
+      }
       const target = CARDS.findIndex(
         (c) =>
           c.id === pref ||
           (pref === "energia" && c.id === "economia") ||
           (pref === "tickets" && c.id === "economia") ||
           (pref === "peques" && c.id === "familia") ||
-          (pref === "tareas" && c.id === "familia")
+          (pref === "tareas" && c.id === "familia") ||
+          (pref === "agenda" && c.id === "familia")
       );
       if (target > 0) {
         goToCard(target);
@@ -360,6 +388,192 @@ export function DashboardClient({
               </span>
             </div>
 
+            {/* Widget Rápido: Agenda de Hoy */}
+            <div
+              className="glass-card"
+              style={{
+                padding: "1rem 1.25rem",
+                borderRadius: "var(--radius-lg)",
+                background: "var(--apple-surface-secondary)",
+                boxShadow: "var(--shadow-sm)",
+                border: "1px solid var(--apple-border)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "0.75rem",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                  <div
+                    style={{
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "50%",
+                      background: "rgba(0, 113, 227, 0.15)",
+                      color: "var(--apple-blue)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <IconCalendar size={15} />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                    <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
+                      📅 Agenda de Hoy
+                    </h3>
+                    <span
+                      style={{
+                        fontSize: "0.7rem",
+                        padding: "0.1rem 0.5rem",
+                        borderRadius: "var(--radius-full)",
+                        background: todayEvents.length > 0 ? "rgba(0, 113, 227, 0.12)" : "var(--apple-surface)",
+                        color: todayEvents.length > 0 ? "var(--apple-blue)" : "var(--apple-text-secondary)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {todayEvents.length} {todayEvents.length === 1 ? "evento" : "eventos"}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={openFamilyAgenda}
+                  className="btn-ghost"
+                  style={{
+                    fontSize: "0.76rem",
+                    color: "var(--apple-blue)",
+                    fontWeight: 600,
+                    padding: "0.2rem 0.45rem",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  Ver agenda completa →
+                </button>
+              </div>
+
+              {todayEvents.length === 0 ? (
+                <div
+                  style={{
+                    padding: "0.85rem 1rem",
+                    textAlign: "center",
+                    borderRadius: "var(--radius-md)",
+                    background: "var(--apple-surface)",
+                    color: "var(--apple-text-secondary)",
+                    fontSize: "0.82rem",
+                    border: "1px dashed var(--apple-border)",
+                  }}
+                >
+                  Sin eventos programados para hoy ✨
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                  {todayEvents.map((ev) => {
+                    const member = ev.member_id ? memberMap.get(ev.member_id) : null;
+                    const accent = member?.color || "var(--apple-blue)";
+                    return (
+                      <div
+                        key={ev.id}
+                        onClick={openFamilyAgenda}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "0.6rem 0.85rem",
+                          borderRadius: "var(--radius-md)",
+                          background: "var(--apple-surface)",
+                          border: "1px solid var(--apple-border)",
+                          borderLeft: `3px solid ${accent}`,
+                          cursor: "pointer",
+                          gap: "0.65rem",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                              fontSize: "0.76rem",
+                              fontWeight: 700,
+                              color: accent,
+                              flexShrink: 0,
+                              minWidth: "62px",
+                            }}
+                          >
+                            <IconClock size={12} />
+                            <span>{ev.all_day ? "Todo el día" : timeOf(ev.starts_at)}</span>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <span
+                              style={{
+                                fontSize: "0.86rem",
+                                fontWeight: 600,
+                                color: "var(--apple-text)",
+                                display: "block",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {ev.title}
+                            </span>
+                            {ev.location && (
+                              <span
+                                style={{
+                                  fontSize: "0.72rem",
+                                  color: "var(--apple-text-secondary)",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.2rem",
+                                  marginTop: "0.1rem",
+                                }}
+                              >
+                                <IconLocation size={11} />
+                                <span>{ev.location}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {member && (
+                          <span
+                            style={{
+                              fontSize: "0.72rem",
+                              padding: "0.15rem 0.5rem",
+                              borderRadius: "var(--radius-full)",
+                              background: `${member.color}15`,
+                              color: member.color,
+                              fontWeight: 600,
+                              border: `1px solid ${member.color}30`,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span>{member.emoji}</span>
+                            <span>{member.name}</span>
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <DinnerCard
               date={today}
               initialPlans={dinners}
@@ -400,34 +614,286 @@ export function DashboardClient({
           </div>
         </div>
 
-        {/* 🃏 Tarjeta 4: Familia & Hogar (Peques & Tareas) */}
+        {/* 🃏 Tarjeta 4: Familia & Hogar (Peques, Tareas & Agenda Integradas) */}
         <div className="deck-slide">
           <div className="deck-card">
-            <KidsModule
-              members={members}
-              today={today}
-              schoolRun={schoolRun}
-              schoolLunch={schoolLunch}
-              schoolDinnerRec={schoolDinnerRec}
-              healthUpcoming={healthUpcoming}
-              currentMemberId={currentMemberId}
-            />
-            <TasksModule
-              tasks={tasks}
-              members={members}
-              currentMemberId={currentMemberId}
-            />
-          </div>
-        </div>
+            {/* Sección 1: Peques (Cole & Salud) */}
+            <div style={{ marginBottom: "1rem" }}>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setFamilyKidsOpen(!familyKidsOpen)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setFamilyKidsOpen(!familyKidsOpen);
+                  }
+                }}
+                aria-expanded={familyKidsOpen}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "0.85rem 1.15rem",
+                  borderRadius: "var(--radius-lg)",
+                  background: "var(--apple-surface-secondary)",
+                  border: "1px solid var(--apple-border)",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  boxShadow: "var(--shadow-sm)",
+                  marginBottom: familyKidsOpen ? "0.75rem" : "0",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <div
+                    className="squircle-icon"
+                    style={{
+                      background: "var(--apple-orange-subtle)",
+                      color: "var(--apple-orange)",
+                      width: "36px",
+                      height: "36px",
+                      borderRadius: "10px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.1rem",
+                    }}
+                  >
+                    🧒
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
+                        Peques (Cole & Salud)
+                      </h2>
+                      <span className="badge badge-amber" style={{ fontSize: "0.72rem" }}>
+                        Montessori Salamanca
+                      </span>
+                    </div>
+                    <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: "0.1rem 0 0 0" }}>
+                      Turnos de recogida, menú del cole y citas médicas
+                    </p>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "var(--radius-full)",
+                    background: "var(--apple-surface)",
+                    border: "1px solid var(--apple-border)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--apple-text-secondary)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {familyKidsOpen ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+                </div>
+              </div>
 
-        {/* 🃏 Tarjeta 5: Agenda & Cronograma */}
-        <div className="deck-slide">
-          <div className="deck-card">
-            <CalendarModule
-              events={events}
-              members={members}
-              today={today}
-            />
+              {familyKidsOpen && (
+                <KidsModule
+                  members={members}
+                  today={today}
+                  schoolRun={schoolRun}
+                  schoolLunch={schoolLunch}
+                  schoolDinnerRec={schoolDinnerRec}
+                  healthUpcoming={healthUpcoming}
+                  currentMemberId={currentMemberId}
+                />
+              )}
+            </div>
+
+            {/* Sección 2: Tareas del Hogar */}
+            <div style={{ marginBottom: "1rem" }}>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setFamilyTasksOpen(!familyTasksOpen)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setFamilyTasksOpen(!familyTasksOpen);
+                  }
+                }}
+                aria-expanded={familyTasksOpen}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "0.85rem 1.15rem",
+                  borderRadius: "var(--radius-lg)",
+                  background: "var(--apple-surface-secondary)",
+                  border: "1px solid var(--apple-border)",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  boxShadow: "var(--shadow-sm)",
+                  marginBottom: familyTasksOpen ? "0.75rem" : "0",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <div
+                    className="squircle-icon"
+                    style={{
+                      background: "var(--apple-blue-subtle)",
+                      color: "var(--apple-blue)",
+                      width: "36px",
+                      height: "36px",
+                      borderRadius: "10px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.1rem",
+                    }}
+                  >
+                    ✅
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
+                        Tareas del Hogar
+                      </h2>
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          padding: "0.12rem 0.5rem",
+                          borderRadius: "var(--radius-full)",
+                          background: pendingTasksCount > 0 ? "rgba(59, 130, 246, 0.12)" : "rgba(52, 199, 89, 0.12)",
+                          color: pendingTasksCount > 0 ? "var(--apple-blue)" : "var(--apple-green)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {pendingTasksCount > 0 ? `${pendingTasksCount} pendientes` : "¡Todo al día!"}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: "0.1rem 0 0 0" }}>
+                      Responsabilidades y organización del hogar
+                    </p>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "var(--radius-full)",
+                    background: "var(--apple-surface)",
+                    border: "1px solid var(--apple-border)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--apple-text-secondary)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {familyTasksOpen ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+                </div>
+              </div>
+
+              {familyTasksOpen && (
+                <TasksModule
+                  tasks={tasks}
+                  members={members}
+                  currentMemberId={currentMemberId}
+                />
+              )}
+            </div>
+
+            {/* Sección 3: Agenda & Cronograma */}
+            <div ref={agendaSectionRef} style={{ marginBottom: "1rem" }}>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setFamilyAgendaOpen(!familyAgendaOpen)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setFamilyAgendaOpen(!familyAgendaOpen);
+                  }
+                }}
+                aria-expanded={familyAgendaOpen}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "0.85rem 1.15rem",
+                  borderRadius: "var(--radius-lg)",
+                  background: "var(--apple-surface-secondary)",
+                  border: "1px solid var(--apple-border)",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  boxShadow: "var(--shadow-sm)",
+                  marginBottom: familyAgendaOpen ? "0.75rem" : "0",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <div
+                    className="squircle-icon"
+                    style={{
+                      background: "rgba(0, 113, 227, 0.12)",
+                      color: "var(--apple-blue)",
+                      width: "36px",
+                      height: "36px",
+                      borderRadius: "10px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.1rem",
+                    }}
+                  >
+                    📅
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <h2 style={{ fontSize: "1.05rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
+                        Agenda & Cronograma
+                      </h2>
+                      <span
+                        style={{
+                          fontSize: "0.72rem",
+                          padding: "0.12rem 0.5rem",
+                          borderRadius: "var(--radius-full)",
+                          background: "var(--apple-surface)",
+                          color: "var(--apple-text-secondary)",
+                          fontWeight: 600,
+                          border: "1px solid var(--apple-border)",
+                        }}
+                      >
+                        {events.length} compromisos
+                      </span>
+                    </div>
+                    <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: "0.1rem 0 0 0" }}>
+                      Sincronización con Google Calendar y eventos del hogar
+                    </p>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "var(--radius-full)",
+                    background: "var(--apple-surface)",
+                    border: "1px solid var(--apple-border)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--apple-text-secondary)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {familyAgendaOpen ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+                </div>
+              </div>
+
+              {familyAgendaOpen && (
+                <CalendarModule
+                  events={events}
+                  members={members}
+                  today={today}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>

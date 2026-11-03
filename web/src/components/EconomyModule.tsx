@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import type {
   Receipt,
   PerishableAlert,
@@ -25,6 +25,7 @@ import {
   deleteFamilyInsuranceAction,
   addWarrantyAction,
   deleteWarrantyAction,
+  updateReceiptItemCategoryAction,
 } from "@/app/actions";
 import {
   IconEconomy,
@@ -40,6 +41,18 @@ import {
 import { TicketManagerModal } from "./TicketManagerModal";
 import { CategoryDonutChart, MonthCompareChart } from "./ChartsLazy";
 
+export type ReceiptItemMonthly = {
+  id: number;
+  receipt_id: number;
+  name: string;
+  quantity: string | null;
+  unit_price: number | null;
+  total_price: number;
+  category: string;
+  store_name?: string | null;
+  date?: string;
+};
+
 export function EconomyModule({
   receipts = [],
   perishables = [],
@@ -48,6 +61,7 @@ export function EconomyModule({
     last_month_total: 0,
     by_store: [],
     by_category: [],
+    items: [],
   },
   priceComparisons = [],
   habits = [],
@@ -63,6 +77,7 @@ export function EconomyModule({
     last_month_total: number;
     by_store: { store_name: string; color: string; total: number; count: number }[];
     by_category: { category: string; total: number; percentage: number }[];
+    items?: ReceiptItemMonthly[];
   };
   priceComparisons: PriceComparison[];
   habits: HabitInsight[];
@@ -73,6 +88,98 @@ export function EconomyModule({
 }) {
   const [activeTab, setActiveTab] = useState<"balance" | "energy" | "insurances" | "warranties" | "scan" | "perishables">("balance");
   const [isPending, startTransition] = useTransition();
+
+  // Estados interactivos para Categorías y Drag & Drop
+  const [categories, setCategories] = useState(monthlyExpenses.by_category);
+  const [monthItems, setMonthItems] = useState<ReceiptItemMonthly[]>(monthlyExpenses.items ?? []);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
+  const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCategories(monthlyExpenses.by_category);
+    setMonthItems(monthlyExpenses.items ?? []);
+  }, [monthlyExpenses]);
+
+  // Manejo de Drag & Drop y reclasificación inmediata
+  const handleDrop = (targetCategory: string, itemIdInput?: number) => {
+    const itemId = itemIdInput ?? draggedItemId;
+    if (!itemId) return;
+
+    const item = monthItems.find((i) => i.id === itemId);
+    if (!item || item.category === targetCategory) {
+      setDragOverCategory(null);
+      setDraggedItemId(null);
+      return;
+    }
+
+    const oldCategory = item.category;
+    const itemPrice = item.total_price;
+
+    // Actualización inmediata del estado local para que los totales cambien al instante
+    setMonthItems((prev) =>
+      prev.map((it) => (it.id === itemId ? { ...it, category: targetCategory } : it))
+    );
+
+    setCategories((prev) => {
+      let targetExists = false;
+      const updated = prev.map((cat) => {
+        if (cat.category === oldCategory) {
+          return { ...cat, total: Math.max(0, cat.total - itemPrice) };
+        }
+        if (cat.category === targetCategory) {
+          targetExists = true;
+          return { ...cat, total: cat.total + itemPrice };
+        }
+        return cat;
+      });
+
+      if (!targetExists) {
+        updated.push({
+          category: targetCategory,
+          total: itemPrice,
+          percentage: 0,
+        });
+      }
+
+      const totalSum = updated.reduce((sum, c) => sum + c.total, 0);
+      return updated.map((c) => ({
+        ...c,
+        percentage: totalSum > 0 ? Math.round((c.total / totalSum) * 100) : 0,
+      }));
+    });
+
+    setDragOverCategory(null);
+    setDraggedItemId(null);
+
+    // Invocación a la server action en una transición
+    startTransition(async () => {
+      try {
+        await updateReceiptItemCategoryAction(itemId, targetCategory);
+      } catch (err) {
+        console.error("Error al actualizar categoría del producto:", err);
+      }
+    });
+  };
+
+  // Categorías estándar y activas para selector y zonas de soltado
+  const standardCategories = [
+    "Alimentación",
+    "Frescos",
+    "Lácteos",
+    "Carnicería",
+    "Pescadería",
+    "Frutas y Verduras",
+    "Panadería",
+    "Bebidas",
+    "Droguería y Limpieza",
+    "Higiene",
+    "Hogar",
+    "Otros",
+  ];
+  const availableCategoryTargets = Array.from(
+    new Set([...categories.map((c) => c.category), ...standardCategories])
+  ).filter(Boolean);
 
   // Estados para Escáner de Tickets
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
@@ -459,42 +566,300 @@ export function EconomyModule({
             )}
           </div>
 
-          {/* Desglose por Categoría */}
-          {monthlyExpenses.by_category.length > 0 && (
+          {/* Desglose por Categoría con Explorador y Drag & Drop */}
+          {categories.length > 0 && (
             <div className="card-apple" style={{ padding: "1.35rem" }}>
-              <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
-                Distribución por Categoría de Consumo
-              </h3>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                <div>
+                  <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
+                    Distribución por Categoría de Consumo
+                  </h3>
+                  <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.15rem" }}>
+                    Haz clic en una categoría para inspeccionar sus productos o arrastra para reclasificarlos.
+                  </p>
+                </div>
+                {selectedCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory(null)}
+                    className="btn-ghost"
+                    style={{ fontSize: "0.75rem", padding: "0.25rem 0.65rem", borderRadius: "var(--radius-full)" }}
+                  >
+                    Ocultar productos ✕
+                  </button>
+                )}
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "1rem" }}>
-                <CategoryDonutChart data={monthlyExpenses.by_category} />
+                <CategoryDonutChart
+                  data={categories}
+                  onSelectCategory={(catName) => setSelectedCategory((prev) => (prev === catName ? null : catName))}
+                />
                 <MonthCompareChart
                   last={monthlyExpenses.last_month_total}
-                  current={monthlyExpenses.current_month_total}
+                  current={categories.reduce((acc, c) => acc + c.total, 0)}
                 />
               </div>
+
+              {/* Cuadrícula de tarjetas de categorías: clickables y drop targets */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem" }}>
-                {monthlyExpenses.by_category.map((cat) => (
+                {categories.map((cat) => {
+                  const isSelected = selectedCategory === cat.category;
+                  const isDragOver = dragOverCategory === cat.category;
+
+                  return (
+                    <div
+                      key={cat.category}
+                      onClick={() => setSelectedCategory(isSelected ? null : cat.category)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverCategory !== cat.category) {
+                          setDragOverCategory(cat.category);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverCategory === cat.category) {
+                          setDragOverCategory(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const idStr = e.dataTransfer.getData("text/plain");
+                        const itemId = idStr ? Number(idStr) : draggedItemId;
+                        if (itemId) {
+                          handleDrop(cat.category, itemId);
+                        }
+                      }}
+                      style={{
+                        padding: "0.85rem",
+                        borderRadius: "var(--radius-md)",
+                        background: isDragOver
+                          ? "var(--apple-blue-subtle)"
+                          : isSelected
+                          ? "var(--apple-surface-elevated)"
+                          : "var(--apple-surface-secondary)",
+                        border: isDragOver
+                          ? "2px dashed var(--apple-blue)"
+                          : isSelected
+                          ? "2px solid var(--apple-blue)"
+                          : "1px solid var(--apple-border)",
+                        boxShadow: isSelected ? "0 4px 16px rgba(0, 113, 227, 0.15)" : "none",
+                        cursor: "pointer",
+                        transition: "all 0.18s ease",
+                        position: "relative",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ fontSize: "0.74rem", fontWeight: 700, color: isSelected ? "var(--apple-blue)" : "var(--apple-text-secondary)" }}>
+                          {cat.category}
+                        </div>
+                        <span style={{ fontSize: "0.72rem", color: isSelected ? "var(--apple-blue)" : "var(--apple-text-tertiary)" }}>
+                          {isSelected ? "▲ Abierto" : "▼ Ver"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, marginTop: "0.2rem", color: "var(--apple-text)" }}>
+                        {cat.total.toFixed(2)} €
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.1rem" }}>
+                        <span style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)" }}>
+                          {cat.percentage}% del total mensual
+                        </span>
+                        {isDragOver && (
+                          <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--apple-blue)" }}>
+                            Soltar aquí
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Panel / Cajón inferior desplegable con los productos de la categoría seleccionada */}
+              {selectedCategory && (
+                <div
+                  style={{
+                    marginTop: "1.25rem",
+                    padding: "1.15rem",
+                    borderRadius: "var(--radius-lg)",
+                    background: "var(--apple-surface-secondary)",
+                    border: "1px solid var(--apple-border)",
+                    boxShadow: "var(--shadow-sm)",
+                    animation: "fadeSlideIn 0.25s var(--ease-spring)",
+                  }}
+                >
                   <div
-                    key={cat.category}
                     style={{
-                      padding: "0.85rem",
-                      borderRadius: "var(--radius-md)",
-                      background: "var(--apple-surface-secondary)",
-                      border: "1px solid var(--apple-border)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "0.75rem",
+                      flexWrap: "wrap",
+                      gap: "0.5rem",
                     }}
                   >
-                    <div style={{ fontSize: "0.74rem", fontWeight: 600, color: "var(--apple-text-secondary)" }}>
-                      {cat.category}
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span style={{ fontSize: "1.1rem" }}>🏷️</span>
+                        <h4 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
+                          Productos en &ldquo;{selectedCategory}&rdquo;
+                        </h4>
+                        <span className="badge badge-blue" style={{ fontSize: "0.7rem" }}>
+                          Mes actual
+                        </span>
+                      </div>
+                      <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.2rem" }}>
+                        Arrastra un producto hacia cualquier categoría de arriba o chips de abajo para reclasificarlo.
+                      </p>
                     </div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 800, marginTop: "0.2rem", color: "var(--apple-text)" }}>
-                      {cat.total.toFixed(2)} €
-                    </div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)", marginTop: "0.1rem" }}>
-                      {cat.percentage}% del total mensual
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory(null)}
+                      className="btn-ghost"
+                      style={{ fontSize: "0.8rem", padding: "0.3rem 0.65rem", borderRadius: "var(--radius-full)" }}
+                    >
+                      ✕ Cerrar
+                    </button>
                   </div>
-                ))}
-              </div>
+
+                  {/* Chips de destino rápido */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                      overflowX: "auto",
+                      paddingBottom: "0.6rem",
+                      marginBottom: "0.85rem",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)", whiteSpace: "nowrap" }}>
+                      Mover a:
+                    </span>
+                    {availableCategoryTargets.map((targetCat) => (
+                      <button
+                        key={targetCat}
+                        type="button"
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const idStr = e.dataTransfer.getData("text/plain");
+                          const itemId = idStr ? Number(idStr) : draggedItemId;
+                          if (itemId) handleDrop(targetCat, itemId);
+                        }}
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          padding: "0.25rem 0.65rem",
+                          borderRadius: "var(--radius-full)",
+                          background: targetCat === selectedCategory ? "var(--apple-blue-subtle)" : "var(--apple-surface)",
+                          border: targetCat === selectedCategory ? "1px solid var(--apple-blue)" : "1px dashed var(--apple-border)",
+                          color: targetCat === selectedCategory ? "var(--apple-blue)" : "var(--apple-text)",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={`Arrastra o suelta aquí para reclasificar en ${targetCat}`}
+                      >
+                        {targetCat}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Lista de productos de la categoría seleccionada */}
+                  {monthItems.filter((i) => i.category === selectedCategory).length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "1.5rem 1rem", color: "var(--apple-text-secondary)", fontSize: "0.85rem" }}>
+                      No hay productos registrados en esta categoría este mes. Puedes arrastrar productos aquí desde otra categoría.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "360px", overflowY: "auto", paddingRight: "0.25rem" }}>
+                      {monthItems
+                        .filter((i) => i.category === selectedCategory)
+                        .map((item) => (
+                          <div
+                            key={item.id}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/plain", String(item.id));
+                              setDraggedItemId(item.id);
+                            }}
+                            onDragEnd={() => {
+                              setDraggedItemId(null);
+                              setDragOverCategory(null);
+                            }}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "0.65rem 0.85rem",
+                              borderRadius: "var(--radius-sm)",
+                              background: "var(--apple-surface)",
+                              border: "1px solid var(--apple-border)",
+                              cursor: "grab",
+                              transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flex: 1, minWidth: 0 }}>
+                              <span
+                                style={{
+                                  color: "var(--apple-text-tertiary)",
+                                  cursor: "grab",
+                                  fontSize: "0.9rem",
+                                  userSelect: "none",
+                                }}
+                                title="Arrastrar para mover de categoría"
+                              >
+                                ⋮⋮
+                              </span>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--apple-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {item.name}
+                                </div>
+                                <div style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", display: "flex", gap: "0.4rem" }}>
+                                  {item.store_name && <span>{item.store_name}</span>}
+                                  {item.date && <span>· {item.date}</span>}
+                                  {item.quantity && <span>· cant: {item.quantity}</span>}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", marginLeft: "0.75rem" }}>
+                              <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--apple-text)" }}>
+                                {item.total_price.toFixed(2)} €
+                              </span>
+                              <select
+                                aria-label={`Mover categoría para ${item.name}`}
+                                value={item.category}
+                                onChange={(e) => handleDrop(e.target.value, item.id)}
+                                style={{
+                                  fontSize: "0.72rem",
+                                  padding: "0.25rem 0.45rem",
+                                  borderRadius: "var(--radius-sm)",
+                                  background: "var(--apple-surface-elevated)",
+                                  color: "var(--apple-text)",
+                                  border: "1px solid var(--apple-border)",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <option value={item.category} disabled>
+                                  Mover a...
+                                </option>
+                                {availableCategoryTargets.map((c) => (
+                                  <option key={c} value={c}>
+                                    {c}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

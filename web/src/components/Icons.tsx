@@ -17,6 +17,7 @@ import {
   MapPin,
   Camera,
   ChevronRight,
+  ChevronDown,
   Receipt,
   PieChart,
   type LucideIcon,
@@ -48,5 +49,6 @@ export const IconClock = wrap(Clock);
 export const IconLocation = wrap(MapPin);
 export const IconCamera = wrap(Camera);
 export const IconChevronRight = wrap(ChevronRight, 16);
+export const IconChevronDown = wrap(ChevronDown, 16);
 export const IconReceipt = wrap(Receipt);
 export const IconPieChart = wrap(PieChart);

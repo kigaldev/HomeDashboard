@@ -246,4 +246,31 @@ describe("repo + db (PGlite en memoria)", () => {
       expect(manzanaComp?.savings_percent).toBe(25);
     });
   });
+
+  describe("updateReceiptItemCategory y explorer", () => {
+    it("actualiza la categoría de un ítem y recalcula los totales mensuales", async () => {
+      const stores = await repo.getStores();
+      const receiptId = await repo.recordReceipt({
+        storeId: stores[0].id,
+        date: new Date().toISOString().slice(0, 10),
+        totalAmount: 12.5,
+        items: [
+          { name: "Yogur Natural", totalPrice: 4.5, unitPrice: 1.5, category: "Lácteos", isPerishable: true },
+          { name: "Detergente Lavadora", totalPrice: 8.0, unitPrice: 8.0, category: "Limpieza", isPerishable: false },
+        ],
+      });
+
+      expect(receiptId).toBeTruthy();
+      const items = await repo.getReceiptItems(receiptId!);
+      const yogur = items.find((i) => i.name === "Yogur Natural");
+      expect(yogur).toBeDefined();
+
+      const expenses = await repo.updateReceiptItemCategory(yogur!.id, "Desayunos");
+      expect(expenses.by_category.some((c) => c.category === "Desayunos")).toBe(true);
+
+      const itemsUpdated = await repo.getReceiptItems(receiptId!);
+      const yogurUpdated = itemsUpdated.find((i) => i.id === yogur!.id);
+      expect(yogurUpdated?.category).toBe("Desayunos");
+    });
+  });
 });

@@ -325,14 +325,15 @@ export function ProfileLoginModal({
                     value={activeMember.preferred_tab || selectedTab}
                     onChange={(e) => handleSavePreference(e.target.value)}
                     className="input-field"
-                    style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem", width: "125px", cursor: "pointer" }}
+                    style={{ fontSize: "0.78rem", padding: "0.25rem 0.6rem", width: "135px", cursor: "pointer" }}
                   >
-                    <option value="resumen">Resumen</option>
+                    <option value="resumen">Hoy (Resumen)</option>
                     <option value="compra">Compra</option>
-                    <option value="tickets">Tickets</option>
-                    <option value="tareas">Tareas</option>
-                    <option value="peques">Peques</option>
-                    <option value="agenda">Agenda</option>
+                    <option value="economia">Economía</option>
+                    <option value="familia">Familia</option>
+                    <option value="agenda">Agenda (en Familia)</option>
+                    <option value="peques">Peques (en Familia)</option>
+                    <option value="tareas">Tareas (en Familia)</option>
                   </select>
                 </div>
 
