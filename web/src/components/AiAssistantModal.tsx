@@ -7,15 +7,23 @@ import { IconSparkles } from "./Icons";
 export function AiAssistantModal({
   isOpen,
   onClose,
+  initialPrompt = "",
 }: {
   isOpen: boolean;
   onClose: () => void;
+  initialPrompt?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialPrompt && isOpen) {
+      setInput(initialPrompt);
+    }
+  }, [initialPrompt, isOpen]);
 
   const [messages, setMessages] = useState<
     Array<{

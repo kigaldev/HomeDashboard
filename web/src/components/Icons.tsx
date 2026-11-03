@@ -20,15 +20,18 @@ import {
   ChevronDown,
   Receipt,
   PieChart,
+  Bot,
+  Activity,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 
-// Shim sobre lucide-react: mantiene los exports y la firma ({ className, size }) originales.
-type IconProps = { className?: string; size?: number };
+// Shim sobre lucide-react: mantiene los exports y la firma ({ className, size, style }) originales.
+type IconProps = { className?: string; size?: number; style?: React.CSSProperties };
 
 function wrap(Icon: LucideIcon, defaultSize = 18) {
-  return function WrappedIcon({ className = "", size = defaultSize }: IconProps) {
-    return <Icon size={size} className={className} aria-hidden="true" />;
+  return function WrappedIcon({ className = "", size = defaultSize, style }: IconProps) {
+    return <Icon size={size} className={className} style={style} aria-hidden="true" />;
   };
 }
 
@@ -52,3 +55,6 @@ export const IconChevronRight = wrap(ChevronRight, 16);
 export const IconChevronDown = wrap(ChevronDown, 16);
 export const IconReceipt = wrap(Receipt);
 export const IconPieChart = wrap(PieChart);
+export const IconBot = wrap(Bot);
+export const IconActivity = wrap(Activity);
+export const IconLayers = wrap(Layers);

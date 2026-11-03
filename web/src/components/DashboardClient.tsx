@@ -10,6 +10,7 @@ import { TasksModule } from "./TasksModule";
 import { KidsModule } from "./KidsModule";
 import { CalendarModule } from "./CalendarModule";
 import { EconomyModule } from "./EconomyModule";
+import { AgentSquadMissionControl } from "./AgentSquadMissionControl";
 import { AiAssistantModal } from "./AiAssistantModal";
 import { SettingsModal } from "./SettingsModal";
 import { ProfileLoginModal } from "./ProfileLoginModal";
@@ -130,8 +131,14 @@ export function DashboardClient({
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [assistantInitialPrompt, setAssistantInitialPrompt] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const handleOpenAssistant = (prompt?: string) => {
+    setAssistantInitialPrompt(prompt || "");
+    setIsAssistantOpen(true);
+  };
 
   // Estados colapsables para los módulos de la pestaña Familia
   const [familyKidsOpen, setFamilyKidsOpen] = useState(true);
@@ -227,7 +234,7 @@ export function DashboardClient({
         weather={weather}
         greeting={greeting}
         formattedDate={formattedDate}
-        onOpenAssistant={() => setIsAssistantOpen(true)}
+        onOpenAssistant={() => handleOpenAssistant()}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
       />
@@ -320,6 +327,19 @@ export function DashboardClient({
                 </span>
               </div>
             )}
+
+            {/* 🤖 Squad Multiagente del Hogar (Mission Control · FortIA Architecture) */}
+            <AgentSquadMissionControl
+              receipts={receipts}
+              events={events}
+              perishables={perishables}
+              energyContracts={energyContracts}
+              onOpenAssistant={handleOpenAssistant}
+              onNavigateTab={(tabId) => {
+                const targetIdx = CARDS.findIndex((c) => c.id === tabId);
+                if (targetIdx >= 0) goToCard(targetIdx);
+              }}
+            />
 
             <div className="wall-dashboard-grid">
               {/* Columna Izquierda: Briefing + Agenda de Hoy compacta */}
@@ -898,7 +918,7 @@ export function DashboardClient({
       {/* ── Botón Flotante Apple Intelligence (Asistente por Voz / Chat) ── */}
       <button
         type="button"
-        onClick={() => setIsAssistantOpen(true)}
+        onClick={() => handleOpenAssistant()}
         className="fab-apple-ai"
         title="Hablar o escribir al Asistente"
         aria-label="Asistente con Inteligencia Artificial"
@@ -911,6 +931,7 @@ export function DashboardClient({
       <AiAssistantModal
         isOpen={isAssistantOpen}
         onClose={() => setIsAssistantOpen(false)}
+        initialPrompt={assistantInitialPrompt}
       />
 
       <SettingsModal
