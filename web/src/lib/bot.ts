@@ -1,8 +1,18 @@
 import "server-only";
-import { askAssistant } from "./assistant";
+import { runAgentInstruction } from "./assistant";
 import { generateBriefing, escapeHtml } from "./briefing";
 import { isoDate, parseRelativeDay } from "./dates";
 import { addShopping, addTask, findStoreId, getMembers, getOpenTasks, getShopping, getStores, setPantry } from "./repo";
+import { parseReceiptImage, saveProcessedReceipt } from "./receipts";
+
+/** Convierte markdown básico (**negrita**, *cursiva*, `código`) a etiquetas HTML seguras para Telegram */
+function formatTelegramHtml(text: string): string {
+  let s = escapeHtml(text);
+  s = s.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+  s = s.replace(/\*(.*?)\*/g, "<i>$1</i>");
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  return s;
+}
 
 /** Divide "leche, huevos y pan" → ["leche","huevos","pan"] */
 function splitItems(s: string): string[] {
@@ -161,6 +171,108 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
       `\nTu ID de Telegram es <code>${escapeHtml(telegramUserId ?? "?")}</code>.`,
     ].join("\n");
 
-  // ── Cualquier otra cosa: consulta al Asistente Inteligente
-  return escapeHtml(await askAssistant(t));
+  // ── Cualquier otra cosa: consulta al Asistente Inteligente con capacidad de acción
+  const result = await runAgentInstruction(t);
+  if (result.actionExecuted) {
+    const icon = {
+      shopping: "🛒",
+      pantry: "📦",
+      task: "✅",
+      school_run: "🏫",
+      dinner: "🍲",
+      energy: "⚡",
+      info: "ℹ️",
+    }[result.actionExecuted.type] || "🛒";
+    return `${icon} <i>Acción realizada:</i> ${escapeHtml(result.actionExecuted.description)}\n\n${formatTelegramHtml(result.message)}`;
+  }
+
+  return formatTelegramHtml(result.message);
+}
+
+/**
+ * Procesa una foto de ticket de compra recibida por Telegram.
+ * Convierte a Base64, analiza con Gemini Vision (parseReceiptImage),
+ * guarda y concilia automáticamente con la BD (saveProcessedReceipt)
+ * y devuelve un resumen formateado en HTML para Telegram.
+ */
+export async function handleBotPhoto(
+  fileUrlOrBuffer: Buffer | string,
+  mimeType: string = "image/jpeg",
+  caption?: string,
+  telegramUserId?: string,
+): Promise<string> {
+  try {
+    let base64: string;
+    if (Buffer.isBuffer(fileUrlOrBuffer)) {
+      base64 = fileUrlOrBuffer.toString("base64");
+    } else if (typeof fileUrlOrBuffer === "string") {
+      if (fileUrlOrBuffer.startsWith("http://") || fileUrlOrBuffer.startsWith("https://")) {
+        const resp = await fetch(fileUrlOrBuffer);
+        if (!resp.ok) {
+          throw new Error(`Error descargando la imagen de la URL (${resp.status})`);
+        }
+        const arr = await resp.arrayBuffer();
+        base64 = Buffer.from(arr).toString("base64");
+      } else if (fileUrlOrBuffer.startsWith("data:")) {
+        const commaIdx = fileUrlOrBuffer.indexOf(",");
+        base64 = commaIdx !== -1 ? fileUrlOrBuffer.slice(commaIdx + 1) : fileUrlOrBuffer;
+      } else if (fileUrlOrBuffer.startsWith("/") || fileUrlOrBuffer.startsWith("./")) {
+        const fs = await import("fs/promises");
+        const fileData = await fs.readFile(fileUrlOrBuffer);
+        base64 = fileData.toString("base64");
+      } else {
+        base64 = fileUrlOrBuffer;
+      }
+    } else {
+      throw new Error("Formato de imagen inválido: se esperaba un Buffer o string.");
+    }
+
+    const parsed = await parseReceiptImage(base64, mimeType);
+    const result = await saveProcessedReceipt(parsed, caption);
+
+    const storeName = result.storeName || parsed.storeName || "Comercio";
+    const dateStr = parsed.date || isoDate();
+    const totalStr = parsed.totalAmount != null ? `${parsed.totalAmount.toFixed(2)} €` : "0.00 €";
+
+    const lines: string[] = [
+      `🧾 <b>Ticket de ${escapeHtml(storeName)}</b>`,
+      `📅 <b>Fecha:</b> ${escapeHtml(dateStr)} · <b>Total:</b> ${escapeHtml(totalStr)}`,
+    ];
+
+    if (parsed.items && parsed.items.length > 0) {
+      lines.push(`\n🛒 <b>Artículos detectados (${parsed.items.length}):</b>`);
+      const limit = 25;
+      const itemsToShow = parsed.items.slice(0, limit);
+      for (const item of itemsToShow) {
+        const priceStr = item.totalPrice > 0 ? ` — ${item.totalPrice.toFixed(2)} €` : "";
+        const qtyStr = item.quantity ? ` (${escapeHtml(item.quantity)})` : "";
+        lines.push(`• ${escapeHtml(item.name)}${qtyStr}${priceStr}`);
+      }
+      if (parsed.items.length > limit) {
+        lines.push(`<i>...y ${parsed.items.length - limit} productos más.</i>`);
+      }
+    }
+
+    const extra: string[] = [];
+    if (result.matchedCount > 0) {
+      extra.push(
+        `✅ <b>Lista de la compra:</b> ${result.matchedCount} productos tachados (${result.matchedNames.map(escapeHtml).join(", ")}).`
+      );
+    }
+    if (result.pantryUpdatedCount > 0) {
+      extra.push(`📦 <b>Despensa:</b> ${result.pantryUpdatedCount} productos actualizados a OK.`);
+    }
+    if (result.pendingRemainingCount > 0) {
+      extra.push(`📝 Quedan <b>${result.pendingRemainingCount}</b> productos pendientes en la lista de la compra.`);
+    }
+
+    if (extra.length > 0) {
+      lines.push(`\n${extra.join("\n")}`);
+    }
+
+    return lines.join("\n");
+  } catch (err: any) {
+    console.error("[bot] Error procesando ticket:", err);
+    return `❌ <b>Error al procesar el ticket:</b> ${escapeHtml(err?.message || "No se ha podido leer la imagen.")}\n\n<i>Asegúrate de que la foto esté bien iluminada y enfocada.</i>`;
+  }
 }

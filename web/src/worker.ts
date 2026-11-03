@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { generateBriefing } from "./lib/briefing";
-import { handleBotMessage } from "./lib/bot";
+import { handleBotMessage, handleBotPhoto } from "./lib/bot";
 import { syncMontessoriMenu } from "./lib/schoolMenu";
 import { syncGoogleCalendars } from "./lib/gcal";
 
@@ -24,6 +24,19 @@ async function tgSend(chatId: string | number, text: string) {
     });
   } catch (err) {
     console.error("[worker] Error sending telegram message:", err);
+  }
+}
+
+async function tgSendAction(chatId: string | number, action: string = "typing") {
+  if (!TOKEN) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${TOKEN}/sendChatAction`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, action }),
+    });
+  } catch (err) {
+    // Silently ignore action errors
   }
 }
 
@@ -120,8 +133,40 @@ async function pollTelegram() {
               continue;
             }
 
-            const text = msg.text || "";
-            if (text) {
+            if (msg.photo && Array.isArray(msg.photo) && msg.photo.length > 0) {
+              console.log(`[worker] [Telegram] Foto recibida de ${msg.from?.first_name || fromId} (${fromId})`);
+              try {
+                await tgSendAction(msg.chat.id, "typing");
+                const bestPhoto = msg.photo[msg.photo.length - 1];
+                const fileId = bestPhoto.file_id;
+
+                const fileRes = await fetch(`https://api.telegram.org/bot${TOKEN}/getFile?file_id=${fileId}`);
+                if (!fileRes.ok) throw new Error(`Telegram getFile falló con status ${fileRes.status}`);
+                const fileJson = await fileRes.json();
+                const filePath = fileJson.result?.file_path;
+                if (!filePath) throw new Error("No se pudo obtener la ruta del archivo (file_path)");
+
+                let mimeType = "image/jpeg";
+                if (filePath.endsWith(".png")) mimeType = "image/png";
+                else if (filePath.endsWith(".webp")) mimeType = "image/webp";
+
+                const downloadUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
+                const imgRes = await fetch(downloadUrl);
+                if (!imgRes.ok) throw new Error(`Error descargando la imagen de Telegram (${imgRes.status})`);
+                const buffer = Buffer.from(await imgRes.arrayBuffer());
+
+                const reply = await handleBotPhoto(buffer, mimeType, msg.caption, fromId);
+                await tgSend(msg.chat.id, reply);
+                console.log(`[worker] [Telegram] Foto de ticket procesada y respuesta enviada con éxito.`);
+              } catch (err: any) {
+                console.error("[worker] [Telegram] Error procesando foto:", err);
+                await tgSend(
+                  msg.chat.id,
+                  `❌ <b>Error al procesar la foto del ticket:</b> ${err?.message || "Error desconocido"}`
+                );
+              }
+            } else if (msg.text) {
+              const text = msg.text;
               console.log(`[worker] [Telegram] Mensaje de ${msg.from?.first_name || fromId} (${fromId}): "${text}"`);
               const reply = await handleBotMessage(text, fromId);
               await tgSend(msg.chat.id, reply);

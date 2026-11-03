@@ -4,8 +4,8 @@ export type ChatMsg = { role: "system" | "user" | "assistant"; content: string }
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
-const FALLBACK_MODELS = Array.from(
-  new Set([DEFAULT_MODEL, "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"])
+export const FALLBACK_MODELS = Array.from(
+  new Set([DEFAULT_MODEL, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"])
 );
 
 const LOCAL_BASE = (process.env.LLM_BASE_URL || "").replace(/\/$/, "");
@@ -39,6 +39,7 @@ export async function llm(
       contents,
       generationConfig: {
         temperature: opts.temperature ?? 0.3,
+        ...(opts.json ? { response_mime_type: "application/json" } : {}),
       },
     };
 
@@ -136,7 +137,7 @@ export async function geminiVision(
     .trim()
     .replace(/\s+/g, "");
 
-  const body = {
+  const body: any = {
     contents: [
       {
         role: "user",
@@ -153,6 +154,7 @@ export async function geminiVision(
     ],
     generationConfig: {
       temperature: 0.1,
+      ...(opts.json ? { response_mime_type: "application/json" } : {}),
     },
   };
 
@@ -163,7 +165,7 @@ export async function geminiVision(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(18_000),
+        signal: AbortSignal.timeout(30_000),
         cache: "no-store",
       });
 
@@ -182,10 +184,7 @@ export async function geminiVision(
         if (jsonBlockMatch) {
           return jsonBlockMatch[1].trim();
         }
-        const bracketMatch = text.match(/\{[\s\S]*\}/);
-        if (bracketMatch) {
-          return bracketMatch[0].trim();
-        }
+        return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
       }
       return text.trim();
     } catch (err: any) {
