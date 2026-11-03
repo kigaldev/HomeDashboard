@@ -1,8 +1,17 @@
 import "server-only";
 import { llm, geminiVision, parseJson } from "./llm";
-import { addDays, isoDate } from "./dates";
-import { findStoreId, recordReceipt, getStores } from "./repo";
+import { addDays, isoDate, normalizeReceiptDate } from "./dates";
+import {
+  findStoreId,
+  recordReceipt,
+  getStores,
+  cleanProductName,
+  normalizeItemCanonical,
+  isDiscountOrPromotion,
+  syncPantryFromReceiptItems,
+} from "./repo";
 import { q } from "./db";
+export { normalizeReceiptDate };
 export type {
   ParsedReceiptItem,
   ParsedReceipt,
@@ -20,23 +29,6 @@ import type {
   ReceiptActionConfig,
   ReceiptExecutionResult,
 } from "./receiptShared";
-
-export function normalizeReceiptDate(raw?: string | null): string {
-  if (!raw) return isoDate();
-  const trimmed = raw.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    return trimmed;
-  }
-  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
-  if (dmyMatch) {
-    const day = dmyMatch[1].padStart(2, "0");
-    const month = dmyMatch[2].padStart(2, "0");
-    let year = dmyMatch[3];
-    if (year.length === 2) year = `20${year}`;
-    return `${year}-${month}-${day}`;
-  }
-  return isoDate();
-}
 
 const PERISHABLE_SHELF_LIFE: Record<string, number> = {
   pescado: 2,
@@ -112,6 +104,12 @@ function normalizeParsedAiReceipt(rawAi: any, defaultStore: string = "Otros"): P
     const totalPrice = parseFlexibleNumber(i.totalPrice ?? i.price ?? i.precio ?? i.total ?? i.importe);
     const unitPrice = i.unitPrice != null ? parseFlexibleNumber(i.unitPrice) : undefined;
     const category = i.category || i.categoria || "Despensa";
+
+    // NUNCA incluir descuentos, promociones ni importes negativos
+    if (isDiscountOrPromotion(name, totalPrice) || (unitPrice !== undefined && unitPrice < 0)) {
+      continue;
+    }
+
     const perish = estimatePerishable(name, category);
 
     items.push({
@@ -150,10 +148,10 @@ export async function parseReceiptText(rawText: string): Promise<ParsedReceipt> 
     {
       role: "system" as const,
       content:
-        "Eres un analizador OCR experto de tickets de compra de supermercados españoles (Mercadona, Carrefour, Lidl, Dia, Alcampo). " +
-        "Extrae en JSON válido la tienda ('Mercadona', 'Carrefour', 'Lidl' u 'Otros'), la fecha (YYYY-MM-DD), el importe total numérico, " +
-        "y la lista 'items' con: 'name' (nombre limpio y claro en español), 'quantity' (opcional), 'unitPrice' (numérico), " +
-        "'totalPrice' (numérico), 'category' ('Fruta y Verdura', 'Carnicería', 'Pescadería', 'Lácteos', 'Huevos', 'Panadería', 'Despensa', 'Bebé / Higiene', 'Limpieza'), " +
+        "Eres un analizador OCR experto de tickets de compra de supermercados españoles (Mercadona, Carrefour, Lidl, Dia, Alcampo, Aldi). " +
+        "Extrae en JSON válido la tienda ('Mercadona', 'Carrefour', 'Lidl', 'Dia', 'Alcampo', 'Aldi' u 'Otros'), la fecha de emisión impresa en el ticket (YYYY-MM-DD; si no es visible usa la actual), el importe total numérico, " +
+        "y la lista 'items' con: 'name' (nombre canónico y claro del producto en español sin abreviaturas crudas; ej. si el ticket pone 'BANANA GRANEL', normalizar a 'Plátanos' o 'Banana'; si pone 'SNACK QUESO CRF 200G', normalizar a 'Snack de queso'; si pone 'CLARA LIQUIDA PASTEU', normalizar a 'Clara de huevo líquida'. NUNCA incluir descuentos, cupones, promociones como 'DESCUENTO EN 2ª UNIDAD' ni números de artículo/juguetes internos como productos de despensa/alimentación), 'quantity' (opcional), 'unitPrice' (numérico positivo opcional), " +
+        "'totalPrice' (numérico positivo), 'category' ('Fruta y Verdura', 'Carnicería', 'Pescadería', 'Lácteos', 'Huevos', 'Panadería', 'Despensa', 'Bebé / Higiene', 'Limpieza', 'Otros'), " +
         "'isPerishable' (true si es fresco que caduca en menos de 10 días), 'expiryDays' (días estimados hasta caducar, ej. 2 para pescado, 3 para pollo, 4 para fruta, 6 para leche).",
     },
     {
@@ -257,14 +255,19 @@ function parseReceiptHeuristic(text: string): ParsedReceipt {
  */
 export async function parseReceiptImage(base64Image: string, mimeType: string = "image/jpeg"): Promise<ParsedReceipt> {
   const prompt =
-    "Eres un analizador OCR visual experto de tickets de compra de comercios y supermercados españoles. " +
+    "Eres un analizador OCR visual experto de tickets de compra de comercios y supermercados españoles (Mercadona, Carrefour, Lidl, Dia, Alcampo, Aldi, etc.). " +
     "Analiza la foto del ticket y extrae en JSON:\n" +
     "- 'storeName': el nombre del comercio o supermercado (ej. 'Mercadona', 'Carrefour', 'Lidl', 'Farmacia', 'Alcampo', 'Dia', 'Aldi', 'Decathlon', etc. Si no se distingue claramente el nombre, usa 'Otros')\n" +
-    "- 'date': fecha en formato YYYY-MM-DD\n" +
-    "- 'totalAmount': importe total numérico\n" +
-    "- 'items': lista con 'name' (nombre limpio del producto), 'quantity' (opcional), 'unitPrice' (opcional numérico), " +
-    "'totalPrice' (numérico), 'category' ('Fruta y Verdura', 'Carnicería', 'Pescadería', 'Lácteos', 'Huevos', 'Panadería', 'Despensa', 'Bebé / Higiene', 'Limpieza', 'Otros'), " +
-    "'isPerishable' (boolean), 'expiryDays' (número de días estimados hasta caducidad, ej. 2 para pescado, 3 para pollo, 4 para fruta, 6 para leche).\n" +
+    "- 'date': fecha EXACTA de emisión u operación impresa en el ticket en formato YYYY-MM-DD (debe ser la fecha física impresa en el ticket; si no es visible en absoluto, usar la actual)\n" +
+    "- 'totalAmount': importe total numérico del ticket\n" +
+    "- 'items': lista de productos donde cada uno tiene:\n" +
+    "  * 'name': nombre canónico y claro del producto en español, sin abreviaturas crudas del ticket ni códigos internos (ej. si el ticket pone 'BANANA GRANEL', normalizar a 'Plátanos' o 'Banana'; si pone 'SNACK QUESO CRF 200G', normalizar a 'Snack de queso'; si pone 'CLARA LIQUIDA PASTEU', normalizar a 'Clara de huevo líquida'). NUNCA incluir descuentos, cupones, promociones (como 'DESCUENTO EN 2ª UNIDAD', 'DTO 2ª UNID', 'CUPÓN') ni números de artículo/juguetes internos como productos de despensa/alimentación.\n" +
+    "  * 'quantity': cantidad o peso si aparece (opcional)\n" +
+    "  * 'unitPrice': precio unitario o por kilo si aparece (opcional numérico positivo)\n" +
+    "  * 'totalPrice': importe total numérico positivo del producto\n" +
+    "  * 'category': una de 'Fruta y Verdura', 'Carnicería', 'Pescadería', 'Lácteos', 'Huevos', 'Panadería', 'Despensa', 'Bebé / Higiene', 'Limpieza', 'Otros'\n" +
+    "  * 'isPerishable': boolean (true si es producto fresco)\n" +
+    "  * 'expiryDays': número estimado de días hasta caducidad (ej. 2 para pescado fresco, 3 para pollo/carne, 4 para fruta/verdura, 6 para leche fresca)\n" +
     "Devuelve ÚNICAMENTE el objeto JSON sin texto adicional ni formato markdown.";
 
   const aiResp = await geminiVision(prompt, base64Image, mimeType, { json: true });
@@ -303,25 +306,11 @@ export async function parseReceiptImage(base64Image: string, mimeType: string = 
 }
 
 /**
- * Normaliza nombres de productos quitando marcas y acentos para comparación semántica.
- */
-function cleanProductName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\b(hacendado|carrefour|lidl|aldi|leclerc|bio|pack|extra|clasica|entera|desnatada|fresca|1l|6x1l|1kg|500g|kg|g|ud)\b/gi, "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
  * Guarda un ticket procesado en la base de datos, realizando:
- * 1. Registro del ticket y desglose de items
+ * 1. Registro del ticket y desglose de items con fecha exacta de emisión
  * 2. Historial de precios por tienda
  * 3. Reconciliación semántica con la lista de la compra pendiente (tacha lo comprado)
- * 4. Actualización del inventario de despensa y nevera a 'ok' con fechas de caducidad
+ * 4. Actualización del inventario de despensa y nevera a 'ok' (solo alimentos/despensa, unificando similares)
  * 5. Auto-detección y promoción de tiendas si procede
  */
 export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: string): Promise<ReceiptReconciliationResult> {
@@ -348,7 +337,7 @@ export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: stri
     companyName = rawStore.toLowerCase() === "otros" ? "Otros" : (rawStore.charAt(0).toUpperCase() + rawStore.slice(1));
   }
 
-  const receiptDate = parsed.date || isoDate();
+  const receiptDate = normalizeReceiptDate(parsed.date);
 
   const items = parsed.items.map((i) => ({
     name: i.name,
@@ -366,6 +355,7 @@ export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: stri
     date: receiptDate,
     totalAmount: parsed.totalAmount,
     rawText: rawText || JSON.stringify(parsed),
+    updatePantry: false,
     items,
   });
 
@@ -380,17 +370,19 @@ export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: stri
   const receiptCleanNames = parsed.items.map((it) => ({
     original: it.name,
     clean: cleanProductName(it.name),
+    canonical: normalizeItemCanonical(it.name).toLowerCase(),
   }));
 
   for (const pending of pendingItems) {
     const pendingClean = cleanProductName(pending.name);
+    const pendingCanonical = normalizeItemCanonical(pending.name).toLowerCase();
     if (!pendingClean) continue;
 
-    // Comprobar coincidencia por inclusión de raíz o palabras clave
+    // Comprobar coincidencia por canónico, inclusión de raíz o palabras clave
     const isMatched = receiptCleanNames.some((r) => {
+      if (pendingCanonical && r.canonical && pendingCanonical === r.canonical) return true;
       if (!r.clean) return false;
       if (r.clean.includes(pendingClean) || pendingClean.includes(r.clean)) return true;
-      // Comprobar palabras compartidas significativas
       const pWords = pendingClean.split(" ").filter((w) => w.length > 2);
       const rWords = r.clean.split(" ").filter((w) => w.length > 2);
       return pWords.some((pw) => rWords.includes(pw));
@@ -410,20 +402,13 @@ export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: stri
     );
   }
 
-  // Actualizar la despensa con todos los productos del ticket a estado 'ok'
-  for (const item of parsed.items) {
-    await q(
-      `insert into pantry (name, status, updated_at)
-       values ($1, 'ok', now())
-       on conflict (name) do update set status = 'ok', updated_at = now()`,
-      [item.name],
-    );
-  }
+  // Actualizar la despensa solo con productos de alimentación/consumo habitual y unificando similares
+  const pantryUpdatedCount = await syncPantryFromReceiptItems(parsed.items);
 
   const remainingItems = pendingItems.filter((p) => !matchedIds.includes(p.id));
   const remainingNames = remainingItems.map((r) => r.name);
 
-  const summaryMessage = `Ticket de ${companyName} procesado (${parsed.totalAmount.toFixed(2)} €). ${matchedNames.length} productos tachados de la lista. Quedan ${remainingNames.length} pendientes. Despensa actualizada con ${parsed.items.length} artículos.`;
+  const summaryMessage = `Ticket de ${companyName} procesado (${parsed.totalAmount.toFixed(2)} €). ${matchedNames.length} productos tachados de la lista. Quedan ${remainingNames.length} pendientes. Despensa actualizada con ${pantryUpdatedCount} artículos.`;
 
   return {
     receiptId: receiptId || 0,
@@ -433,7 +418,7 @@ export async function saveProcessedReceipt(parsed: ParsedReceipt, rawText?: stri
     pendingRemainingCount: remainingNames.length,
     matchedNames,
     remainingNames,
-    pantryUpdatedCount: parsed.items.length,
+    pantryUpdatedCount,
     summaryMessage,
   };
 }
@@ -532,6 +517,7 @@ export async function executeReceiptActions(
       date: receiptDate,
       totalAmount: Math.round((Number(parsed.totalAmount) || 0) * 100) / 100,
       rawText: rawText || JSON.stringify(parsed),
+      updatePantry: false,
       items,
     });
     if (recId) receiptId = recId;
@@ -555,18 +541,10 @@ export async function executeReceiptActions(
     }
   }
 
-  // 3. Actualizar despensa si está seleccionado
+  // 3. Actualizar despensa si está seleccionado (solo alimentos/consumo y unificando similares)
   let pantryCount = 0;
   if (config.updatePantry && parsed.items.length > 0) {
-    for (const item of parsed.items) {
-      await q(
-        `insert into pantry (name, status, updated_at)
-         values ($1, 'ok', now())
-         on conflict (name) do update set status = 'ok', updated_at = now()`,
-        [item.name.trim()]
-      );
-    }
-    pantryCount = parsed.items.length;
+    pantryCount = await syncPantryFromReceiptItems(parsed.items);
   }
 
   // 4. Registro de garantía opcional si se especificó

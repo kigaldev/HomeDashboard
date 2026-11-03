@@ -61,7 +61,7 @@ import {
   type ReceiptActionConfig,
   type ReceiptExecutionResult,
 } from "@/lib/receipts";
-import { markItemConsumed, ensureDemoReceipts, updateEnergyContract, upsertEnergyContract, type EnergyContract } from "@/lib/repo";
+import { markItemConsumed, ensureDemoReceipts, updateEnergyContract, upsertEnergyContract, type EnergyContract, syncFrequentStaples } from "@/lib/repo";
 import { parseEnergyBillText, parseEnergyBillImage } from "@/lib/energy";
 
 export async function addShoppingAction(formData: FormData) {
@@ -76,6 +76,14 @@ export async function quickAddStapleAction(name: string, storeId: number | null)
   const by = await getActiveMemberId();
   await addShopping(v.name, { storeId: v.storeId, by });
   revalidatePath("/");
+}
+
+export async function syncFrequentStaplesAction(): Promise<string[]> {
+  const promoted = await syncFrequentStaples();
+  if (promoted.length > 0) {
+    revalidatePath("/");
+  }
+  return promoted;
 }
 
 export async function toggleShoppingAction(id: number) {

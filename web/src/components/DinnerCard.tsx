@@ -17,6 +17,17 @@ export function DinnerCard({
 }) {
   const [plans, setPlans] = useState<DinnerPlan[]>(initialPlans);
   const [isPending, startTransition] = useTransition();
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({
+    mambo: false,
+    estandar: false,
+  });
+
+  const toggleExpand = (option: string) => {
+    setExpanded((prev) => ({
+      ...prev,
+      [option]: !prev[option],
+    }));
+  };
 
   const mambo = plans.find((p) => p.option === "mambo");
   const estandar = plans.find((p) => p.option === "estandar");
@@ -110,6 +121,12 @@ export function DinnerCard({
       <div className="responsive-grid-2">
         {/* Opción Cecotec Mambo */}
         <div
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("button[data-action='choose']")) return;
+            toggleExpand("mambo");
+          }}
+          role="region"
+          aria-expanded={expanded.mambo}
           style={{
             padding: "1.15rem",
             borderRadius: "var(--radius-lg)",
@@ -119,6 +136,7 @@ export function DinnerCard({
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
+            cursor: "pointer",
             transition: "all 0.2s var(--ease-spring)",
           }}
         >
@@ -148,13 +166,69 @@ export function DinnerCard({
             <h3 style={{ fontSize: "1.02rem", fontWeight: 700, letterSpacing: "-0.015em", marginBottom: "0.45rem", color: "var(--apple-text)" }}>
               {mambo?.title || "Crema de calabacín con quesitos"}
             </h3>
-            <p style={{ fontSize: "0.83rem", color: "var(--apple-text-secondary)", lineHeight: 1.5, marginBottom: "1rem" }}>
-              {mambo?.description || "Programar velocidad y temperatura según receta Mambo."}
-            </p>
+
+            {/* Indicador interactivo para ver / cerrar receta */}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                fontSize: "0.79rem",
+                fontWeight: 600,
+                color: mambo?.chosen ? "var(--apple-orange)" : "var(--apple-text-secondary)",
+                marginBottom: expanded.mambo ? "0.6rem" : "1rem",
+                transition: "color 0.15s ease",
+              }}
+            >
+              <span>{expanded.mambo ? "Cerrar receta" : "📖 Pulsa para ver receta"}</span>
+              <span
+                style={{
+                  fontSize: "0.65rem",
+                  transform: expanded.mambo ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.25s ease",
+                  display: "inline-block",
+                }}
+              >
+                ▼
+              </span>
+            </div>
+
+            {/* Receta colapsable */}
+            <div
+              style={{
+                overflow: "hidden",
+                maxHeight: expanded.mambo ? "500px" : "0px",
+                opacity: expanded.mambo ? 1 : 0,
+                transition: "max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, margin 0.2s ease",
+                marginBottom: expanded.mambo ? "1.1rem" : "0px",
+              }}
+            >
+              <div
+                style={{
+                  padding: "0.75rem 0.85rem",
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--apple-surface-elevated)",
+                  border: "1px solid var(--apple-border)",
+                  fontSize: "0.82rem",
+                  color: "var(--apple-text-secondary)",
+                  lineHeight: 1.55,
+                  whiteSpace: "pre-line",
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: "0.75rem", color: "var(--apple-text)", marginBottom: "0.3rem" }}>
+                  👨‍🍳 Preparación / Receta Mambo:
+                </div>
+                {mambo?.description || "Programar velocidad y temperatura según receta Mambo."}
+              </div>
+            </div>
           </div>
 
           <button
-            onClick={() => handleChoose("mambo")}
+            data-action="choose"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleChoose("mambo");
+            }}
             disabled={isPending}
             style={{
               width: "100%",
@@ -176,6 +250,12 @@ export function DinnerCard({
 
         {/* Opción Estándar */}
         <div
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("button[data-action='choose']")) return;
+            toggleExpand("estandar");
+          }}
+          role="region"
+          aria-expanded={expanded.estandar}
           style={{
             padding: "1.15rem",
             borderRadius: "var(--radius-lg)",
@@ -185,6 +265,7 @@ export function DinnerCard({
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
+            cursor: "pointer",
             transition: "all 0.2s var(--ease-spring)",
           }}
         >
@@ -214,13 +295,69 @@ export function DinnerCard({
             <h3 style={{ fontSize: "1.02rem", fontWeight: 700, letterSpacing: "-0.015em", marginBottom: "0.45rem", color: "var(--apple-text)" }}>
               {estandar?.title || "Merluza en papillote con verduras"}
             </h3>
-            <p style={{ fontSize: "0.83rem", color: "var(--apple-text-secondary)", lineHeight: 1.5, marginBottom: "1rem" }}>
-              {estandar?.description || "Preparación tradicional rápida y limpia."}
-            </p>
+
+            {/* Indicador interactivo para ver / cerrar receta */}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                fontSize: "0.79rem",
+                fontWeight: 600,
+                color: estandar?.chosen ? "var(--apple-green)" : "var(--apple-text-secondary)",
+                marginBottom: expanded.estandar ? "0.6rem" : "1rem",
+                transition: "color 0.15s ease",
+              }}
+            >
+              <span>{expanded.estandar ? "Cerrar receta" : "📖 Pulsa para ver receta"}</span>
+              <span
+                style={{
+                  fontSize: "0.65rem",
+                  transform: expanded.estandar ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.25s ease",
+                  display: "inline-block",
+                }}
+              >
+                ▼
+              </span>
+            </div>
+
+            {/* Receta colapsable */}
+            <div
+              style={{
+                overflow: "hidden",
+                maxHeight: expanded.estandar ? "500px" : "0px",
+                opacity: expanded.estandar ? 1 : 0,
+                transition: "max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, margin 0.2s ease",
+                marginBottom: expanded.estandar ? "1.1rem" : "0px",
+              }}
+            >
+              <div
+                style={{
+                  padding: "0.75rem 0.85rem",
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--apple-surface-elevated)",
+                  border: "1px solid var(--apple-border)",
+                  fontSize: "0.82rem",
+                  color: "var(--apple-text-secondary)",
+                  lineHeight: 1.55,
+                  whiteSpace: "pre-line",
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: "0.75rem", color: "var(--apple-text)", marginBottom: "0.3rem" }}>
+                  👨‍🍳 Preparación / Receta:
+                </div>
+                {estandar?.description || "Preparación tradicional rápida y limpia."}
+              </div>
+            </div>
           </div>
 
           <button
-            onClick={() => handleChoose("estandar")}
+            data-action="choose"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleChoose("estandar");
+            }}
             disabled={isPending}
             style={{
               width: "100%",

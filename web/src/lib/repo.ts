@@ -1,6 +1,6 @@
 import "server-only";
 import { q } from "./db";
-import { addDays, isoDate, weekday } from "./dates";
+import { addDays, isoDate, weekday, normalizeReceiptDate } from "./dates";
 
 export type Member = {
   id: number;
@@ -130,6 +130,103 @@ export async function toggleStapleByName(name: string, emoji: string = "🛒", s
       [clean, emoji, storeId ?? null],
     );
     return true;
+  }
+}
+
+/**
+ * Deduce un emoji adecuado para un producto básico según su categoría o denominación.
+ */
+export function inferStapleEmoji(name: string, category?: string | null): string {
+  const n = name.toLowerCase();
+  const c = (category || "").toLowerCase();
+
+  if (c.includes("lácteo") || c.includes("lacteo") || n.includes("leche") || n.includes("yogur") || n.includes("queso") || n.includes("mantequilla") || n.includes("nata")) return "🥛";
+  if (c.includes("huevo") || n.includes("huevo")) return "🥚";
+  if (c.includes("pan") || n.includes("pan ") || n.endsWith("pan") || n.includes("tostad") || n.includes("bollo") || n.includes("baguette") || n.includes("croissant")) return "🥖";
+  if (c.includes("carnic") || n.includes("pollo") || n.includes("carne") || n.includes("ternera") || n.includes("cerdo") || n.includes("lomo") || n.includes("jamon") || n.includes("jamón") || n.includes("pavo") || n.includes("hamburguesa") || n.includes("salchicha")) return "🥩";
+  if (c.includes("pescad") || n.includes("merluza") || n.includes("salmon") || n.includes("salmón") || n.includes("atun") || n.includes("atún") || n.includes("bacalao") || n.includes("gamba") || n.includes("pescado") || n.includes("langostino")) return "🐟";
+  if (c.includes("fruta") || c.includes("verdur") || n.includes("manzana") || n.includes("platano") || n.includes("plátano") || n.includes("naranja") || n.includes("fruta") || n.includes("tomate") || n.includes("lechuga") || n.includes("patata") || n.includes("verdura") || n.includes("zanahoria") || n.includes("cebolla")) return "🍎";
+  if (c.includes("bebé") || c.includes("bebe") || n.includes("pañal") || n.includes("panal") || n.includes("toallit") || n.includes("potito")) return "🧷";
+  if (c.includes("higiene") || n.includes("champu") || n.includes("champú") || n.includes("jabon") || n.includes("jabón") || n.includes("dentifrico") || n.includes("dentífrico") || n.includes("pasta dental") || n.includes("desodorante")) return "🧴";
+  if (c.includes("limpieza") || n.includes("detergente") || n.includes("lejia") || n.includes("lejía") || n.includes("suavizante") || n.includes("fregasuelos")) return "🧹";
+  if (n.includes("papel higienico") || n.includes("papel higiénico") || n.includes("papel de cocina") || n.includes("servillet")) return "🧻";
+  if (c.includes("bebida") || n.includes("agua") || n.includes("zumo") || n.includes("refresco") || n.includes("cafe") || n.includes("café")) return "☕";
+  if (c.includes("farmacia") || n.includes("apiretal") || n.includes("dalsy") || n.includes("ibuprofeno") || n.includes("paracetamol") || n.includes("suero")) return "💊";
+
+  return "🛒";
+}
+
+/**
+ * Auto-promoción a básicos si un producto se compra más de 3 veces en los últimos 30 días.
+ * Si no está todavía en staples, se inserta con emoji adecuado y la tienda más frecuente donde se compró.
+ * Retorna los nombres de los nuevos básicos auto-promovidos.
+ */
+export async function syncFrequentStaples(): Promise<string[]> {
+  try {
+    const candidates = await q<{
+      clean_name: string;
+      sample_name: string;
+      category: string | null;
+      purchase_count: number;
+    }>(
+      `select
+         lower(trim(ri.name)) as clean_name,
+         min(ri.name) as sample_name,
+         max(ri.category) as category,
+         count(*)::int as purchase_count
+       from receipt_items ri
+       join receipts r on r.id = ri.receipt_id
+       where r.date >= current_date - 30
+       group by lower(trim(ri.name))
+       having count(*) > 3`,
+    );
+
+    if (!candidates || candidates.length === 0) return [];
+
+    const existingStaples = await q<{ name: string }>("select name from staples");
+    const existingSet = new Set(existingStaples.map((s) => s.name.trim().toLowerCase()));
+
+    const promoted: string[] = [];
+
+    for (const cand of candidates) {
+      const cleanLower = cand.clean_name.trim().toLowerCase();
+      if (!cleanLower || existingSet.has(cleanLower)) continue;
+
+      const rawName = cand.sample_name.trim();
+      const stapleName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+
+      // Obtener la tienda más frecuente para este producto en los últimos 30 días
+      const storeRows = await q<{ store_id: number; count: number }>(
+        `select r.store_id, count(*)::int as count
+         from receipt_items ri
+         join receipts r on r.id = ri.receipt_id
+         where lower(trim(ri.name)) = $1
+           and r.date >= current_date - 30
+           and r.store_id is not null
+         group by r.store_id
+         order by count desc
+         limit 1`,
+        [cand.clean_name],
+      );
+      const storeId = storeRows[0]?.store_id ?? null;
+
+      const emoji = inferStapleEmoji(stapleName, cand.category);
+
+      await q(
+        `insert into staples (name, emoji, store_id)
+         values ($1, $2, $3)
+         on conflict (name) do nothing`,
+        [stapleName, emoji, storeId],
+      );
+
+      existingSet.add(cleanLower);
+      promoted.push(stapleName);
+    }
+
+    return promoted;
+  } catch (err) {
+    console.warn("[repo] Error en syncFrequentStaples:", err);
+    return [];
   }
 }
 export const getShopping = () =>
@@ -539,6 +636,347 @@ export async function getMonthlyExpenses() {
   };
 }
 
+/**
+ * Normaliza nombres de productos quitando marcas comunes, acentos y unidades
+ * para comparación semántica y limpieza.
+ */
+export function cleanProductName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(hacendado|carrefour|crf|lidl|aldi|dia|alcampo|auchan|milbona|leclerc|bio|pack|extra|clasica|entera|desnatada|fresca|1l|6x1l|1kg|500g|kg|g|ud|uds)\b/gi, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Normaliza un producto a su denominación canónica española para comparar
+ * precios equivalentes entre diferentes cadenas de supermercados (Mercadona, Carrefour, Lidl, Dia, etc.)
+ * y evitar duplicar entradas en la despensa.
+ */
+export function normalizeItemCanonical(name: string): string {
+  if (!name) return "";
+  const raw = name.trim();
+  if (!raw) return "";
+
+  const norm = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  // 1. Clara de huevo líquida
+  if (norm.includes("clara") && (norm.includes("liquida") || norm.includes("pasteu") || norm.includes("huevo"))) {
+    return "Clara de huevo líquida";
+  }
+
+  // 2. Snack de queso
+  if (norm.includes("snack") && norm.includes("queso")) {
+    return "Snack de queso";
+  }
+
+  // 3. Plátano / Banana
+  if (/\b(platano|platanos|banana|bananas)\b/.test(norm)) {
+    return "Plátano";
+  }
+
+  // 4. Manzana
+  if (/\b(manzana|manzanas)\b/.test(norm)) {
+    return "Manzana";
+  }
+
+  // 5. Huevos
+  if (/\b(huevo|huevos)\b/.test(norm)) {
+    return "Huevos";
+  }
+
+  // 6. Leche (entera, semidesnatada, desnatada)
+  if (/\bleche\b/.test(norm)) {
+    if (/\b(semi|semidesnatada)\b/.test(norm)) return "Leche semidesnatada";
+    if (/\bdesnatada\b/.test(norm)) return "Leche desnatada";
+    if (/\bentera\b/.test(norm)) return "Leche entera";
+    return "Leche entera";
+  }
+
+  // 7. Pan de molde / Pan
+  if (norm.includes("pan") && norm.includes("molde")) {
+    return "Pan de molde";
+  }
+  if (/\b(barra|baguette|pistola|chapata)\s*(de\s*)?pan\b/.test(norm) || /\bbarra\b/.test(norm)) {
+    return "Barra de pan";
+  }
+  if (/\bpan\b/.test(norm) && !norm.includes("rallado")) {
+    return "Pan";
+  }
+
+  // 8. Pollo / Pechuga de pollo
+  if (norm.includes("pechuga") && norm.includes("pollo")) {
+    return "Pechuga de pollo";
+  }
+  if (norm.includes("pechuga")) {
+    return "Pechuga de pollo";
+  }
+  if (/\bpollo\b/.test(norm)) {
+    return "Pollo";
+  }
+
+  // 9. Arroz
+  if (/\barroz\b/.test(norm)) {
+    return "Arroz";
+  }
+
+  // 10. Aceite (oliva virgen extra, oliva, girasol)
+  if (norm.includes("aceite") || norm.includes("aove")) {
+    if (norm.includes("virgen extra") || norm.includes("aove")) return "Aceite de oliva virgen extra";
+    if (norm.includes("oliva")) return "Aceite de oliva";
+    if (norm.includes("girasol")) return "Aceite de girasol";
+    return "Aceite de oliva";
+  }
+
+  // 11. Queso
+  if (norm.includes("queso")) {
+    if (norm.includes("rallado")) return "Queso rallado";
+    if (norm.includes("fresco") || norm.includes("burgos")) return "Queso fresco";
+    if (norm.includes("curado") || norm.includes("semicurado") || norm.includes("viejo") || norm.includes("anejo") || norm.includes("añejo")) {
+      return "Queso curado";
+    }
+    return "Queso";
+  }
+
+  // 12. Yogur
+  if (norm.includes("yogur")) {
+    if (norm.includes("natural") || norm.includes("griego")) return "Yogur natural";
+    return "Yogur";
+  }
+
+  // 13. Tomate
+  if (/\btomates?\b/.test(norm)) {
+    if (norm.includes("frito")) return "Tomate frito";
+    return "Tomate";
+  }
+
+  // 14. Patatas
+  if (/\b(patatas?|papas?)\b/.test(norm)) {
+    return "Patatas";
+  }
+
+  // 15. Cebolla
+  if (/\bcebollas?\b/.test(norm)) {
+    return "Cebolla";
+  }
+
+  // 16. Zanahoria
+  if (/\bzanahorias?\b/.test(norm)) {
+    return "Zanahoria";
+  }
+
+  // 17. Lechuga
+  if (/\b(lechugas?|cogollos?)\b/.test(norm)) {
+    return "Lechuga";
+  }
+
+  // 18. Naranja
+  if (/\bnaranjas?\b/.test(norm)) {
+    return "Naranja";
+  }
+
+  // 19. Limón
+  if (/\b(limon|limones)\b/.test(norm)) {
+    return "Limón";
+  }
+
+  // 20. Fresas
+  if (/\b(fresas?|fresones?)\b/.test(norm)) {
+    return "Fresas";
+  }
+
+  // 21. Aguacate
+  if (/\baguacates?\b/.test(norm)) {
+    return "Aguacate";
+  }
+
+  // 22. Pasta
+  if (/\b(macarrones|espaguetis?|pasta)\b/.test(norm)) {
+    return "Pasta";
+  }
+
+  // 23. Pescado común
+  if (/\b(salmon|salmones)\b/.test(norm)) return "Salmón";
+  if (/\bmerluza\b/.test(norm)) return "Merluza";
+  if (/\b(atun|atunes)\b/.test(norm)) return "Atún";
+
+  // 24. Café, Azúcar, Mantequilla
+  if (/\b(cafe|cafes)\b/.test(norm)) return "Café";
+  if (/\bazucar\b/.test(norm)) return "Azúcar";
+  if (/\bmantequilla\b/.test(norm)) return "Mantequilla";
+
+  // Limpieza genérica de marcas, pesos, unidades y formato
+  let cleaned = raw
+    .replace(/\b(hacendado|carrefour|crf|lidl|milbona|aldi|dia|alcampo|auchan|el pozo|danone|pascual|asturiana)\b/gi, "")
+    .replace(/\b\d+([.,]\d+)?\s*(kg|g|l|ml|cl|ud|uds|unidades|pack|piezas?)\b/gi, "")
+    .replace(/\b\d+x\d+\b/gi, "")
+    .replace(/\b(granel|fresco|fresca|extra|origen|seleccion|selección|calidad|promo)\b/gi, "")
+    .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) cleaned = raw;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+/**
+ * Determina si una categoría corresponde a alimentación o despensa de consumo habitual.
+ */
+export function isPantryCategory(category?: string | null): boolean {
+  if (!category) return false;
+  const c = category
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+
+  // Descartar no comestibles o de categorías ajenas a la despensa
+  if (
+    c.includes("limpieza") ||
+    c.includes("bebe") ||
+    c.includes("higiene") ||
+    c.includes("bazar") ||
+    c.includes("textil") ||
+    c.includes("mascota") ||
+    c.includes("descuento") ||
+    c.includes("promoc")
+  ) {
+    return false;
+  }
+
+  return (
+    c.includes("fruta") ||
+    c.includes("verdura") ||
+    c.includes("carne") ||
+    c.includes("carniceri") ||
+    c.includes("pesca") ||
+    c.includes("pescaderi") ||
+    c.includes("lacteo") ||
+    c.includes("leche") ||
+    c.includes("huevo") ||
+    c.includes("pan") ||
+    c.includes("panaderi") ||
+    c.includes("despensa")
+  );
+}
+
+/**
+ * Detecta si una línea corresponde a un descuento, promoción, cupón o importe negativo.
+ */
+export function isDiscountOrPromotion(name?: string | null, price?: number | null): boolean {
+  if (price !== undefined && price !== null && price <= 0) return true;
+  if (!name) return false;
+  const n = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+
+  return (
+    /\b(descuento|dto\.?|promocion|promo|cupon|cupón|bono|reembolso|ahorro|2a\s*unidad|segunda\s*unidad|vale\b)/i.test(n) ||
+    /^-?\s*dto\b/i.test(n) ||
+    n.startsWith("-")
+  );
+}
+
+/**
+ * Busca si un producto entrante coincide semántica o canónicamente con uno existente en la despensa.
+ */
+export function findPantryMatch(
+  name: string,
+  existing: { id: number; name: string }[]
+): { id: number; name: string } | null {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  const canonicalTarget = normalizeItemCanonical(trimmed).toLowerCase();
+  const cleanTarget = cleanProductName(trimmed);
+
+  for (const item of existing) {
+    const itemTrimmed = item.name.trim();
+
+    // 1. Coincidencia exacta insensible a mayúsculas
+    if (itemTrimmed.toLowerCase() === trimmed.toLowerCase()) {
+      return item;
+    }
+
+    // 2. Coincidencia canónica (ej: "Banana" / "BANANA GRANEL" vs "Plátano" / "Plátanos")
+    const existingCanonical = normalizeItemCanonical(itemTrimmed).toLowerCase();
+    if (canonicalTarget && existingCanonical && canonicalTarget === existingCanonical) {
+      return item;
+    }
+
+    // 3. Coincidencia limpia idéntica
+    const existingClean = cleanProductName(itemTrimmed);
+    if (cleanTarget && existingClean && cleanTarget === existingClean) {
+      return item;
+    }
+
+    // 4. Singular / Plural (Plátano / Plátanos, Huevo / Huevos, Manzana / Manzanas)
+    if (cleanTarget && existingClean) {
+      const tStem = cleanTarget.replace(/e?s$/, "");
+      const eStem = existingClean.replace(/e?s$/, "");
+      if (tStem.length >= 4 && tStem === eStem) {
+        return item;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Sincroniza productos de ticket en la despensa:
+ * - Filtra únicamente categorías de alimentación / despensa habitual
+ * - Ignora descuentos y promociones
+ * - Unifica productos similares para evitar duplicados en la despensa
+ */
+export async function syncPantryFromReceiptItems(
+  items: { name: string; totalPrice?: number; unitPrice?: number; category?: string }[]
+): Promise<number> {
+  const validItems = items.filter(
+    (i) => isPantryCategory(i.category) && !isDiscountOrPromotion(i.name, i.totalPrice ?? i.unitPrice)
+  );
+  if (validItems.length === 0) return 0;
+
+  const existingPantry = await q<{ id: number; name: string }>("select id, name from pantry");
+  let updatedCount = 0;
+
+  for (const item of validItems) {
+    const rawName = item.name.trim();
+    if (!rawName) continue;
+
+    const matched = findPantryMatch(rawName, existingPantry);
+    if (matched) {
+      if (matched.id > 0) {
+        await q("update pantry set status = 'ok', updated_at = now() where id = $1", [matched.id]);
+      } else {
+        await q("update pantry set status = 'ok', updated_at = now() where name = $1", [matched.name]);
+      }
+      updatedCount++;
+    } else {
+      const canonical = normalizeItemCanonical(rawName);
+      const insertName = canonical || (rawName.charAt(0).toUpperCase() + rawName.slice(1));
+      await q(
+        `insert into pantry (name, status, updated_at)
+         values ($1, 'ok', now())
+         on conflict (name) do update set status = 'ok', updated_at = now()`,
+        [insertName]
+      );
+      existingPantry.push({ id: 0, name: insertName });
+      updatedCount++;
+    }
+  }
+
+  return updatedCount;
+}
+
 export async function getPriceComparisons(): Promise<PriceComparison[]> {
   const rows = await q<{ item_name: string; store_name: string; store_color: string; price: number; date: string }>(
     `select ph.item_name, s.name as store_name, coalesce(s.color, '#3b82f6') as store_color,
@@ -546,18 +984,26 @@ export async function getPriceComparisons(): Promise<PriceComparison[]> {
      from price_history ph
      join stores s on s.id = ph.store_id
      where ph.date >= current_date - 60
-     order by ph.item_name, ph.price asc, ph.date desc`,
+     order by ph.date desc, ph.price asc`,
   );
 
-  // Agrupar por item
+  // Agrupar por producto canónico normalizado para comparar entre diferentes supermercados
   const map = new Map<string, { store_name: string; store_color: string; price: number; date: string }[]>();
   for (const r of rows) {
-    const list = map.get(r.item_name) || [];
-    // Mantener el más reciente por tienda
+    const canonicalName = normalizeItemCanonical(r.item_name);
+    if (!canonicalName) continue;
+
+    const list = map.get(canonicalName) || [];
+    // Mantener el precio más reciente por tienda
     if (!list.some((existing) => existing.store_name === r.store_name)) {
-      list.push(r);
+      list.push({
+        store_name: r.store_name,
+        store_color: r.store_color,
+        price: r.price,
+        date: r.date,
+      });
     }
-    map.set(r.item_name, list);
+    map.set(canonicalName, list);
   }
 
   const result: PriceComparison[] = [];
@@ -732,6 +1178,7 @@ export async function recordReceipt(data: {
   totalAmount: number;
   rawText?: string;
   photoUrl?: string;
+  updatePantry?: boolean;
   items: {
     name: string;
     quantity?: string;
@@ -742,11 +1189,13 @@ export async function recordReceipt(data: {
     expiryDate?: string | null;
   }[];
 }) {
+  const receiptDate = normalizeReceiptDate(data.date);
+
   const [receipt] = await q<{ id: number }>(
     `insert into receipts (store_id, company_name, date, total_amount, photo_url, raw_text)
      values ($1, $2, $3, $4, $5, $6)
      returning id`,
-    [data.storeId, data.companyName ?? null, data.date, data.totalAmount, data.photoUrl ?? null, data.rawText ?? null],
+    [data.storeId, data.companyName ?? null, receiptDate, data.totalAmount, data.photoUrl ?? null, data.rawText ?? null],
   );
 
   if (!receipt?.id) return null;
@@ -769,24 +1218,16 @@ export async function recordReceipt(data: {
       ],
     );
 
-    // 2. Historial de precios si tenemos tienda
-    if (data.storeId) {
+    // 2. Historial de precios si tenemos tienda (ignorar descuentos y promociones)
+    if (data.storeId && !isDiscountOrPromotion(item.name, item.unitPrice ?? item.totalPrice)) {
       await q(
         `insert into price_history (item_name, store_id, price, date)
          values ($1, $2, $3, $4)`,
-        [item.name, data.storeId, item.unitPrice ?? item.totalPrice, data.date],
+        [item.name, data.storeId, item.unitPrice ?? item.totalPrice, receiptDate],
       );
     }
 
-    // 3. Auto-actualización de Despensa a 'ok'
-    await q(
-      `insert into pantry (name, status, updated_at)
-       values ($1, 'ok', now())
-       on conflict (name) do update set status = 'ok', updated_at = now()`,
-      [item.name],
-    );
-
-    // 4. Si estaba en la lista de la compra pendiente, marcarlo como comprado
+    // 3. Si estaba en la lista de la compra pendiente, marcarlo como comprado
     await q(
       `update shopping_items
        set checked = true, checked_at = now()
@@ -795,11 +1236,23 @@ export async function recordReceipt(data: {
     );
   }
 
+  // 4. Auto-actualización de Despensa a 'ok' (solo alimentos/consumo y unificando similares)
+  if (data.updatePantry !== false) {
+    await syncPantryFromReceiptItems(data.items);
+  }
+
   // 5. Comprobar si corresponde auto-crear nueva tienda por alcanzar 3 tickets
   try {
     await checkAndPromoteCompanyStores();
   } catch (err) {
     console.warn("[repo] Error al comprobar auto-promoción de tiendas:", err);
+  }
+
+  // 6. Auto-promoción a básicos si se compra más de 3 veces en un mes
+  try {
+    await syncFrequentStaples();
+  } catch (err) {
+    console.warn("[repo] Error al sincronizar básicos frecuentes:", err);
   }
 
   return receiptId;

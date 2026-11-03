@@ -13,11 +13,15 @@ vi.mock("./llm", () => ({
     }
   },
 }));
-vi.mock("./repo", () => ({
-  findStoreId: vi.fn(async () => null),
-  recordReceipt: vi.fn(),
-  getStores: vi.fn(async () => []),
-}));
+vi.mock("./repo", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./repo")>();
+  return {
+    ...actual,
+    findStoreId: vi.fn(async () => null),
+    recordReceipt: vi.fn(),
+    getStores: vi.fn(async () => []),
+  };
+});
 vi.mock("./db", () => ({ q: vi.fn(async () => []) }));
 
 import { normalizeReceiptDate, estimatePerishable, parseReceiptText } from "./receipts";
@@ -31,6 +35,12 @@ describe("normalizeReceiptDate", () => {
     expect(normalizeReceiptDate("5/3/2026")).toBe("2026-03-05");
     expect(normalizeReceiptDate("05-03-26")).toBe("2026-03-05");
     expect(normalizeReceiptDate("15.11.2025")).toBe("2025-11-15");
+  });
+  it("parsea fechas españolas con hora o texto y no sobreescribe con hoy si es válida", () => {
+    expect(normalizeReceiptDate("25/10/2026 18:42:00")).toBe("2026-10-25");
+    expect(normalizeReceiptDate("25-10-26 14:30")).toBe("2026-10-25");
+    expect(normalizeReceiptDate("25 de octubre de 2026")).toBe("2026-10-25");
+    expect(normalizeReceiptDate("25 oct 2026")).toBe("2026-10-25");
   });
   it("vacío o basura → hoy", () => {
     expect(normalizeReceiptDate(null)).toBe(isoDate());
@@ -119,6 +129,26 @@ describe("parseReceiptText", () => {
     const r = await parseReceiptText("PAN 1,10\nHUEVOS 2,40");
     expect(r.totalAmount).toBe(3.5);
     expect(r.storeName).toBe("Otros");
+  });
+
+  it("ignora líneas de descuentos, promociones y números negativos en la respuesta de la IA", async () => {
+    llmMock.mockResolvedValue(
+      JSON.stringify({
+        storeName: "Carrefour",
+        date: "25/10/2026",
+        totalAmount: 5.50,
+        items: [
+          { name: "Snack de queso", totalPrice: 2.50, category: "Lácteos" },
+          { name: "DESCUENTO EN 2ª UNIDAD", totalPrice: -1.00, category: "Otros" },
+          { name: "DTO CUPON FIDELIDAD", totalPrice: 0, category: "Promociones" },
+          { name: "Plátanos", totalPrice: 4.00, category: "Fruta y Verdura" },
+        ],
+      }),
+    );
+    const r = await parseReceiptText("ticket raw");
+    expect(r.date).toBe("2026-10-25");
+    expect(r.items).toHaveLength(2);
+    expect(r.items.map((i) => i.name)).toEqual(["Snack de queso", "Plátanos"]);
   });
 
   it("BUG conocido: 'MEDIA LUNA' se detecta como tienda Dia (includes('dia'))", async () => {

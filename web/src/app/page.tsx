@@ -21,6 +21,7 @@ import {
   getEnergyContracts,
   getFamilyInsurances,
   getWarranties,
+  syncFrequentStaples,
 } from "@/lib/repo";
 import { getWeather } from "@/lib/weather";
 import { ensureDinnerPlans } from "@/lib/dinners";
@@ -32,6 +33,9 @@ export const instant = false;
 
 export default async function HomePage() {
   await connection();
+  await syncFrequentStaples().catch((err) => {
+    console.warn("[page] Error al sincronizar básicos frecuentes:", err);
+  });
   const today = isoDate();
   const formattedDate = longDate(today);
   const currentGreeting = greeting();

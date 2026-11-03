@@ -75,3 +75,107 @@ export function parseRelativeDay(text: string, today = isoDate()): string | null
   }
   return null;
 }
+
+const SPANISH_MONTHS: Record<string, string> = {
+  enero: "01",
+  ene: "01",
+  febrero: "02",
+  feb: "02",
+  marzo: "03",
+  mar: "03",
+  abril: "04",
+  abr: "04",
+  mayo: "05",
+  may: "05",
+  junio: "06",
+  jun: "06",
+  julio: "07",
+  jul: "07",
+  agosto: "08",
+  ago: "08",
+  septiembre: "09",
+  setiembre: "09",
+  sep: "09",
+  octubre: "10",
+  oct: "10",
+  noviembre: "11",
+  nov: "11",
+  diciembre: "12",
+  dic: "12",
+};
+
+/**
+ * Normaliza fechas procedentes de tickets impresos o de análisis OCR/IA al formato YYYY-MM-DD.
+ * Soporta ISO (YYYY-MM-DD), formatos españoles habituales (DD/MM/YYYY, DD-MM-YYYY, DD.MM.YY),
+ * formatos con marcas horarias adjuntas y fechas en texto ("25 de octubre de 2026").
+ * Si la fecha es válida, se preserva íntegramente. Si es inválida o vacía, devuelve la fecha actual.
+ */
+export function normalizeReceiptDate(raw?: string | null): string {
+  if (!raw) return isoDate();
+  const trimmed = raw.trim();
+  if (!trimmed) return isoDate();
+
+  // 1. ISO o YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD (incluso con hora adjunta ej: "2026-10-25 14:30")
+  const isoMatch = trimmed.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+  if (isoMatch) {
+    const year = isoMatch[1];
+    const month = isoMatch[2].padStart(2, "0");
+    const day = isoMatch[3].padStart(2, "0");
+    const yNum = Number(year);
+    const mNum = Number(month);
+    const dNum = Number(day);
+    if (yNum >= 2000 && yNum <= 2099 && mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  // 2. Formato español numérico DD/MM/YYYY, DD-MM-YYYY, DD.MM.YY (incluso con hora adjunta)
+  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, "0");
+    const month = dmyMatch[2].padStart(2, "0");
+    let year = dmyMatch[3];
+    if (year.length === 2) year = `20${year}`;
+    const yNum = Number(year);
+    const mNum = Number(month);
+    const dNum = Number(day);
+    if (yNum >= 2000 && yNum <= 2099 && mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  // 3. Formato textual español: "25 de octubre de 2026", "25 oct 2026", etc.
+  const textMatch = trimmed.match(/(\d{1,2})\s*(?:de\s+)?([a-záéíóú]+)(?:\s+de)?\s+(\d{2,4})/i);
+  if (textMatch) {
+    const day = textMatch[1].padStart(2, "0");
+    const rawMonth = textMatch[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    let year = textMatch[3];
+    if (year.length === 2) year = `20${year}`;
+    const month = SPANISH_MONTHS[rawMonth];
+    if (month) {
+      const yNum = Number(year);
+      const mNum = Number(month);
+      const dNum = Number(day);
+      if (yNum >= 2000 && yNum <= 2099 && mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+        return `${year}-${month}-${day}`;
+      }
+    }
+  }
+
+  // 4. Buscar fecha DD/MM/YYYY o DD-MM-YYYY en cualquier parte del texto
+  const embeddedDmy = trimmed.match(/\b(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\b/);
+  if (embeddedDmy) {
+    const day = embeddedDmy[1].padStart(2, "0");
+    const month = embeddedDmy[2].padStart(2, "0");
+    let year = embeddedDmy[3];
+    if (year.length === 2) year = `20${year}`;
+    const yNum = Number(year);
+    const mNum = Number(month);
+    const dNum = Number(day);
+    if (yNum >= 2000 && yNum <= 2099 && mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  return isoDate();
+}
