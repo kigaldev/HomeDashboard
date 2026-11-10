@@ -25,13 +25,14 @@ import {
   checkShoppingItemByName,
   getShopping,
   getPantry,
+  recordManualExpense,
 } from "./repo";
 import { getEnergyRecommendations, parseEnergyBillText } from "./energy";
 
 export type AgentActionResult = {
   message: string;
   actionExecuted?: {
-    type: "calendar" | "task" | "shopping" | "pantry" | "school_run" | "dinner" | "energy" | "info";
+    type: "calendar" | "task" | "shopping" | "pantry" | "school_run" | "dinner" | "energy" | "expense" | "info";
     description: string;
     ok: boolean;
     details?: Record<string, any>;
@@ -250,6 +251,24 @@ export const JARVIS_TOOLS: ToolDeclaration[] = [
         fixed_monthly_price: { type: "NUMBER" },
       },
       required: ["service", "energy_price_kwh"],
+    },
+  },
+  {
+    name: "create_expense",
+    description: "Registra un gasto manual en la economía familiar (restaurante, ocio, suministros, farmacia, compras fuera de ticket, etc.) y lo incorpora de inmediato a los totales y desglose de gastos del hogar",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        concept: { type: "STRING", description: "Concepto o descripción del gasto (ej: 'Comida restaurante', 'Gasolina Repsol', 'Medicamentos Farmacia')" },
+        amount: { type: "NUMBER", description: "Importe positivo del gasto en euros (ej: 50.0)" },
+        category: {
+          type: "STRING",
+          description: "Categoría de gasto: 'Restaurante', 'Fruta y Verdura', 'Carnicería', 'Pescadería', 'Lácteos', 'Huevos', 'Panadería', 'Despensa', 'Bebé / Higiene', 'Salud / Farmacia', 'Transporte', 'Ocio', 'Otros'",
+        },
+        store_name: { type: "STRING", description: "Nombre del establecimiento o comercio (ej: 'Restaurante El Laurel', 'Repsol', 'Farmacia', 'Mercadona', 'Carrefour')" },
+        date: { type: "STRING", description: "Fecha del gasto en formato YYYY-MM-DD. Omitir si es hoy" },
+      },
+      required: ["concept", "amount"],
     },
   },
 ];
@@ -719,6 +738,42 @@ async function executeJarvisToolCall(
       };
     }
 
+    case "create_expense": {
+      const concept = String(args.concept || "Gasto manual").trim();
+      const amount = Math.abs(Number(args.amount) || 0);
+      if (amount <= 0) {
+        return {
+          success: false,
+          message: "⚠️ El importe del gasto debe ser un número positivo en euros.",
+          actionExecuted: undefined,
+        };
+      }
+      const rawDate = args.date ? String(args.date).trim() : today;
+      const targetDate = parseRelativeDay(rawDate, today) ?? rawDate ?? today;
+      const storeName = args.store_name ? String(args.store_name).trim() : undefined;
+      const category = args.category ? String(args.category).trim() : undefined;
+
+      const res = await recordManualExpense({
+        concept,
+        amount,
+        category,
+        date: targetDate,
+        storeName,
+      });
+
+      return {
+        success: true,
+        message: `💶 ¡Gasto registrado!: **${res.totalAmount.toFixed(2)} €** en concepto de **"${concept}"** clasificado en **${res.category}**${res.storeName ? ` (${res.storeName})` : ""}.\n\nYa aparece reflejado en el desglose de gastos y presupuesto mensual de la app.`,
+        actionExecuted: {
+          type: "expense",
+          description: `Gasto: ${res.totalAmount.toFixed(2)} € - ${concept} (${res.category})`,
+          ok: true,
+          details: res,
+        },
+        data: res,
+      };
+    }
+
     default:
       return {
         success: false,
@@ -745,6 +800,41 @@ export async function runAgentInstruction(
 
   const kikeId = members.find((m) => m.name.toLowerCase() === "kike")?.id ?? 1;
   const laraId = members.find((m) => m.name.toLowerCase() === "lara")?.id ?? 2;
+
+  // ── Heurística Rápida 0: Gasto Manual (ej. "incluye un gasto de 50€ con concepto comida restaurante") ──
+  const expenseRegex = /(?:incluye|añade|agrega|apunta|registra|mete)?\s*(?:un\s+)?gasto\s+(?:de\s+)?([\d.,]+)\s*(?:€|euros?)\s*(?:con\s+concepto|en\s+concepto\s+de|en|de|para)?\s*(.+)/i;
+  const expenseMatch = lower.match(expenseRegex);
+  if (expenseMatch) {
+    const rawAmt = expenseMatch[1].replace(",", ".");
+    const amount = parseFloat(rawAmt);
+    let concept = expenseMatch[2].trim();
+    if (!isNaN(amount) && amount > 0 && concept.length > 0) {
+      let storeName: string | undefined = undefined;
+      for (const st of stores) {
+        if (concept.toLowerCase().includes(st.name.toLowerCase())) {
+          storeName = st.name;
+          break;
+        }
+      }
+
+      const res = await recordManualExpense({
+        concept,
+        amount,
+        date: today,
+        storeName,
+      });
+
+      return {
+        message: `💶 ¡Anotado y registrado en la app! He guardado un gasto de **${res.totalAmount.toFixed(2)} €** con concepto **"${concept}"** clasificado en la categoría **${res.category}**${res.storeName ? ` (${res.storeName})` : ""}.\n\nYa aparece actualizado en el desglose de gastos y presupuesto del hogar.`,
+        actionExecuted: {
+          type: "expense",
+          description: `Gasto: ${res.totalAmount.toFixed(2)} € - ${concept} (${res.category})`,
+          ok: true,
+          details: res,
+        },
+      };
+    }
+  }
 
   // ── Heurística Rápida 1: Compra directa (ej. "añade leche a mercadona", "comprar pañales") ──
   const isAppointmentOrTask = /(?:dentista|médico|medico|pediatra|cita|reunión|reunion|cumpleaños|cumple|partido|entrenamiento|veterinario|tutoría|tutoria|agenda|evento|tarea|recordar|cole)/i.test(lower);
@@ -943,7 +1033,7 @@ export async function runAgentInstruction(
   const systemPrompt = [
     "Eres JARVIS, el Asistente Inteligente del Hogar familiar de Kike, Lara, Fabio (nacido en sept 2023) y Bruno (nacido en mayo 2025) en Salamanca.",
     "Tienes control completo sobre la aplicación Home Dashboard a través de tus herramientas disponibles (tools / function declarations).",
-    "Cuando el usuario te pida crear o modificar eventos en la agenda, añadir o completar tareas, añadir o tachar productos de la compra, o actualizar la despensa, DEBES LLAMAR A LA HERRAMIENTA CORRESPONDIENTE.",
+    "Cuando el usuario te pida crear o modificar eventos en la agenda, añadir o completar tareas, añadir o tachar productos de la compra, registrar gastos familiares ('create_expense'), o actualizar la despensa, DEBES LLAMAR A LA HERRAMIENTA CORRESPONDIENTE.",
     "",
     `Hoy es ${today} (${new Date().toLocaleDateString("es-ES", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}).`,
     "",

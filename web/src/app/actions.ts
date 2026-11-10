@@ -61,7 +61,7 @@ import {
   type ReceiptActionConfig,
   type ReceiptExecutionResult,
 } from "@/lib/receipts";
-import { markItemConsumed, ensureDemoReceipts, updateEnergyContract, upsertEnergyContract, type EnergyContract, syncFrequentStaples, updateReceiptItemCategory } from "@/lib/repo";
+import { markItemConsumed, ensureDemoReceipts, updateEnergyContract, upsertEnergyContract, type EnergyContract, syncFrequentStaples, updateReceiptItemCategory, recordManualExpense } from "@/lib/repo";
 import { parseEnergyBillText, parseEnergyBillImage } from "@/lib/energy";
 
 export async function addShoppingAction(formData: FormData) {
@@ -453,6 +453,74 @@ export async function updateReceiptItemCategoryAction(itemId: number, newCategor
 export async function seedDemoReceiptsAction() {
   await ensureDemoReceipts();
   revalidatePath("/");
+}
+
+// ── Registro de Gasto Manual ─────────────────────────────
+export async function createManualExpenseAction(data: {
+  concept: string;
+  amount: number;
+  category?: string;
+  date?: string;
+  storeName?: string;
+}) {
+  const schema = z.object({
+    concept: z.string().trim().min(1, "El concepto es obligatorio").max(200),
+    amount: z.number().positive("El importe debe ser superior a 0 €"),
+    category: z.string().trim().max(100).optional(),
+    date: z.string().trim().max(30).optional(),
+    storeName: z.string().trim().max(100).optional(),
+  });
+
+  const parsed = parse(schema, data);
+  const result = await recordManualExpense(parsed);
+  revalidatePath("/");
+  return { success: true, ...result };
+}
+
+// ── Diagnóstico y Control de Webhook de Telegram ─────────
+export async function getTelegramWebhookStatusAction() {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { ok: false, error: "TELEGRAM_BOT_TOKEN no configurado" };
+  try {
+    const [meRes, whRes] = await Promise.all([
+      fetch(`https://api.telegram.org/bot${token}/getMe`),
+      fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`),
+    ]);
+    const me = await meRes.json();
+    const wh = await whRes.json();
+    return {
+      ok: true,
+      bot: me.result,
+      webhook: wh.result,
+    };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+export async function setTelegramWebhookAction(webhookUrl: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { ok: false, error: "TELEGRAM_BOT_TOKEN no configurado" };
+  try {
+    const url = parse(z.string().url("URL de webhook no válida"), webhookUrl.trim());
+    const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    return { ok: data.ok, result: data };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) };
+  }
+}
+
+export async function deleteTelegramWebhookAction() {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { ok: false, error: "TELEGRAM_BOT_TOKEN no configurado" };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook`);
+    const data = await res.json();
+    return { ok: data.ok, result: data };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) };
+  }
 }
 
 // ── Gestión manual de Básicos (Staples) ───────────────────

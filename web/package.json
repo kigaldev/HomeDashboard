@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "worker": "tsx --conditions=react-server src/worker.ts",
+    "worker": "tsx --env-file=.env.local --conditions=react-server src/worker.ts",
     "lint": "eslint",
     "test": "vitest run"
   },

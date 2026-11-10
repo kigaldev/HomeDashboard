@@ -8,6 +8,9 @@ import {
   verifyGoogleCalendarAction,
   verifyTelegramIntegrationAction,
   syncGoogleCalendarAction,
+  getTelegramWebhookStatusAction,
+  setTelegramWebhookAction,
+  deleteTelegramWebhookAction,
 } from "@/app/actions";
 import type { Member } from "@/lib/repo";
 
@@ -38,7 +41,7 @@ export function SettingsModal({
   const [gcalKikeResult, setGcalKikeResult] = useState<{ ok: boolean; message: string; count?: number } | null>(null);
   const [gcalLaraResult, setGcalLaraResult] = useState<{ ok: boolean; message: string; count?: number } | null>(null);
 
-  // Verificación Telegram
+  // Verificación Telegram y Webhook
   const [telegramChecking, setTelegramChecking] = useState(false);
   const [telegramResult, setTelegramResult] = useState<{
     ok: boolean;
@@ -47,6 +50,28 @@ export function SettingsModal({
     botName?: string;
     message: string;
   } | null>(null);
+
+  const [webhookUrlInput, setWebhookUrlInput] = useState("");
+  const [webhookInfo, setWebhookInfo] = useState<{ url?: string; pending_update_count?: number } | null>(null);
+  const [webhookStatusLoading, setWebhookStatusLoading] = useState(false);
+  const [webhookMsg, setWebhookMsg] = useState<string | null>(null);
+
+  const refreshWebhookStatus = async () => {
+    setWebhookStatusLoading(true);
+    try {
+      const res = await getTelegramWebhookStatusAction();
+      if (res.ok && res.webhook) {
+        setWebhookInfo(res.webhook);
+        if (res.webhook.url && !webhookUrlInput) {
+          setWebhookUrlInput(res.webhook.url);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setWebhookStatusLoading(false);
+    }
+  };
 
   // Sincronizar datos al cambiar de miembro seleccionado
   useEffect(() => {
@@ -61,7 +86,7 @@ export function SettingsModal({
     }
   }, [selectedMember]);
 
-  // Cargar URLs de Google Calendar cuando se abre el modal
+  // Cargar URLs de Google Calendar y estado de Telegram cuando se abre el modal
   useEffect(() => {
     if (isOpen) {
       getGcalUrlsAction()
@@ -70,6 +95,8 @@ export function SettingsModal({
           setGcalLara(urlLara || "");
         })
         .catch(console.error);
+
+      refreshWebhookStatus().catch(console.error);
     }
   }, [isOpen]);
 
@@ -542,6 +569,144 @@ export function SettingsModal({
           >
             Guardar y Sincronizar Calendarios
           </button>
+        </div>
+
+        {/* Telegram Bot & Webhook Manager */}
+        <div
+          style={{
+            marginTop: "1.25rem",
+            padding: "1.1rem",
+            background: "var(--apple-surface-secondary)",
+            borderRadius: "var(--radius-lg)",
+            border: "1px solid var(--apple-border)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+            <h3 style={{ fontSize: "0.88rem", fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: "0.45rem" }}>
+              <span>🤖</span> <span>Telegram Bot (@Kike_pepe_homebot) & Webhook</span>
+            </h3>
+            <button
+              type="button"
+              onClick={refreshWebhookStatus}
+              disabled={webhookStatusLoading}
+              className="btn-ghost"
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.15rem 0.5rem",
+                color: "var(--apple-blue)",
+                fontWeight: 600,
+                borderRadius: "var(--radius-sm)",
+                background: "rgba(0, 113, 227, 0.08)",
+              }}
+            >
+              {webhookStatusLoading ? "⏳ Actualizando..." : "🔄 Refrescar Estado"}
+            </button>
+          </div>
+
+          <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginBottom: "0.85rem", lineHeight: 1.45 }}>
+            Estado de conexión para recibir tickets, notas de voz y órdenes de JARVIS en tiempo real:
+          </p>
+
+          <div
+            style={{
+              padding: "0.6rem 0.75rem",
+              borderRadius: "var(--radius-md)",
+              fontSize: "0.76rem",
+              marginBottom: "0.75rem",
+              background: webhookInfo?.url ? "rgba(48, 209, 88, 0.12)" : "rgba(255, 159, 10, 0.12)",
+              border: `1px solid ${webhookInfo?.url ? "rgba(48, 209, 88, 0.3)" : "rgba(255, 159, 10, 0.3)"}`,
+              color: "var(--apple-text)",
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>
+              {webhookInfo?.url ? "🟢 Webhook Activo en Telegram" : "🟡 Modo Polling Local / Webhook no configurado"}
+            </div>
+            {webhookInfo?.url ? (
+              <div>
+                Destino: <code style={{ color: "var(--apple-blue)" }}>{webhookInfo.url}</code>
+                {webhookInfo.pending_update_count != null && (
+                  <div style={{ marginTop: "0.15rem" }}>Mensajes en cola Telegram: {webhookInfo.pending_update_count}</div>
+                )}
+              </div>
+            ) : (
+              <div>
+                Para recibir tickets en local, ejecuta en la terminal: <code style={{ color: "#f59e0b" }}>npm run worker</code>.
+                Si la app está desplegada en Vercel o un dominio público con HTTPS, introduce la URL abajo para activar el webhook instantáneo.
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--apple-text)" }}>
+              URL Pública de la App (Webhook HTTPS para Vercel o Tunnel)
+            </label>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <input
+                type="url"
+                placeholder="https://tu-app.vercel.app/api/telegram"
+                value={webhookUrlInput}
+                onChange={(e) => setWebhookUrlInput(e.target.value)}
+                className="input-field"
+                style={{ flex: "1 1 240px", fontSize: "0.82rem" }}
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!webhookUrlInput.trim()) return;
+                  setWebhookStatusLoading(true);
+                  setWebhookMsg(null);
+                  try {
+                    const res = await setTelegramWebhookAction(webhookUrlInput.trim());
+                    if (res.ok) {
+                      setWebhookMsg("✅ Webhook registrado con éxito");
+                      await refreshWebhookStatus();
+                    } else {
+                      setWebhookMsg(`❌ Error: ${res.error || "No se pudo registrar"}`);
+                    }
+                  } catch (err: any) {
+                    setWebhookMsg(`❌ Error: ${err.message}`);
+                  } finally {
+                    setWebhookStatusLoading(false);
+                  }
+                }}
+                disabled={webhookStatusLoading || !webhookUrlInput.trim()}
+                className="btn-primary"
+                style={{ fontSize: "0.78rem", padding: "0.4rem 0.8rem", whiteSpace: "nowrap" }}
+              >
+                Conectar Webhook
+              </button>
+              {webhookInfo?.url && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setWebhookStatusLoading(true);
+                    setWebhookMsg(null);
+                    try {
+                      const res = await deleteTelegramWebhookAction();
+                      if (res.ok) {
+                        setWebhookMsg("ℹ️ Webhook desactivado (modo polling local)");
+                        await refreshWebhookStatus();
+                      }
+                    } catch (err: any) {
+                      setWebhookMsg(`❌ Error: ${err.message}`);
+                    } finally {
+                      setWebhookStatusLoading(false);
+                    }
+                  }}
+                  disabled={webhookStatusLoading}
+                  className="btn-secondary"
+                  style={{ fontSize: "0.78rem", padding: "0.4rem 0.8rem", whiteSpace: "nowrap" }}
+                >
+                  Quitar Webhook
+                </button>
+              )}
+            </div>
+            {webhookMsg && (
+              <div style={{ fontSize: "0.75rem", marginTop: "0.25rem", color: webhookMsg.startsWith("✅") ? "#30d158" : "#ff453a" }}>
+                {webhookMsg}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </dialog>

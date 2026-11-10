@@ -11,6 +11,7 @@ const setPantryMock = vi.hoisted(() => vi.fn());
 const checkShoppingItemByNameMock = vi.hoisted(() => vi.fn());
 const setSchoolRunOverrideMock = vi.hoisted(() => vi.fn());
 const chooseDinnerMock = vi.hoisted(() => vi.fn());
+const recordManualExpenseMock = vi.hoisted(() => vi.fn());
 
 vi.mock("./repo", () => ({
   getMembers: vi.fn(async () => [
@@ -45,6 +46,7 @@ vi.mock("./repo", () => ({
   setSchoolRunOverride: setSchoolRunOverrideMock,
   chooseDinner: chooseDinnerMock,
   upsertEnergyContract: vi.fn(),
+  recordManualExpense: recordManualExpenseMock,
 }));
 
 vi.mock("./context", () => ({
@@ -92,6 +94,7 @@ describe("JARVIS Assistant & Tools", () => {
     expect(names).toContain("update_pantry");
     expect(names).toContain("set_school_run");
     expect(names).toContain("set_dinner");
+    expect(names).toContain("create_expense");
   });
 
   it("procesa compra inmediata mediante heurística rápida con tienda", async () => {
@@ -185,6 +188,66 @@ describe("JARVIS Assistant & Tools", () => {
     expect(res.actionExecuted?.type).toBe("shopping");
     expect(res.actionExecuted?.ok).toBe(true);
     expect(res.message).toContain("leche, huevos");
+  });
+
+  it("registra un gasto manual por comando de voz o texto directo", async () => {
+    recordManualExpenseMock.mockResolvedValueOnce({
+      receiptId: 101,
+      itemId: 201,
+      totalAmount: 50,
+      category: "Restaurante",
+      storeName: "Restaurante",
+      date: "2026-11-03",
+    });
+
+    const res = await runAgentInstruction("incluye un gasto de 50€ con concepto comida restaurante");
+    expect(recordManualExpenseMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 50,
+        concept: "comida restaurante",
+      })
+    );
+    expect(res.actionExecuted?.type).toBe("expense");
+    expect(res.actionExecuted?.ok).toBe(true);
+    expect(res.message).toContain("50.00 €");
+    expect(res.message).toContain("comida restaurante");
+  });
+
+  it("ejecuta create_expense a través de Gemini Function Calling", async () => {
+    llmWithToolsMock.mockResolvedValueOnce({
+      toolCalls: [
+        {
+          name: "create_expense",
+          args: {
+            concept: "Cena familiar japonesa",
+            amount: 68.5,
+            category: "Restaurante",
+            store_name: "Sushi Bar",
+          },
+        },
+      ],
+    });
+    recordManualExpenseMock.mockResolvedValueOnce({
+      receiptId: 102,
+      itemId: 202,
+      totalAmount: 68.5,
+      category: "Restaurante",
+      storeName: "Sushi Bar",
+      date: "2026-11-03",
+    });
+
+    const res = await runAgentInstruction("Apunta la cena que fueron 68.50 euros en Sushi Bar");
+    expect(recordManualExpenseMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        concept: "Cena familiar japonesa",
+        amount: 68.5,
+        category: "Restaurante",
+        storeName: "Sushi Bar",
+      })
+    );
+    expect(res.actionExecuted?.type).toBe("expense");
+    expect(res.actionExecuted?.ok).toBe(true);
+    expect(res.message).toContain("68.50 €");
   });
 
   it("devuelve la respuesta conversacional normal cuando no hay llamadas a herramientas", async () => {

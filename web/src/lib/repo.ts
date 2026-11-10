@@ -1398,6 +1398,91 @@ export async function recordReceipt(data: {
   return receiptId;
 }
 
+export async function recordManualExpense(data: {
+  concept: string;
+  amount: number;
+  category?: string;
+  date?: string;
+  storeName?: string;
+}): Promise<{ receiptId: number; itemId: number; totalAmount: number; category: string; storeName: string; date: string }> {
+  const amount = Math.abs(Number(data.amount) || 0);
+  if (amount <= 0) {
+    throw new Error("El importe debe ser mayor que 0 €");
+  }
+
+  const rawConcept = (data.concept || "Gasto diverso").trim();
+  const rawDate = data.date ? normalizeReceiptDate(data.date) : isoDate();
+  const rawStore = (data.storeName || "").trim();
+
+  // Inferencia inteligente de categoría si no se proporciona o es genérica
+  let category = (data.category || "").trim();
+  if (!category || category.toLowerCase() === "otros") {
+    const low = rawConcept.toLowerCase();
+    if (low.includes("restaurante") || low.includes("comida") || low.includes("cena") || low.includes("bar") || low.includes("café") || low.includes("tapas")) {
+      category = "Restaurante";
+    } else if (low.includes("farmacia") || low.includes("medicamento") || low.includes("salud") || low.includes("médico")) {
+      category = "Salud / Farmacia";
+    } else if (low.includes("gasolina") || low.includes("gasoil") || low.includes("parking") || low.includes("aparcamiento") || low.includes("peaje") || low.includes("repsol") || low.includes("cepsa")) {
+      category = "Transporte";
+    } else if (low.includes("cine") || low.includes("teatro") || low.includes("concierto") || low.includes("ocio") || low.includes("viaje")) {
+      category = "Ocio";
+    } else if (low.includes("leche") || low.includes("yogur") || low.includes("queso")) {
+      category = "Lácteos";
+    } else if (low.includes("carne") || low.includes("pollo") || low.includes("ternera") || low.includes("cerdo") || low.includes("lomo")) {
+      category = "Carnicería";
+    } else if (low.includes("pescado") || low.includes("merluza") || low.includes("salmón") || low.includes("salmon") || low.includes("atún")) {
+      category = "Pescadería";
+    } else if (low.includes("fruta") || low.includes("verdura") || low.includes("manzana") || low.includes("plátano") || low.includes("platano") || low.includes("tomate")) {
+      category = "Fruta y Verdura";
+    } else if (low.includes("huevo")) {
+      category = "Huevos";
+    } else if (low.includes("pan") || low.includes("barra")) {
+      category = "Panadería";
+    } else if (low.includes("pañal") || low.includes("toallit") || low.includes("champu") || low.includes("higiene")) {
+      category = "Bebé / Higiene";
+    } else if (low.includes("detergente") || low.includes("limpieza") || low.includes("lejía") || low.includes("suavizante")) {
+      category = "Limpieza";
+    } else {
+      category = category || "Otros";
+    }
+  }
+
+  const stores = await getStores();
+  let matchedStore = stores.find((s) => s.name.toLowerCase() === rawStore.toLowerCase());
+  if (!matchedStore && rawStore) {
+    matchedStore = stores.find((s) => s.name.toLowerCase().includes(rawStore.toLowerCase()) || rawStore.toLowerCase().includes(s.name.toLowerCase()));
+  }
+
+  const otrosStore = stores.find((s) => s.name.toLowerCase() === "otros") || { id: 5, name: "Otros" };
+  const storeId = matchedStore ? matchedStore.id : otrosStore.id;
+  const storeDisplayName = rawStore || (matchedStore ? matchedStore.name : (category === "Restaurante" ? "Restaurante" : "Gasto Manual"));
+
+  const [receipt] = await q<{ id: number }>(
+    `insert into receipts (store_id, company_name, date, total_amount, raw_text)
+     values ($1, $2, $3, $4, $5)
+     returning id`,
+    [storeId, storeDisplayName, rawDate, amount, `Gasto manual: ${rawConcept} (${category})`],
+  );
+
+  const receiptId = receipt.id;
+
+  const [item] = await q<{ id: number }>(
+    `insert into receipt_items (receipt_id, name, quantity, unit_price, total_price, category, is_perishable)
+     values ($1, $2, $3, $4, $5, $6, $7)
+     returning id`,
+    [receiptId, rawConcept, "1", amount, amount, category, false],
+  );
+
+  return {
+    receiptId,
+    itemId: item.id,
+    totalAmount: amount,
+    category,
+    storeName: storeDisplayName,
+    date: rawDate,
+  };
+}
+
 /**
  * Semilla de tickets desactivada para permitir al usuario comenzar con inventario limpio.
  */

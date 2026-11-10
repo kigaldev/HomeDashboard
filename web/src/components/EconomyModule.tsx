@@ -39,6 +39,7 @@ import {
   IconPieChart,
 } from "./Icons";
 import { TicketManagerModal } from "./TicketManagerModal";
+import { ManualExpenseModal } from "./ManualExpenseModal";
 import { CategoryDonutChart, MonthCompareChart } from "./ChartsLazy";
 
 export type ReceiptItemMonthly = {
@@ -181,8 +182,9 @@ export function EconomyModule({
     new Set([...categories.map((c) => c.category), ...standardCategories])
   ).filter(Boolean);
 
-  // Estados para Escáner de Tickets
+  // Estados para Escáner de Tickets y Gastos Manuales
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  const [isManualExpenseOpen, setIsManualExpenseOpen] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [rawInput, setRawInput] = useState("");
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
@@ -340,7 +342,15 @@ export function EconomyModule({
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "0.5rem" }}>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <button
+              onClick={() => setIsManualExpenseOpen(true)}
+              className="btn-secondary"
+              style={{ fontSize: "0.82rem", padding: "0.45rem 0.95rem", gap: "0.4rem" }}
+            >
+              <IconPlus size={14} />
+              <span>Nuevo Gasto Manual</span>
+            </button>
             <button
               onClick={() => setIsTicketModalOpen(true)}
               className="btn-primary"
@@ -1499,6 +1509,12 @@ export function EconomyModule({
       <TicketManagerModal
         isOpen={isTicketModalOpen}
         onClose={() => setIsTicketModalOpen(false)}
+      />
+
+      {/* ── Modal de Gasto Manual ── */}
+      <ManualExpenseModal
+        isOpen={isManualExpenseOpen}
+        onClose={() => setIsManualExpenseOpen(false)}
       />
     </div>
   );

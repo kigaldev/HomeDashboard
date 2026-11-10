@@ -257,6 +257,7 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
       dinner: "🍲",
       energy: "⚡",
       info: "ℹ️",
+      expense: "💶",
     }[result.actionExecuted.type] || "✅";
 
     return [
