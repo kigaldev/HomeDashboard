@@ -20,6 +20,8 @@ import {
   deleteShopping,
   clearChecked,
   setPantry,
+  setPantryStockLevel,
+  deletePantryItem,
   addTask,
   toggleTask,
   deleteTask,
@@ -129,6 +131,26 @@ export async function clearCheckedShoppingAction() {
 export async function setPantryStatusAction(name: string, status: PantryItem["status"]) {
   name = parse(z.string().trim().min(1).max(120), name);
   await setPantry(name, status);
+  revalidatePath("/");
+}
+
+export async function setPantryStockLevelAction(name: string, level: number) {
+  name = parse(z.string().trim().min(1).max(120), name);
+  level = parse(z.number().min(0).max(100), Math.round(Number(level)));
+  await setPantryStockLevel(name, level);
+  revalidatePath("/");
+}
+
+export async function addPantryItemAction(name: string, level: number = 100) {
+  name = parse(z.string().trim().min(1).max(120), name);
+  level = parse(z.number().min(0).max(100), Math.round(Number(level)));
+  await setPantryStockLevel(name, level);
+  revalidatePath("/");
+}
+
+export async function deletePantryItemAction(name: string) {
+  name = parse(z.string().trim().min(1).max(120), name);
+  await deletePantryItem(name);
   revalidatePath("/");
 }
 

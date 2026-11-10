@@ -76,11 +76,9 @@ export function AgentSquadMissionControl({
       color: "#FF9500", // Apple Orange
       bgGlow: "rgba(255, 149, 0, 0.15)",
       status: "active",
-      lastAction: urgentPerishable
-        ? `Atención a perecedero: ${urgentPerishable.name} (caduca pronto)`
-        : "Despensa y lista de la compra sincronizadas",
-      capability: "Promociona básicos automáticos (+3 compras/mes) y alerta caducidades.",
-      prompt: "Dime qué alimentos de la despensa están bajos o próximos a caducar",
+      lastAction: "Supervisando nivel de existencias (0-100%) y reposición",
+      capability: "Monitor de existencias táctil y reposición automática a la compra.",
+      prompt: "Dime qué alimentos de la despensa tienen poco stock estimado",
     },
     {
       id: "family",

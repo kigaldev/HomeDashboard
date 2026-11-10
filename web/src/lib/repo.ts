@@ -25,7 +25,7 @@ export type ShoppingItem = {
   in_cart?: boolean;
 };
 export type Staple = { id: number; name: string; emoji: string; store_id: number | null };
-export type PantryItem = { id: number; name: string; status: "ok" | "low" | "out" };
+export type PantryItem = { id: number; name: string; status: "ok" | "low" | "out"; quantity_level?: number };
 export type Task = {
   id: number; title: string; assignee_id: number | null; due_date: string | null;
   recurrence: "daily" | "weekly" | "monthly" | null; done: boolean;
@@ -302,15 +302,39 @@ export async function checkShoppingItemByName(name: string): Promise<{ matched: 
 }
 
 // ── Despensa ──────────────────────────────────────────────
-export const getPantry = () => q<PantryItem>("select id,name,status from pantry order by status desc, name");
-export async function setPantry(name: string, status: PantryItem["status"]) {
+export const getPantry = () =>
+  q<PantryItem>(
+    "select id, name, status, coalesce(quantity_level, case when status = 'out' then 0 when status = 'low' then 25 else 100 end) as quantity_level from pantry order by status desc, name"
+  );
+
+export async function setPantry(name: string, status: PantryItem["status"], quantity_level?: number) {
   const pretty = name.trim()[0].toUpperCase() + name.trim().slice(1);
+  const level =
+    quantity_level !== undefined
+      ? Math.max(0, Math.min(100, Math.round(quantity_level)))
+      : status === "out"
+      ? 0
+      : status === "low"
+      ? 25
+      : 100;
+
   await q(
-    `insert into pantry (name,status) values ($1,$2)
-     on conflict (name) do update set status=excluded.status, updated_at=now()`,
-    [pretty, status],
+    `insert into pantry (name, status, quantity_level) values ($1, $2, $3)
+     on conflict (name) do update set status = excluded.status, quantity_level = excluded.quantity_level, updated_at = now()`,
+    [pretty, status, level],
   );
   if (status !== "ok") await addShopping(pretty);
+}
+
+export async function setPantryStockLevel(name: string, level: number) {
+  const cleanLevel = Math.max(0, Math.min(100, Math.round(level)));
+  const status: PantryItem["status"] = cleanLevel === 0 ? "out" : cleanLevel <= 25 ? "low" : "ok";
+  await setPantry(name, status, cleanLevel);
+  return { name, status, quantity_level: cleanLevel };
+}
+
+export async function deletePantryItem(name: string) {
+  await q("delete from pantry where lower(name) = lower($1)", [name.trim()]);
 }
 
 // ── Tareas ────────────────────────────────────────────────
@@ -1095,18 +1119,18 @@ export async function syncPantryFromReceiptItems(
     const matched = findPantryMatch(rawName, existingPantry);
     if (matched) {
       if (matched.id > 0) {
-        await q("update pantry set status = 'ok', updated_at = now() where id = $1", [matched.id]);
+        await q("update pantry set status = 'ok', quantity_level = 100, updated_at = now() where id = $1", [matched.id]);
       } else {
-        await q("update pantry set status = 'ok', updated_at = now() where name = $1", [matched.name]);
+        await q("update pantry set status = 'ok', quantity_level = 100, updated_at = now() where name = $1", [matched.name]);
       }
       updatedCount++;
     } else {
       const canonical = normalizeItemCanonical(rawName);
       const insertName = canonical || (rawName.charAt(0).toUpperCase() + rawName.slice(1));
       await q(
-        `insert into pantry (name, status, updated_at)
-         values ($1, 'ok', now())
-         on conflict (name) do update set status = 'ok', updated_at = now()`,
+        `insert into pantry (name, status, quantity_level, updated_at)
+         values ($1, 'ok', 100, now())
+         on conflict (name) do update set status = 'ok', quantity_level = 100, updated_at = now()`,
         [insertName]
       );
       existingPantry.push({ id: 0, name: insertName });

@@ -44,6 +44,7 @@ create table if not exists pantry (
   id serial primary key,
   name text not null unique,
   status text not null default 'ok' check (status in ('ok','low','out')),
+  quantity_level int not null default 100 check (quantity_level >= 0 and quantity_level <= 100),
   updated_at timestamptz not null default now()
 );
 
@@ -203,6 +204,7 @@ alter table receipts add column if not exists company_name text;
 alter table members add column if not exists pin text;
 alter table members add column if not exists preferred_tab text default 'resumen';
 alter table shopping_items add column if not exists in_cart boolean not null default false;
+alter table pantry add column if not exists quantity_level int not null default 100;
 delete from stores where name in ('Eroski', 'BM');
 `;
 

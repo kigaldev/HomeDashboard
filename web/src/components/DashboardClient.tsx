@@ -146,7 +146,9 @@ export function DashboardClient({
   const [familyAgendaOpen, setFamilyAgendaOpen] = useState(false);
   const agendaSectionRef = useRef<HTMLDivElement>(null);
 
-  const urgentPerishablesCount = (perishables || []).filter((p) => p.days_left <= 3).length;
+  const lowStockItems = (pantry || []).filter(
+    (p) => (p.quantity_level ?? (p.status === "out" ? 0 : p.status === "low" ? 25 : 100)) <= 25
+  );
   const pendingTasksCount = (tasks || []).filter((t) => !t.done).length;
 
   const memberMap = new Map((members || []).map((m) => [m.id, m]));
@@ -254,9 +256,9 @@ export function DashboardClient({
             >
               <div className="deck-nav-icon-box">
                 {card.icon(18)}
-                {card.id === "economia" && urgentPerishablesCount > 0 && (
+                {card.id === "compra" && lowStockItems.length > 0 && (
                   <span className="deck-badge-counter deck-badge-amber">
-                    {urgentPerishablesCount}
+                    {lowStockItems.length}
                   </span>
                 )}
                 {card.id === "familia" && pendingTasksCount > 0 && (
@@ -292,9 +294,9 @@ export function DashboardClient({
         {/* 🃏 Tarjeta 1: Hoy (Centro de Mando) */}
         <div className="deck-slide">
           <div className="deck-card wall-kiosk-card">
-            {urgentPerishablesCount > 0 && (
+            {lowStockItems.length > 0 && (
               <div
-                onClick={() => goToCard(2)}
+                onClick={() => goToCard(1)}
                 className="wall-alert-banner touch-target"
                 style={{
                   cursor: "pointer",
@@ -312,18 +314,18 @@ export function DashboardClient({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
-                  <IconClock size={16} className="text-orange" />
+                  <IconCart size={16} className="text-orange" />
                   <div>
                     <p style={{ fontWeight: 600, color: "var(--apple-text)", margin: 0 }}>
-                      Atención en despensa · {urgentPerishablesCount} alimentos perecederos
+                      Reposición en Despensa · {lowStockItems.length} {lowStockItems.length === 1 ? "producto con stock bajo" : "productos con stock bajo"} (≤ 25%)
                     </p>
                     <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
-                      Consumir pronto: {perishables.slice(0, 3).map((p) => p.name).join(", ")}
+                      Stock crítico: {lowStockItems.slice(0, 3).map((p) => p.name).join(", ")}
                     </p>
                   </div>
                 </div>
                 <span className="badge badge-amber" style={{ fontSize: "0.76rem" }}>
-                  Ver en Economía →
+                  Ver en Despensa →
                 </span>
               </div>
             )}

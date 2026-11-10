@@ -1190,10 +1190,10 @@ TOTAL 16.50 €`;
                 />
                 <label htmlFor="act-update-pantry" style={{ cursor: "pointer", flex: 1 }}>
                   <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--apple-text)" }}>
-                    🥫 Actualizar Despensa / Nevera y Vigilar Frescos
+                    🥫 Actualizar Despensa / Nivel de Stock (100%)
                   </div>
                   <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.15rem" }}>
-                    Marca los artículos como disponibles en la despensa y activa alertas automáticas en el semáforo para frescos (pescados, carnes, fruta, lácteos).
+                    Marca los artículos como reabastecidos con stock al 100% en tu despensa.
                   </div>
                 </label>
               </div>
@@ -1384,23 +1384,26 @@ TOTAL 16.50 €`;
                     />
                     <span style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)" }}>€</span>
 
-                    <button
-                      type="button"
-                      onClick={() => handleTogglePerishable(idx)}
-                      title={item.isPerishable ? "Perecedero (alerta de caducidad activada)" : "No perecedero"}
-                      style={{
-                        padding: "0.25rem 0.5rem",
-                        fontSize: "0.72rem",
-                        borderRadius: "var(--radius-full)",
-                        border: "none",
-                        cursor: "pointer",
-                        background: item.isPerishable ? "var(--apple-orange-subtle)" : "var(--apple-surface-tertiary)",
-                        color: item.isPerishable ? "var(--apple-orange)" : "var(--apple-text-tertiary)",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {item.isPerishable ? `⏳ ${item.expiryDays || 4}d` : "📦 Seco"}
-                    </button>
+                    {/* Botón de perecedero oculto a petición del usuario */}
+                    {false && (
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePerishable(idx)}
+                        title={item.isPerishable ? "Perecedero (alerta de caducidad activada)" : "No perecedero"}
+                        style={{
+                          padding: "0.25rem 0.5rem",
+                          fontSize: "0.72rem",
+                          borderRadius: "var(--radius-full)",
+                          border: "none",
+                          cursor: "pointer",
+                          background: item.isPerishable ? "var(--apple-orange-subtle)" : "var(--apple-surface-tertiary)",
+                          color: item.isPerishable ? "var(--apple-orange)" : "var(--apple-text-tertiary)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {item.isPerishable ? `⏳ ${item.expiryDays || 4}d` : "📦 Seco"}
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -1546,19 +1549,7 @@ TOTAL 16.50 €`;
                   🥫 {executionResult.pantryCount} items a despensa
                 </span>
               )}
-              {executionResult.perishablesCount > 0 && (
-                <span
-                  style={{
-                    padding: "0.3rem 0.7rem",
-                    borderRadius: "var(--radius-full)",
-                    background: "var(--apple-surface)",
-                    fontSize: "0.78rem",
-                    fontWeight: 700,
-                  }}
-                >
-                  ⏳ {executionResult.perishablesCount} frescos en semáforo
-                </span>
-              )}
+              {/* Chip de perecederos oculto a petición del usuario */}
             </div>
 
             <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.6rem" }}>

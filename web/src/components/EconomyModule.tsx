@@ -507,6 +507,7 @@ export function EconomyModule({
           >
             Tickets Digitalizados ({receipts.length})
           </button>
+          {/* Pestaña de Caducidades oculta a petición del usuario
           <button
             type="button"
             onClick={() => setActiveTab("perishables")}
@@ -514,7 +515,7 @@ export function EconomyModule({
             style={{ fontSize: "0.82rem", padding: "0.4rem 0.95rem" }}
           >
             Caducidades ({perishables.length})
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -1436,8 +1437,8 @@ export function EconomyModule({
         </div>
       )}
 
-      {/* ── VISTA 6: CADUCIDADES & FRESCOS ── */}
-      {activeTab === "perishables" && (
+      {/* ── VISTA 6: CADUCIDADES & FRESCOS (Oculto a petición del usuario) ── */}
+      {false && activeTab === ("perishables" as any) && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
             <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
