@@ -3,35 +3,133 @@
 import { useState, useEffect, useRef } from "react";
 import { IconCamera } from "./Icons";
 
+const DEFAULT_PHOTO = "/photos/familia-feliz-gallego.jpg";
+
 export function FamilyPhotoFrame() {
-  const [photoUrl, setPhotoUrl] = useState<string | null>("/IMG_3395.JPG");
+  const [photos, setPhotos] = useState<string[]>([DEFAULT_PHOTO]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [photoUrl, setPhotoUrl] = useState<string>(DEFAULT_PHOTO);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Cargar lista de fotos del repositorio y preferencia guardada
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("hd_family_photo");
-      if (saved) setPhotoUrl(saved);
-      else setPhotoUrl("/IMG_3395.JPG");
-    } catch {
-      setPhotoUrl("/IMG_3395.JPG");
+    let isMounted = true;
+
+    async function loadPhotos() {
+      try {
+        const res = await fetch("/api/photos");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.photos) && data.photos.length > 0 && isMounted) {
+            setPhotos(data.photos);
+
+            // Revisar si el usuario tenía una foto seleccionada previamente
+            const saved = localStorage.getItem("hd_family_photo");
+            if (saved && data.photos.includes(saved)) {
+              setPhotoUrl(saved);
+              setCurrentIndex(data.photos.indexOf(saved));
+            } else {
+              setPhotoUrl(data.photos[0]);
+              setCurrentIndex(0);
+            }
+            return;
+          }
+        }
+      } catch {}
+
+      // Fallback
+      if (isMounted) {
+        const saved = localStorage.getItem("hd_family_photo");
+        if (saved) setPhotoUrl(saved);
+      }
     }
+
+    loadPhotos();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Transición suave entre fotos si hay varias (cada 45 segundos, típico de marco digital)
+  useEffect(() => {
+    if (photos.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => {
+        const next = (prev + 1) % photos.length;
+        setPhotoUrl(photos[next]);
+        return next;
+      });
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [photos]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/photos", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          setPhotoUrl(data.url);
+          setPhotos((prev) => [data.url, ...prev.filter((p) => p !== data.url)]);
+          setCurrentIndex(0);
+          try {
+            localStorage.setItem("hd_family_photo", data.url);
+          } catch {}
+          setIsUploading(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("[photo-frame] Error subiendo foto al servidor:", err);
+    }
+
+    // Fallback local en caso de desconexión
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
       setPhotoUrl(result);
       try {
         localStorage.setItem("hd_family_photo", result);
-      } catch (err) {
-        console.warn("[photo-frame] Error saving photo to localStorage:", err);
-      }
+      } catch {}
+      setIsUploading(false);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (photos.length <= 1) return;
+    const prev = (currentIndex - 1 + photos.length) % photos.length;
+    setCurrentIndex(prev);
+    setPhotoUrl(photos[prev]);
+    try {
+      localStorage.setItem("hd_family_photo", photos[prev]);
+    } catch {}
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (photos.length <= 1) return;
+    const next = (currentIndex + 1) % photos.length;
+    setCurrentIndex(next);
+    setPhotoUrl(photos[next]);
+    try {
+      localStorage.setItem("hd_family_photo", photos[next]);
+    } catch {}
   };
 
   return (
@@ -41,18 +139,18 @@ export function FamilyPhotoFrame() {
         borderRadius: "var(--radius-xl)",
         overflow: "hidden",
         position: "relative",
-        minHeight: "210px",
+        minHeight: "220px",
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-end",
         boxShadow: "var(--liquid-shadow-elevated)",
       }}
     >
-      {/* Imagen de Fondo o Marco Artístico Familiar */}
+      {/* Imagen de Fondo o Fotografía Familiar */}
       {photoUrl ? (
         <img
           src={photoUrl}
-          alt="Fotografía familiar"
+          alt="Fotografía Familia Feliz Gallego"
           style={{
             position: "absolute",
             inset: 0,
@@ -60,6 +158,7 @@ export function FamilyPhotoFrame() {
             height: "100%",
             objectFit: "cover",
             filter: "brightness(0.92)",
+            transition: "opacity 0.6s ease-in-out",
           }}
         />
       ) : (
@@ -82,6 +181,61 @@ export function FamilyPhotoFrame() {
               Kike · Lara · Fabio · Bruno
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Flechas táctiles si hay más de 1 fotografía */}
+      {photos.length > 1 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "12px",
+            right: "12px",
+            zIndex: 3,
+            display: "flex",
+            alignItems: "center",
+            gap: "0.35rem",
+            background: "rgba(0, 0, 0, 0.45)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            borderRadius: "var(--radius-full)",
+            padding: "0.2rem 0.5rem",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handlePrev}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#ffffff",
+              fontSize: "0.75rem",
+              cursor: "pointer",
+              padding: "0.15rem 0.3rem",
+            }}
+            title="Foto anterior"
+          >
+            ‹
+          </button>
+          <span style={{ fontSize: "0.68rem", color: "rgba(255, 255, 255, 0.8)", fontWeight: 600 }}>
+            {currentIndex + 1} / {photos.length}
+          </span>
+          <button
+            type="button"
+            onClick={handleNext}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#ffffff",
+              fontSize: "0.75rem",
+              cursor: "pointer",
+              padding: "0.15rem 0.3rem",
+            }}
+            title="Siguiente foto"
+          >
+            ›
+          </button>
         </div>
       )}
 
@@ -120,7 +274,7 @@ export function FamilyPhotoFrame() {
           </p>
         </div>
 
-        {/* Botón para cambiar / subir fotografía */}
+        {/* Botón para cambiar / subir fotografía al repositorio */}
         <div>
           <input
             ref={fileInputRef}
@@ -131,6 +285,7 @@ export function FamilyPhotoFrame() {
           />
           <button
             type="button"
+            disabled={isUploading}
             onClick={() => fileInputRef.current?.click()}
             className="btn-ghost touch-target"
             style={{
@@ -146,15 +301,14 @@ export function FamilyPhotoFrame() {
               display: "inline-flex",
               alignItems: "center",
               gap: "0.35rem",
-              cursor: "pointer",
+              cursor: isUploading ? "wait" : "pointer",
             }}
           >
             <IconCamera size={13} />
-            <span>{photoUrl ? "Cambiar foto" : "Subir foto"}</span>
+            <span>{isUploading ? "Guardando..." : "Añadir foto"}</span>
           </button>
         </div>
       </div>
     </div>
   );
 }
-

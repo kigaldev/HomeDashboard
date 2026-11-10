@@ -19,3 +19,4 @@ describe("traffic", () => {
     expect(traffic.delayMinutes).toBeGreaterThanOrEqual(2);
   });
 });
+
