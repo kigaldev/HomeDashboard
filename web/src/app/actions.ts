@@ -201,8 +201,14 @@ export async function regenerateDinnerAction(date: string) {
   revalidatePath("/");
 }
 
-export async function setSchoolRunOverrideAction(date: string, dropoffId: number | null, pickupId: number | null, note: string | null) {
-  await setSchoolRunOverride(date, dropoffId, pickupId, note);
+export async function setSchoolRunOverrideAction(
+  date: string,
+  dropoffId: number | null,
+  pickupId: number | null,
+  note: string | null,
+  pickupNoonId: number | null = null,
+) {
+  await setSchoolRunOverride(date, dropoffId, pickupId, note, pickupNoonId);
   revalidatePath("/");
 }
 

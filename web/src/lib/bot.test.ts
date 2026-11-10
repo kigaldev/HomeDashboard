@@ -41,7 +41,7 @@ describe("handleBotMessage", () => {
 
   it("responde a comandos informativos directamente (/start)", async () => {
     const res = await handleBotMessage("/start", "123");
-    expect(res).toContain("Soy Pepe (JARVIS), tu asistente de hogar");
+    expect(res).toContain("Soy Pepe, tu asistente de hogar");
     expect(res).toContain("123");
   });
 

@@ -4,6 +4,26 @@ import { useState, useTransition } from "react";
 import { addTaskAction, toggleTaskAction, deleteTaskAction } from "@/app/actions";
 import type { Task, Member } from "@/lib/repo";
 
+const PRESET_TASKS = [
+  { label: "🧺 Poner lavadora", text: "Poner lavadora", rec: "" },
+  { label: "👕 Tender la colada", text: "Tender la colada", rec: "" },
+  { label: "👔 Doblar y guardar ropa", text: "Doblar y guardar ropa", rec: "" },
+  { label: "🍽️ Vaciar lavavajillas", text: "Vaciar lavavajillas", rec: "daily" },
+  { label: "🫧 Poner lavavajillas", text: "Poner lavavajillas", rec: "daily" },
+  { label: "🗑️ Bajar basura y reciclaje", text: "Bajar la basura y reciclaje", rec: "daily" },
+  { label: "🧹 Pasar aspiradora / Roomba", text: "Pasar la aspiradora", rec: "weekly" },
+  { label: "🧽 Limpiar baños", text: "Limpiar cuartos de baño", rec: "weekly" },
+  { label: "🍳 Limpiar cocina a fondo", text: "Limpiar la cocina", rec: "weekly" },
+  { label: "🛏️ Cambiar sábanas y toallas", text: "Cambiar sábanas y toallas", rec: "weekly" },
+  { label: "🪟 Limpiar polvo y superficies", text: "Limpiar el polvo y muebles", rec: "weekly" },
+  { label: "🛒 Compra semanal", text: "Hacer compra semanal", rec: "weekly" },
+  { label: "🥫 Revisar despensa y nevera", text: "Revisar despensa y caducidades", rec: "weekly" },
+  { label: "🪴 Regar plantas", text: "Regar las plantas", rec: "weekly" },
+  { label: "🎒 Preparar mochilas del cole", text: "Preparar mochilas del cole", rec: "daily" },
+  { label: "🩺 Pedir cita médico / dentista", text: "Pedir cita médico / pediatra", rec: "" },
+  { label: "🚗 Revisión / ITV coche", text: "Pasar la ITV / revisión del coche", rec: "" },
+];
+
 export function TasksModule({
   tasks = [],
   members = [],
@@ -105,9 +125,32 @@ export function TasksModule({
 
       {/* Formulario añadir tarea */}
       <form onSubmit={handleAddTask} style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem", marginBottom: "1rem" }}>
+        {/* Desplegable de tareas predeterminadas */}
+        <select
+          onChange={(e) => {
+            if (!e.target.value) return;
+            const chosen = PRESET_TASKS.find((p) => p.text === e.target.value);
+            if (chosen) {
+              setNewTitle(chosen.text);
+              if (chosen.rec) setNewRecurrence(chosen.rec);
+            }
+          }}
+          defaultValue=""
+          className="input-field"
+          style={{ flex: "0 1 180px", color: "var(--apple-blue)", fontWeight: 500 }}
+          title="Seleccionar una tarea habitual predeterminada"
+        >
+          <option value="">📋 Tareas habituales...</option>
+          {PRESET_TASKS.map((p) => (
+            <option key={p.text} value={p.text}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+
         <input
           type="text"
-          placeholder="Nueva tarea (ej. Pedir cita ITV, Lavadora sábanas)..."
+          placeholder="O escribe una tarea personalizada..."
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           className="input-field"

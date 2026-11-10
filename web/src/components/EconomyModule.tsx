@@ -96,6 +96,8 @@ export function EconomyModule({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+  const [isStoresBreakdownOpen, setIsStoresBreakdownOpen] = useState(false);
+  const [isCategoriesListOpen, setIsCategoriesListOpen] = useState(false);
 
   useEffect(() => {
     setCategories(monthlyExpenses.by_category);
@@ -522,57 +524,83 @@ export function EconomyModule({
       {/* ── VISTA 1: BALANCE & GASTOS ── */}
       {activeTab === "balance" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          {/* Desglose por Comercios */}
-          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
-            <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
-              Desglose por Establecimiento Comercial
-            </h3>
-
-            {monthlyExpenses.by_store.length === 0 ? (
-              <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--apple-text-secondary)" }}>
-                <p style={{ margin: 0, fontSize: "0.85rem" }}>Aún no hay compras registradas este mes.</p>
-                <button
-                  onClick={() => startTransition(() => seedDemoReceiptsAction())}
-                  disabled={isPending}
-                  className="btn-secondary"
-                  style={{ fontSize: "0.78rem", marginTop: "0.6rem" }}
-                >
-                  Cargar demostración de tickets
-                </button>
+          {/* Desglose por Comercios (Plegable) */}
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.15rem 1.35rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div>
+                <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
+                  🏪 Desglose por Establecimiento Comercial
+                </h3>
+                <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.15rem" }}>
+                  {monthlyExpenses.by_store.length} comercios registrados este mes
+                </p>
               </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-                {monthlyExpenses.by_store.map((st) => {
-                  const pct = monthlyExpenses.current_month_total > 0
-                    ? Math.round((st.total / monthlyExpenses.current_month_total) * 100)
-                    : 0;
+              <button
+                type="button"
+                onClick={() => setIsStoresBreakdownOpen(!isStoresBreakdownOpen)}
+                className="btn-ghost"
+                style={{
+                  fontSize: "0.76rem",
+                  padding: "0.25rem 0.65rem",
+                  borderRadius: "var(--radius-full)",
+                  border: "1px solid var(--apple-border)",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  cursor: "pointer",
+                }}
+              >
+                {isStoresBreakdownOpen ? "Plegar ▲" : "Desplegar ▼"}
+              </button>
+            </div>
 
-                  return (
-                    <div key={st.store_name}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem", fontSize: "0.82rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontWeight: 600 }}>
-                          <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: st.color || "var(--apple-blue)" }} />
-                          <span style={{ color: "var(--apple-text)" }}>{st.store_name}</span>
-                          <span style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)" }}>({st.count} compras)</span>
+            {isStoresBreakdownOpen && (
+              <div style={{ marginTop: "1rem" }}>
+                {monthlyExpenses.by_store.length === 0 ? (
+                  <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--apple-text-secondary)" }}>
+                    <p style={{ margin: 0, fontSize: "0.85rem" }}>Aún no hay compras registradas este mes.</p>
+                    <button
+                      onClick={() => startTransition(() => seedDemoReceiptsAction())}
+                      disabled={isPending}
+                      className="btn-secondary"
+                      style={{ fontSize: "0.78rem", marginTop: "0.6rem" }}
+                    >
+                      Cargar demostración de tickets
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                    {monthlyExpenses.by_store.map((st) => {
+                      const pct = monthlyExpenses.current_month_total > 0
+                        ? Math.round((st.total / monthlyExpenses.current_month_total) * 100)
+                        : 0;
+
+                      return (
+                        <div key={st.store_name}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem", fontSize: "0.82rem" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontWeight: 600 }}>
+                              <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: st.color || "var(--apple-blue)" }} />
+                              <span style={{ color: "var(--apple-text)" }}>{st.store_name}</span>
+                              <span style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)" }}>({st.count} compras)</span>
+                            </div>
+                            <div style={{ fontWeight: 700, color: "var(--apple-text)" }}>
+                              {st.total.toFixed(2)} € <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", fontWeight: 500 }}>({pct}%)</span>
+                            </div>
+                          </div>
+                          <div style={{ width: "100%", height: "7px", background: "var(--apple-surface-secondary)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
+                            <div
+                              style={{
+                                width: `${pct}%`,
+                                height: "100%",
+                                background: st.color || "var(--apple-blue)",
+                                borderRadius: "var(--radius-full)",
+                                transition: "width 0.4s ease",
+                              }}
+                            />
+                          </div>
                         </div>
-                        <div style={{ fontWeight: 700, color: "var(--apple-text)" }}>
-                          {st.total.toFixed(2)} € <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", fontWeight: 500 }}>({pct}%)</span>
-                        </div>
-                      </div>
-                      <div style={{ width: "100%", height: "7px", background: "var(--apple-surface-secondary)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
-                        <div
-                          style={{
-                            width: `${pct}%`,
-                            height: "100%",
-                            background: st.color || "var(--apple-blue)",
-                            borderRadius: "var(--radius-full)",
-                            transition: "width 0.4s ease",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -604,7 +632,10 @@ export function EconomyModule({
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginBottom: "1rem" }}>
                 <CategoryDonutChart
                   data={categories}
-                  onSelectCategory={(catName) => setSelectedCategory((prev) => (prev === catName ? null : catName))}
+                  onSelectCategory={(catName) => {
+                    setSelectedCategory((prev) => (prev === catName ? null : catName));
+                    setIsCategoriesListOpen(true);
+                  }}
                 />
                 <MonthCompareChart
                   last={monthlyExpenses.last_month_total}
@@ -612,84 +643,108 @@ export function EconomyModule({
                 />
               </div>
 
-              {/* Cuadrícula de tarjetas de categorías: clickables y drop targets */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem" }}>
-                {categories.map((cat) => {
-                  const isSelected = selectedCategory === cat.category;
-                  const isDragOver = dragOverCategory === cat.category;
-
-                  return (
-                    <div
-                      key={cat.category}
-                      onClick={() => setSelectedCategory(isSelected ? null : cat.category)}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                        if (dragOverCategory !== cat.category) {
-                          setDragOverCategory(cat.category);
-                        }
-                      }}
-                      onDragLeave={() => {
-                        if (dragOverCategory === cat.category) {
-                          setDragOverCategory(null);
-                        }
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        const idStr = e.dataTransfer.getData("text/plain");
-                        const itemId = idStr ? Number(idStr) : draggedItemId;
-                        if (itemId) {
-                          handleDrop(cat.category, itemId);
-                        }
-                      }}
-                      style={{
-                        padding: "0.85rem",
-                        borderRadius: "var(--radius-md)",
-                        background: isDragOver
-                          ? "rgba(10, 132, 255, 0.22)"
-                          : isSelected
-                          ? "rgba(10, 132, 255, 0.15)"
-                          : "var(--liquid-glass-bg-subtle, rgba(255, 255, 255, 0.04))",
-                        backdropFilter: "blur(14px)",
-                        WebkitBackdropFilter: "blur(14px)",
-                        border: isDragOver
-                          ? "2px dashed var(--apple-blue)"
-                          : isSelected
-                          ? "1.5px solid var(--apple-blue)"
-                          : "1px solid var(--liquid-glass-border, rgba(255, 255, 255, 0.09))",
-                        boxShadow: isSelected
-                          ? "0 4px 18px rgba(0, 113, 227, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
-                          : "inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 8px rgba(0, 0, 0, 0.2)",
-                        cursor: "pointer",
-                        transition: "all 0.18s ease",
-                        position: "relative",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ fontSize: "0.74rem", fontWeight: 700, color: isSelected ? "var(--apple-blue)" : "var(--apple-text-secondary)" }}>
-                          {cat.category}
-                        </div>
-                        <span style={{ fontSize: "0.72rem", color: isSelected ? "var(--apple-blue)" : "var(--apple-text-tertiary)" }}>
-                          {isSelected ? "▲ Abierto" : "▼ Ver"}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: "1.1rem", fontWeight: 800, marginTop: "0.2rem", color: "var(--apple-text)" }}>
-                        {cat.total.toFixed(2)} €
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.1rem" }}>
-                        <span style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)" }}>
-                          {cat.percentage}% del total mensual
-                        </span>
-                        {isDragOver && (
-                          <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--apple-blue)" }}>
-                            Soltar aquí
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              {/* Botón para desplegar la cuadrícula de categorías */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isCategoriesListOpen ? "0.85rem" : "0" }}>
+                <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--apple-text-secondary)" }}>
+                  Reparto detallado por categorías ({categories.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsCategoriesListOpen(!isCategoriesListOpen)}
+                  className="btn-ghost"
+                  style={{
+                    fontSize: "0.76rem",
+                    padding: "0.25rem 0.65rem",
+                    borderRadius: "var(--radius-full)",
+                    border: "1px solid var(--apple-border)",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {isCategoriesListOpen ? "Plegar categorías ▲" : "Ver detalle de categorías ▼"}
+                </button>
               </div>
+
+              {/* Cuadrícula de tarjetas de categorías (Plegada por defecto) */}
+              {isCategoriesListOpen && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem" }}>
+                  {categories.map((cat) => {
+                    const isSelected = selectedCategory === cat.category;
+                    const isDragOver = dragOverCategory === cat.category;
+
+                    return (
+                      <div
+                        key={cat.category}
+                        onClick={() => setSelectedCategory(isSelected ? null : cat.category)}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          if (dragOverCategory !== cat.category) {
+                            setDragOverCategory(cat.category);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverCategory === cat.category) {
+                            setDragOverCategory(null);
+                          }
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const idStr = e.dataTransfer.getData("text/plain");
+                          const itemId = idStr ? Number(idStr) : draggedItemId;
+                          if (itemId) {
+                            handleDrop(cat.category, itemId);
+                          }
+                        }}
+                        style={{
+                          padding: "0.85rem",
+                          borderRadius: "var(--radius-md)",
+                          background: isDragOver
+                            ? "rgba(10, 132, 255, 0.22)"
+                            : isSelected
+                            ? "rgba(10, 132, 255, 0.15)"
+                            : "var(--liquid-glass-bg-subtle, rgba(255, 255, 255, 0.04))",
+                          backdropFilter: "blur(14px)",
+                          WebkitBackdropFilter: "blur(14px)",
+                          border: isDragOver
+                            ? "2px dashed var(--apple-blue)"
+                            : isSelected
+                            ? "1.5px solid var(--apple-blue)"
+                            : "1px solid var(--liquid-glass-border, rgba(255, 255, 255, 0.09))",
+                          boxShadow: isSelected
+                            ? "0 4px 18px rgba(0, 113, 227, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
+                            : "inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 8px rgba(0, 0, 0, 0.2)",
+                          cursor: "pointer",
+                          transition: "all 0.18s ease",
+                          position: "relative",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ fontSize: "0.74rem", fontWeight: 700, color: isSelected ? "var(--apple-blue)" : "var(--apple-text-secondary)" }}>
+                            {cat.category}
+                          </div>
+                          <span style={{ fontSize: "0.72rem", color: isSelected ? "var(--apple-blue)" : "var(--apple-text-tertiary)" }}>
+                            {isSelected ? "▲ Abierto" : "▼ Ver"}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "1.1rem", fontWeight: 800, marginTop: "0.2rem", color: "var(--apple-text)" }}>
+                          {cat.total.toFixed(2)} €
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.1rem" }}>
+                          <span style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)" }}>
+                            {cat.percentage}% del total mensual
+                          </span>
+                          {isDragOver && (
+                            <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--apple-blue)" }}>
+                              Soltar aquí
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Panel / Cajón inferior desplegable con los productos de la categoría seleccionada */}
               {selectedCategory && (

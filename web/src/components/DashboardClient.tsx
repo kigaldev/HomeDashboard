@@ -60,6 +60,7 @@ const CARDS = [
   { id: "resumen", label: "Hoy", icon: (s = 16) => <IconHome size={s} /> },
   { id: "cenas", label: "Cenas", icon: (s = 16) => <span style={{ fontSize: `${s}px`, lineHeight: 1 }}>🍽️</span> },
   { id: "compra", label: "Compra", icon: (s = 16) => <IconCart size={s} /> },
+  { id: "despensa", label: "Despensa", icon: (s = 16) => <span style={{ fontSize: `${s}px`, lineHeight: 1 }}>🥫</span> },
   { id: "economia", label: "Economía", icon: (s = 16) => <IconEconomy size={s} /> },
   { id: "tips", label: "Tips", icon: (s = 16) => <span style={{ fontSize: `${s}px`, lineHeight: 1 }}>💡</span> },
   { id: "familia", label: "Familia", icon: (s = 16) => <IconFamily size={s} /> },
@@ -145,12 +146,24 @@ export function DashboardClient({
 
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [assistantInitialPrompt, setAssistantInitialPrompt] = useState("");
+  const [assistantInitialFile, setAssistantInitialFile] = useState<File | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const quickCameraInputRef = useRef<HTMLInputElement>(null);
+  const quickGalleryInputRef = useRef<HTMLInputElement>(null);
 
-  const handleOpenAssistant = (prompt?: string) => {
+  const handleOpenAssistant = (prompt?: string, file?: File | null) => {
     setAssistantInitialPrompt(prompt || "");
+    setAssistantInitialFile(file || null);
     setIsAssistantOpen(true);
+  };
+
+  const handleQuickScanFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleOpenAssistant("", file);
+    }
+    e.target.value = "";
   };
 
   // Estados colapsables para los módulos de la pestaña Familia
@@ -415,7 +428,7 @@ export function DashboardClient({
           </div>
         </div>
 
-        {/* 🃏 Tarjeta 3: Compra & Despensa */}
+        {/* 🃏 Tarjeta 3: Compra */}
         <div className="deck-slide">
           <div className="deck-card">
             <ShoppingModule
@@ -425,11 +438,17 @@ export function DashboardClient({
               members={members}
               currentMemberId={currentMemberId}
             />
+          </div>
+        </div>
+
+        {/* 🃏 Tarjeta 4: Despensa */}
+        <div className="deck-slide">
+          <div className="deck-card">
             <PantryModule items={pantry} />
           </div>
         </div>
 
-        {/* 🃏 Tarjeta 4: Economía & Patrimonio Familiar (Unificada) */}
+        {/* 🃏 Tarjeta 5: Economía & Patrimonio Familiar (Unificada) */}
         <div className="deck-slide">
           <div className="deck-card">
             <EconomyModule
@@ -742,24 +761,106 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* ── Globo / Botón Flotante con Icono de Chatbot (Asistente por Voz y Texto) ── */}
-      <button
-        type="button"
-        onClick={() => handleOpenAssistant()}
-        className="fab-apple-ai"
-        title="Hablar o escribir al Asistente del Hogar"
-        aria-label="Asistente Chatbot del Hogar"
+      {/* ── Globo / Botón Flotante con Icono de Chatbot (Pepe) y Accesos a Cámara / Galería ── */}
+      <input
+        ref={quickCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: "none" }}
+        onChange={handleQuickScanFile}
+      />
+      <input
+        ref={quickGalleryInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleQuickScanFile}
+      />
+
+      <div
+        style={{
+          position: "fixed",
+          bottom: "1.2rem",
+          right: "1.2rem",
+          zIndex: 90,
+          display: "flex",
+          alignItems: "center",
+          gap: "0.45rem",
+        }}
       >
-        <span style={{ fontSize: "1.1rem", display: "inline-flex", alignItems: "center" }}>💬</span>
-        <span>Asistente</span>
-        <span className="status-dot-live" style={{ width: "6px", height: "6px" }} />
-      </button>
+        <button
+          type="button"
+          onClick={() => quickCameraInputRef.current?.click()}
+          style={{
+            width: "42px",
+            height: "42px",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "1.15rem",
+            background: "rgba(30, 35, 48, 0.75)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255, 255, 255, 0.16)",
+            boxShadow: "0 6px 20px rgba(0, 0, 0, 0.35)",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+          title="Tomar foto con la cámara para que Pepe registre el ticket de gasto"
+          aria-label="Cámara de ticket"
+        >
+          📷
+        </button>
+
+        <button
+          type="button"
+          onClick={() => quickGalleryInputRef.current?.click()}
+          style={{
+            width: "42px",
+            height: "42px",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "1.15rem",
+            background: "rgba(30, 35, 48, 0.75)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255, 255, 255, 0.16)",
+            boxShadow: "0 6px 20px rgba(0, 0, 0, 0.35)",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+          title="Subir foto de ticket desde galería para que Pepe lo organice"
+          aria-label="Galería de fotos"
+        >
+          🖼️
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleOpenAssistant()}
+          className="fab-apple-ai"
+          title="Hablar o escribir a Pepe · Asistente del Hogar"
+          aria-label="Pepe Asistente Chatbot"
+        >
+          <span style={{ fontSize: "1.1rem", display: "inline-flex", alignItems: "center" }}>💬</span>
+          <span>Pepe</span>
+          <span className="status-dot-live" style={{ width: "6px", height: "6px" }} />
+        </button>
+      </div>
 
       {/* Modales */}
       <AiAssistantModal
         isOpen={isAssistantOpen}
-        onClose={() => setIsAssistantOpen(false)}
+        onClose={() => {
+          setIsAssistantOpen(false);
+          setAssistantInitialFile(null);
+        }}
         initialPrompt={assistantInitialPrompt}
+        initialFile={assistantInitialFile}
       />
 
       <SettingsModal

@@ -1031,7 +1031,7 @@ export async function runAgentInstruction(
     shopping.filter((i) => !i.checked).slice(0, 10).map((i) => `• ${i.name}`).join(", ") || "Lista vacía";
 
   const systemPrompt = [
-    "Eres JARVIS, el Asistente Inteligente del Hogar familiar de Kike, Lara, Fabio (nacido en sept 2023) y Bruno (nacido en mayo 2025) en Salamanca.",
+    "Eres Pepe, el Asistente Inteligente del Hogar familiar de Kike, Lara, Fabio (nacido en sept 2023) y Bruno (nacido en mayo 2025) en Salamanca.",
     "Tienes control completo sobre la aplicación Home Dashboard a través de tus herramientas disponibles (tools / function declarations).",
     "Cuando el usuario te pida crear o modificar eventos en la agenda, añadir o completar tareas, añadir o tachar productos de la compra, registrar gastos familiares ('create_expense'), o actualizar la despensa, DEBES LLAMAR A LA HERRAMIENTA CORRESPONDIENTE.",
     "",
@@ -1119,7 +1119,7 @@ export async function runAgentInstruction(
 
   if (!aiResp) {
     return {
-      message: "⚠️ Lo siento, no he podido conectar con el núcleo de JARVIS en este momento. Puedes usar los botones del dashboard directamente.",
+      message: "⚠️ Lo siento, no he podido conectar con el núcleo de Pepe en este momento. Puedes usar los botones del dashboard directamente.",
     };
   }
 

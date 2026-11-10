@@ -215,7 +215,7 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
 
   if (/^(\/start|\/help|ayuda)$/.test(low))
     return [
-      "👋 <b>Soy Pepe (JARVIS), tu asistente de hogar.</b>",
+      "👋 <b>Soy Pepe, tu asistente de hogar.</b>",
       "Estoy conectado a la aplicación del hogar y ejecuto cambios en tiempo real:",
       "",
       "📅 <b>Agenda familiar:</b>",

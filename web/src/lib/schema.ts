@@ -205,6 +205,8 @@ alter table members add column if not exists pin text;
 alter table members add column if not exists preferred_tab text default 'resumen';
 alter table shopping_items add column if not exists in_cart boolean not null default false;
 alter table pantry add column if not exists quantity_level int not null default 100;
+alter table school_run_defaults add column if not exists pickup_noon_id int references members(id) on delete set null;
+alter table school_run_overrides add column if not exists pickup_noon_id int references members(id) on delete set null;
 delete from stores where name in ('Eroski', 'BM');
 `;
 
@@ -213,6 +215,10 @@ delete from stores where name in ('Eroski', 'BM');
  * Supermercados: Mercadona, Carrefour, Lidl, Aldi, E.Leclerc, Farmacia, Otros.
  */
 export const SEED_SQL = /* sql */ `
+insert into members (id, name, role, color, emoji) values
+  (0, 'Ambos', 'adult', '#8b5cf6', '👥')
+on conflict (id) do nothing;
+
 insert into members (name, role, birthdate, color, emoji) values
   ('Kike', 'adult', '1991-03-13', '#3b82f6', '👨'),
   ('Lara', 'adult', '1999-06-19', '#ec4899', '👩'),

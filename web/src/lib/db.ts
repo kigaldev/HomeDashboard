@@ -83,7 +83,7 @@ async function init(): Promise<Db> {
   const db = await connect();
   try {
     await db.exec(SCHEMA_SQL);
-    const res = await db.query<{ n: number }>("select count(*)::int as n from members");
+    const res = await db.query<{ n: number }>("select count(*)::int as n from stores");
     const n = res[0]?.n ?? 0;
     if (n === 0) {
       await db.exec(SEED_SQL);

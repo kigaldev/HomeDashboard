@@ -18,6 +18,7 @@ export function MiniUpcomingAgenda({
 }) {
   // Estado para filtrar por miembro: null = Todos, 1 = Kike, 2 = Lara
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const kike = members.find((m) => m.name.toLowerCase() === "kike");
   const lara = members.find((m) => m.name.toLowerCase() === "lara");
@@ -157,6 +158,28 @@ export function MiniUpcomingAgenda({
             </button>
           )}
 
+          {/* Botón expandir/plegar */}
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="btn-ghost touch-target"
+            style={{
+              padding: "0.22rem 0.55rem",
+              borderRadius: "var(--radius-full)",
+              fontSize: "0.74rem",
+              fontWeight: 600,
+              background: "rgba(255, 255, 255, 0.06)",
+              border: "1px solid var(--liquid-glass-border)",
+              color: "var(--apple-text-secondary)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.25rem",
+              cursor: "pointer",
+            }}
+          >
+            <span>{isExpanded ? "Plegar ▲" : `Ver (${fallbackEvents.length}) ▼`}</span>
+          </button>
+
           {/* Botón '+' para ver la pestaña completa de Agenda */}
           <button
             type="button"
@@ -181,108 +204,110 @@ export function MiniUpcomingAgenda({
         </div>
       </div>
 
-      {/* Lista de Eventos */}
-      {fallbackEvents.length === 0 ? (
-        <div
-          style={{
-            padding: "0.85rem 1rem",
-            textAlign: "center",
-            borderRadius: "var(--radius-md)",
-            background: "var(--liquid-glass-bg-subtle)",
-            color: "var(--apple-text-secondary)",
-            fontSize: "0.82rem",
-            border: "1px dashed var(--liquid-glass-border)",
-          }}
-        >
-          Todo despejado en las próximas 3 horas ✨
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-          {fallbackEvents.map((ev) => {
-            const member = ev.member_id ? memberMap.get(ev.member_id) : null;
-            const accent = member?.color || "var(--apple-blue)";
+      {/* Lista de Eventos (Plegable) */}
+      {isExpanded && (
+        fallbackEvents.length === 0 ? (
+          <div
+            style={{
+              padding: "0.85rem 1rem",
+              textAlign: "center",
+              borderRadius: "var(--radius-md)",
+              background: "var(--liquid-glass-bg-subtle)",
+              color: "var(--apple-text-secondary)",
+              fontSize: "0.82rem",
+              border: "1px dashed var(--liquid-glass-border)",
+            }}
+          >
+            Todo despejado en las próximas 3 horas ✨
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+            {fallbackEvents.map((ev) => {
+              const member = ev.member_id ? memberMap.get(ev.member_id) : null;
+              const accent = member?.color || "var(--apple-blue)";
 
-            return (
-              <div
-                key={ev.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: "var(--radius-md)",
-                  background: "var(--liquid-glass-bg-subtle)",
-                  border: "1px solid var(--liquid-glass-border)",
-                  borderLeft: `3px solid ${accent}`,
-                  gap: "0.6rem",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", minWidth: 0, flex: 1 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.25rem",
-                      fontSize: "0.78rem",
-                      fontWeight: 700,
-                      color: accent,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <IconClock size={12} />
-                    <span>{ev.all_day ? "Día" : timeOf(ev.starts_at)}</span>
-                  </div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <span
+              return (
+                <div
+                  key={ev.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "0.5rem 0.75rem",
+                    borderRadius: "var(--radius-md)",
+                    background: "var(--liquid-glass-bg-subtle)",
+                    border: "1px solid var(--liquid-glass-border)",
+                    borderLeft: `3px solid ${accent}`,
+                    gap: "0.6rem",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", minWidth: 0, flex: 1 }}>
+                    <div
                       style={{
-                        fontSize: "0.84rem",
-                        fontWeight: 600,
-                        color: "var(--apple-text)",
-                        display: "block",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                        fontSize: "0.78rem",
+                        fontWeight: 700,
+                        color: accent,
+                        flexShrink: 0,
                       }}
                     >
-                      {ev.title}
-                    </span>
-                    {ev.location && (
+                      <IconClock size={12} />
+                      <span>{ev.all_day ? "Día" : timeOf(ev.starts_at)}</span>
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
                       <span
                         style={{
-                          fontSize: "0.7rem",
-                          color: "var(--apple-text-secondary)",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "0.2rem",
+                          fontSize: "0.84rem",
+                          fontWeight: 600,
+                          color: "var(--apple-text)",
+                          display: "block",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
                         }}
                       >
-                        <IconLocation size={10} />
-                        <span>{ev.location}</span>
+                        {ev.title}
                       </span>
-                    )}
+                      {ev.location && (
+                        <span
+                          style={{
+                            fontSize: "0.7rem",
+                            color: "var(--apple-text-secondary)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.2rem",
+                          }}
+                        >
+                          <IconLocation size={10} />
+                          <span>{ev.location}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {member && (
-                  <span
-                    style={{
-                      fontSize: "0.72rem",
-                      padding: "0.1rem 0.45rem",
-                      borderRadius: "var(--radius-full)",
-                      background: `${member.color}15`,
-                      color: member.color,
-                      fontWeight: 600,
-                      border: `1px solid ${member.color}30`,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {member.emoji} {member.name}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  {member && (
+                    <span
+                      style={{
+                        fontSize: "0.72rem",
+                        padding: "0.1rem 0.45rem",
+                        borderRadius: "var(--radius-full)",
+                        background: `${member.color}15`,
+                        color: member.color,
+                        fontWeight: 600,
+                        border: `1px solid ${member.color}30`,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {member.emoji} {member.name}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
     </div>
   );

@@ -37,10 +37,16 @@ export type CalEvent = {
 export type HealthItem = {
   id: number; member_id: number; kind: string; title: string; due_date: string | null; notes: string | null; done: boolean;
 };
-export type SchoolRun = { dropoff_id: number | null; pickup_id: number | null; note: string | null };
+export type SchoolRun = {
+  dropoff_id: number | null;
+  pickup_noon_id?: number | null;
+  pickup_id: number | null;
+  note: string | null;
+};
 export type DinnerPlan = { option: "mambo" | "estandar"; title: string; description: string | null; chosen: boolean };
 
 export const DEFAULT_MEMBERS: Member[] = [
+  { id: 0, name: "Ambos", role: "adult", birthdate: null, color: "#8b5cf6", emoji: "👥", telegram_user_id: null, allergies: null, preferred_tab: "resumen" },
   { id: 1, name: "Kike", role: "adult", birthdate: "1991-03-13", color: "#3b82f6", emoji: "👨", telegram_user_id: null, allergies: null, preferred_tab: "resumen" },
   { id: 2, name: "Lara", role: "adult", birthdate: "1999-06-19", color: "#ec4899", emoji: "👩", telegram_user_id: null, allergies: null, preferred_tab: "resumen" },
   { id: 3, name: "Fabio", role: "child", birthdate: "2023-09-06", color: "#f59e0b", emoji: "🧒", telegram_user_id: null, allergies: null, preferred_tab: "resumen" },
@@ -501,27 +507,33 @@ export async function updateEvent(
 
 // ── Cole ──────────────────────────────────────────────────
 export async function getSchoolRun(date: string): Promise<SchoolRun | null> {
-  const [o] = await q<SchoolRun>("select dropoff_id,pickup_id,note from school_run_overrides where date=$1", [date]);
+  const [o] = await q<SchoolRun>("select dropoff_id,pickup_noon_id,pickup_id,note from school_run_overrides where date=$1", [date]);
   if (o) return o;
   const wd = weekday(date);
   if (wd > 5) return null;
-  const [d] = await q<SchoolRun>("select dropoff_id,pickup_id,null as note from school_run_defaults where weekday=$1", [wd]);
+  const [d] = await q<SchoolRun>("select dropoff_id,pickup_noon_id,pickup_id,null as note from school_run_defaults where weekday=$1", [wd]);
   return d ?? null;
 }
-export async function setSchoolRunOverride(date: string, dropoff: number | null, pickup: number | null, note: string | null) {
+export async function setSchoolRunOverride(
+  date: string,
+  dropoff: number | null,
+  pickup: number | null,
+  note: string | null,
+  pickupNoon: number | null = null,
+) {
   await q(
-    `insert into school_run_overrides (date,dropoff_id,pickup_id,note) values ($1,$2,$3,$4)
-     on conflict (date) do update set dropoff_id=excluded.dropoff_id, pickup_id=excluded.pickup_id, note=excluded.note`,
-    [date, dropoff, pickup, note],
+    `insert into school_run_overrides (date,dropoff_id,pickup_id,note,pickup_noon_id) values ($1,$2,$3,$4,$5)
+     on conflict (date) do update set dropoff_id=excluded.dropoff_id, pickup_id=excluded.pickup_id, note=excluded.note, pickup_noon_id=excluded.pickup_noon_id`,
+    [date, dropoff, pickup, note, pickupNoon],
   );
 }
 export const getSchoolRunDefaults = () =>
-  q<{ weekday: number; dropoff_id: number | null; pickup_id: number | null }>("select * from school_run_defaults order by weekday");
-export async function setSchoolRunDefault(wd: number, dropoff: number | null, pickup: number | null) {
+  q<{ weekday: number; dropoff_id: number | null; pickup_noon_id: number | null; pickup_id: number | null }>("select * from school_run_defaults order by weekday");
+export async function setSchoolRunDefault(wd: number, dropoff: number | null, pickup: number | null, pickupNoon: number | null = null) {
   await q(
-    `insert into school_run_defaults (weekday,dropoff_id,pickup_id) values ($1,$2,$3)
-     on conflict (weekday) do update set dropoff_id=excluded.dropoff_id, pickup_id=excluded.pickup_id`,
-    [wd, dropoff, pickup],
+    `insert into school_run_defaults (weekday,dropoff_id,pickup_id,pickup_noon_id) values ($1,$2,$3,$4)
+     on conflict (weekday) do update set dropoff_id=excluded.dropoff_id, pickup_id=excluded.pickup_id, pickup_noon_id=excluded.pickup_noon_id`,
+    [wd, dropoff, pickup, pickupNoon],
   );
 }
 

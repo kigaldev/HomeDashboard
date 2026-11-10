@@ -12,6 +12,7 @@ export function NewsWidget({
   cylNews: NewsItem[];
 }) {
   const [selectedRegion, setSelectedRegion] = useState<"espana" | "cyl">("cyl");
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const currentList = selectedRegion === "cyl" ? cylNews : espanaNews;
 
@@ -104,79 +105,130 @@ export function NewsWidget({
           >
             🇪🇸 España
           </button>
+
+          {/* Botón Plegar / Desplegar */}
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="btn-ghost touch-target"
+            style={{
+              padding: "0.22rem 0.55rem",
+              borderRadius: "var(--radius-full)",
+              fontSize: "0.74rem",
+              fontWeight: 600,
+              background: "rgba(255, 255, 255, 0.06)",
+              border: "1px solid var(--liquid-glass-border)",
+              color: "var(--apple-text-secondary)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.25rem",
+              cursor: "pointer",
+              marginLeft: "0.3rem",
+            }}
+          >
+            <span>{isExpanded ? "Plegar ▲" : `Titulares (${currentList.length}) ▼`}</span>
+          </button>
         </div>
       </div>
 
-      {/* Lista de Titulares */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-        {currentList.slice(0, 3).map((item, idx) => (
+      {/* Lista de Titulares (Plegable para Kiosk) */}
+      {isExpanded ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+          {currentList.slice(0, 3).map((item, idx) => (
+            <a
+              key={item.id || idx}
+              href={item.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                textDecoration: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: "0.65rem",
+                padding: "0.45rem 0.65rem",
+                borderRadius: "var(--radius-md)",
+                background: "var(--liquid-glass-bg-subtle)",
+                border: "1px solid var(--liquid-glass-border)",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                e.currentTarget.style.borderColor = "var(--apple-blue)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "var(--liquid-glass-bg-subtle)";
+                e.currentTarget.style.borderColor = "var(--liquid-glass-border)";
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: "0.84rem",
+                    fontWeight: 600,
+                    color: "var(--apple-text)",
+                    lineHeight: 1.35,
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                >
+                  {item.title}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginTop: "0.25rem" }}>
+                  <span
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      color: "var(--apple-blue)",
+                      background: "rgba(10, 132, 255, 0.12)",
+                      padding: "0.1rem 0.45rem",
+                      borderRadius: "var(--radius-full)",
+                    }}
+                  >
+                    {item.source}
+                  </span>
+                  {item.timeAgo && (
+                    <span style={{ fontSize: "0.68rem", color: "var(--apple-text-tertiary)" }}>
+                      {item.timeAgo}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span style={{ fontSize: "0.8rem", color: "var(--apple-text-tertiary)", marginTop: "0.1rem" }}>
+                ↗
+              </span>
+            </a>
+          ))}
+        </div>
+      ) : (
+        /* Titular único compacto en 1 línea cuando está plegado */
+        currentList[0] && (
           <a
-            key={item.id || idx}
-            href={item.link}
+            href={currentList[0].link}
             target="_blank"
             rel="noopener noreferrer"
             style={{
               textDecoration: "none",
               display: "flex",
+              alignItems: "center",
               justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: "0.65rem",
-              padding: "0.45rem 0.65rem",
+              gap: "0.6rem",
+              padding: "0.35rem 0.65rem",
               borderRadius: "var(--radius-md)",
-              background: "var(--liquid-glass-bg-subtle)",
+              background: "rgba(255,255,255,0.03)",
               border: "1px solid var(--liquid-glass-border)",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-              e.currentTarget.style.borderColor = "var(--apple-blue)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "var(--liquid-glass-bg-subtle)";
-              e.currentTarget.style.borderColor = "var(--liquid-glass-border)";
+              fontSize: "0.78rem",
             }}
           >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: "0.84rem",
-                  fontWeight: 600,
-                  color: "var(--apple-text)",
-                  lineHeight: 1.35,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
-              >
-                {item.title}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginTop: "0.25rem" }}>
-                <span
-                  style={{
-                    fontSize: "0.68rem",
-                    fontWeight: 700,
-                    color: "var(--apple-blue)",
-                    background: "rgba(10, 132, 255, 0.12)",
-                    padding: "0.1rem 0.45rem",
-                    borderRadius: "var(--radius-full)",
-                  }}
-                >
-                  {item.source}
-                </span>
-                {item.timeAgo && (
-                  <span style={{ fontSize: "0.68rem", color: "var(--apple-text-tertiary)" }}>
-                    {item.timeAgo}
-                  </span>
-                )}
-              </div>
-            </div>
-            <span style={{ fontSize: "0.8rem", color: "var(--apple-text-tertiary)", marginTop: "0.1rem" }}>
-              ↗
+            <span style={{ color: "var(--apple-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              📢 <b>{currentList[0].source}:</b> {currentList[0].title}
             </span>
+            <span style={{ color: "var(--apple-blue)", fontSize: "0.72rem", flexShrink: 0, fontWeight: 600 }}>Leer ↗</span>
           </a>
-        ))}
-      </div>
+        )
+      )}
     </div>
   );
 }

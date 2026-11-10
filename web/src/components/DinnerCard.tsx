@@ -94,26 +94,79 @@ export function DinnerCard({
         </div>
       </div>
 
-      {/* Recomendación oficial del cole (*) */}
-      {schoolDinnerRec && (
+      {/* Bloque Destacado: Menú del Colegio Montessori a Mediodía */}
+      {schoolLunch && (
         <div
           style={{
-            marginBottom: "1.1rem",
-            padding: "0.65rem 1rem",
-            borderRadius: "var(--radius-md)",
-            background: "var(--apple-orange-subtle)",
-            border: "1px solid rgba(255, 149, 0, 0.25)",
-            fontSize: "0.825rem",
+            marginBottom: "1.25rem",
+            padding: "1rem 1.25rem",
+            borderRadius: "var(--radius-lg)",
+            background: "var(--liquid-glass-bg-subtle)",
+            border: "1px solid rgba(255, 149, 0, 0.3)",
+            borderLeft: "4px solid var(--apple-orange)",
+            boxShadow: "var(--liquid-shadow-ambient)",
             display: "flex",
-            alignItems: "center",
-            gap: "0.6rem",
+            flexDirection: "column",
+            gap: "0.55rem",
           }}
         >
-          <span style={{ fontSize: "1.1rem" }}>⭐</span>
-          <span style={{ color: "var(--apple-text)", lineHeight: 1.45 }}>
-            <strong style={{ color: "var(--apple-orange)" }}>Pauta del colegio (*):</strong> {schoolDinnerRec} —{" "}
-            <em style={{ color: "var(--apple-text-secondary)" }}>Platos sugeridos abajo para equilibrar la jornada.</em>
-          </span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontSize: "1.25rem" }}>🏫</span>
+              <div>
+                <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
+                  Comida de Hoy en el Colegio Montessori
+                </h3>
+                <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)" }}>
+                  Fabio & Bruno · Menú Basal oficial del centro
+                </span>
+              </div>
+            </div>
+
+            <a
+              href="/menus/menu_actual.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="touch-target"
+              style={{
+                fontSize: "0.72rem",
+                fontWeight: 600,
+                color: "var(--apple-blue)",
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.3rem",
+                padding: "0.25rem 0.6rem",
+                borderRadius: "var(--radius-full)",
+                background: "rgba(0, 113, 227, 0.12)",
+              }}
+            >
+              <span>📄 Ver PDF oficial del mes ↗</span>
+            </a>
+          </div>
+
+          <div
+            style={{
+              padding: "0.6rem 0.85rem",
+              borderRadius: "var(--radius-md)",
+              background: "rgba(0,0,0,0.18)",
+              fontSize: "0.92rem",
+              fontWeight: 600,
+              color: "var(--apple-text)",
+              lineHeight: 1.4,
+            }}
+          >
+            🍽️ {schoolLunch}
+          </div>
+
+          {schoolDinnerRec && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.78rem", color: "var(--apple-text-secondary)" }}>
+              <span>⭐</span>
+              <span>
+                <strong style={{ color: "var(--apple-orange)" }}>Pauta nutricional del cole para cenar:</strong> {schoolDinnerRec}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

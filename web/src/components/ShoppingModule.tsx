@@ -19,6 +19,7 @@ import {
 import type { ShoppingItem, Store, Staple, Member } from "@/lib/repo";
 import type { BasketOptimizationResult } from "@/lib/pricesProvider";
 import { TicketManagerModal } from "./TicketManagerModal";
+import { ManualExpenseModal } from "./ManualExpenseModal";
 import { IconCamera, IconChevronDown, IconChevronRight } from "./Icons";
 
 export function ShoppingModule({
@@ -38,6 +39,7 @@ export function ShoppingModule({
   const [viewMode, setViewMode] = useState<"store_chips" | "grouped">("store_chips");
   const [showCompleted, setShowCompleted] = useState(false);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  const [isManualExpenseOpen, setIsManualExpenseOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemStore, setNewItemStore] = useState<string>("");
   const [isManagingStaples, setIsManagingStaples] = useState(false);
@@ -46,11 +48,11 @@ export function ShoppingModule({
   const [newStapleStore, setNewStapleStore] = useState<string>("");
   const [isPending, startTransition] = useTransition();
 
-  // Estados colapsables para ahorrar espacio vertical
+  // Estados colapsables para ahorrar espacio vertical (plegados por defecto)
   const [showAddForm, setShowAddForm] = useState(false);
   const [showStoreFilters, setShowStoreFilters] = useState(false);
   const [showStaples, setShowStaples] = useState(false);
-  const [showPendingList, setShowPendingList] = useState(true);
+  const [showPendingList, setShowPendingList] = useState(false);
 
   // Optimización de cesta
   const [optimization, setOptimization] = useState<BasketOptimizationResult | null>(null);
@@ -465,6 +467,27 @@ export function ShoppingModule({
           >
             <IconCamera size={14} />
             <span>Escanear Ticket</span>
+          </button>
+
+          <button
+            onClick={() => setIsManualExpenseOpen(true)}
+            className="btn-secondary"
+            style={{
+              fontSize: "0.78rem",
+              padding: "0.4rem 0.75rem",
+              background: "rgba(255, 255, 255, 0.08)",
+              color: "var(--apple-text)",
+              border: "1px solid var(--apple-border)",
+              fontWeight: 600,
+              borderRadius: "var(--radius-full)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.3rem",
+            }}
+            title="Añadir un gasto o ticket manual sin foto"
+          >
+            <span>➕</span>
+            <span>Gasto Manual</span>
           </button>
         </div>
       </div>
@@ -1234,6 +1257,12 @@ export function ShoppingModule({
       <TicketManagerModal
         isOpen={isTicketModalOpen}
         onClose={() => setIsTicketModalOpen(false)}
+      />
+
+      {/* ── Modal de Gasto Manual ── */}
+      <ManualExpenseModal
+        isOpen={isManualExpenseOpen}
+        onClose={() => setIsManualExpenseOpen(false)}
       />
     </div>
   );

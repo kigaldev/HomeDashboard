@@ -143,7 +143,7 @@ export function FamilyPhotoFrame({
         borderRadius: "var(--radius-xl)",
         overflow: "hidden",
         position: "relative",
-        minHeight: "330px",
+        minHeight: "490px",
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-end",

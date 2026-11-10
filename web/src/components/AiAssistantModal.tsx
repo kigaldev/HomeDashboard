@@ -1,19 +1,23 @@
 "use client";
 
 import { useState, useRef, useEffect, useTransition } from "react";
-import { runAgentInstructionAction } from "@/app/actions";
+import { runAgentInstructionAction, processReceiptImageAction } from "@/app/actions";
 import { IconSparkles } from "./Icons";
 
 export function AiAssistantModal({
   isOpen,
   onClose,
   initialPrompt = "",
+  initialFile = null,
 }: {
   isOpen: boolean;
   onClose: () => void;
   initialPrompt?: string;
+  initialFile?: File | null;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
@@ -25,16 +29,23 @@ export function AiAssistantModal({
     }
   }, [initialPrompt, isOpen]);
 
+  useEffect(() => {
+    if (initialFile && isOpen) {
+      handleProcessReceipt(initialFile);
+    }
+  }, [initialFile, isOpen]);
+
   const [messages, setMessages] = useState<
     Array<{
       role: "user" | "assistant";
       text: string;
       actionExecuted?: string;
+      imagePreview?: string;
     }>
   >([
     {
       role: "assistant",
-      text: "👋 ¡Hola Kike y Lara! Soy vuestro agente de acción del hogar. Podéis pedirme información o darme órdenes directas por voz o texto:\n\n• *\"Añade leche y plátanos al Mercadona\"*\n• *\"Se ha acabado el papel higiénico\"*\n• *\"Mañana Kike lleva a Fabio al cole y Lara lo recoge\"*\n• *\"Añade tarea para Kike: pedir cita pediatra el viernes\"*\n• *\"¿Qué ropa les pongo hoy a los niños con el frío de Salamanca?\"*",
+      text: "👋 ¡Hola Kike y Lara! Soy Pepe, vuestro asistente de acción del hogar. Podéis pedirme información o darme órdenes directas por voz, texto o subiendo una foto de un ticket:\n\n• *\"Añade leche y plátanos al Mercadona\"*\n• *\"Se ha acabado el papel higiénico en la despensa\"*\n• *\"Mañana Kike lleva a Fabio al cole y Lara lo recoge\"*\n• *\"Añade tarea para Kike: pedir cita pediatra el viernes\"*\n• *\"¿Qué ropa les pongo hoy a los niños con el frío de Salamanca?\"*\n• O pulsa 📷 **Cámara** o 🖼️ **Galería** para que registre y organice automáticamente un ticket de gasto.",
     },
   ]);
   const [isPending, startTransition] = useTransition();
@@ -151,6 +162,57 @@ export function AiAssistantModal({
     });
   };
 
+  const handleProcessReceipt = (file: File) => {
+    if (!file || isPending) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(",")[1];
+      const mimeType = file.type || "image/jpeg";
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "user",
+          text: `📸 [Ticket adjuntado: ${file.name}]`,
+          imagePreview: dataUrl,
+        },
+      ]);
+
+      startTransition(async () => {
+        try {
+          const res = await processReceiptImageAction(base64, mimeType);
+          const storeName = res.storeName || "Establecimiento";
+          const totalVal = typeof res.totalAmount === "number" ? res.totalAmount.toFixed(2) : "0.00";
+          const catName = res.items?.[0]?.category || "Alimentación";
+          const itemsSummary = res.items?.length
+            ? res.items.slice(0, 5).map((i) => `${i.name} (${i.totalPrice.toFixed(2)}€)`).join(", ")
+            : "Artículos reconocidos";
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              text: `✅ **¡Ticket procesado y organizado por Pepe!**\n\n• **Comercio:** ${storeName}\n• **Importe:** ${totalVal} €\n• **Categoría:** ${catName}\n• **Fecha:** ${res.date || "Hoy"}\n• **Productos (${res.items?.length || 0}):** ${itemsSummary}${res.items && res.items.length > 5 ? "..." : ""}\n\nEl gasto ha quedado registrado en el desglose de Economía y los productos se han actualizado en la despensa.`,
+              actionExecuted: `Ticket de ${totalVal} € registrado en ${storeName} (${catName})`,
+            },
+          ]);
+          setLastAction(`Ticket de ${totalVal} € en ${storeName} guardado con éxito`);
+        } catch (err: any) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              text: `⚠️ No he podido procesar el ticket automáticamente: ${err?.message || "Error al leer imagen"}. Puedes introducir el gasto manualmente.`,
+            },
+          ]);
+        }
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const actionPrompts = [
     "📅 Apuntar dentista para Lara el viernes a las 17:30",
     "🛒 Añadir leche y huevos a Mercadona",
@@ -208,7 +270,7 @@ export function AiAssistantModal({
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
               <h2 id="assistant-title" style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
-                JARVIS · Asistente del Hogar
+                Pepe · Asistente del Hogar
               </h2>
               <span className="badge badge-purple" style={{ fontSize: "0.7rem", padding: "0.15rem 0.5rem" }}>
                 Tool Calling Activo
@@ -317,6 +379,22 @@ export function AiAssistantModal({
           >
             <div style={{ whiteSpace: "pre-wrap" }}>{m.text}</div>
 
+            {m.imagePreview && (
+              <img
+                src={m.imagePreview}
+                alt="Ticket adjuntado"
+                style={{
+                  maxWidth: "180px",
+                  maxHeight: "180px",
+                  borderRadius: "var(--radius-md)",
+                  objectFit: "cover",
+                  marginTop: "0.5rem",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
+                }}
+              />
+            )}
+
             {m.actionExecuted && (
               <div
                 style={{
@@ -376,14 +454,89 @@ export function AiAssistantModal({
         )}
       </div>
 
-      {/* Input estilo Apple Siri / Messages Bar */}
+      {/* Input estilo Apple Siri / Messages Bar con Cámara y Galería */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           handleSend();
         }}
-        style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
+        style={{ display: "flex", gap: "0.45rem", alignItems: "center" }}
       >
+        {/* Inputs ocultos para Cámara y Galería */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleProcessReceipt(f);
+            e.target.value = "";
+          }}
+        />
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleProcessReceipt(f);
+            e.target.value = "";
+          }}
+        />
+
+        {/* Botón Cámara rápida para ticket */}
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          disabled={isPending}
+          title="Tomar foto de ticket con la cámara"
+          className="touch-target"
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "1.1rem",
+            flexShrink: 0,
+            background: "var(--apple-surface-secondary)",
+            border: "1px solid var(--apple-border)",
+            color: "var(--apple-text)",
+            cursor: "pointer",
+          }}
+        >
+          📷
+        </button>
+
+        {/* Botón Galería para ticket */}
+        <button
+          type="button"
+          onClick={() => galleryInputRef.current?.click()}
+          disabled={isPending}
+          title="Seleccionar ticket de la galería"
+          className="touch-target"
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "1.1rem",
+            flexShrink: 0,
+            background: "var(--apple-surface-secondary)",
+            border: "1px solid var(--apple-border)",
+            color: "var(--apple-text)",
+            cursor: "pointer",
+          }}
+        >
+          🖼️
+        </button>
+
         {speechSupported && (
           <button
             type="button"
