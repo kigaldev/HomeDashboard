@@ -10,10 +10,15 @@ import { TasksModule } from "./TasksModule";
 import { KidsModule } from "./KidsModule";
 import { CalendarModule } from "./CalendarModule";
 import { EconomyModule } from "./EconomyModule";
-import { AgentSquadMissionControl } from "./AgentSquadMissionControl";
+import { TipsModule } from "./TipsModule";
+import { NewsWidget } from "./NewsWidget";
+import { WeatherDetailWidget } from "./WeatherDetailWidget";
+import { FamilyPhotoFrame } from "./FamilyPhotoFrame";
+import { MiniUpcomingAgenda } from "./MiniUpcomingAgenda";
 import { AiAssistantModal } from "./AiAssistantModal";
 import { SettingsModal } from "./SettingsModal";
 import { ProfileLoginModal } from "./ProfileLoginModal";
+import type { NewsItem } from "@/lib/news";
 import {
   IconHome,
   IconCart,
@@ -51,8 +56,10 @@ import type { Weather, DayWeather } from "@/lib/weather";
 
 const CARDS = [
   { id: "resumen", label: "Hoy", icon: (s = 16) => <IconHome size={s} /> },
+  { id: "cenas", label: "Cenas", icon: (s = 16) => <span style={{ fontSize: `${s}px`, lineHeight: 1 }}>🍽️</span> },
   { id: "compra", label: "Compra", icon: (s = 16) => <IconCart size={s} /> },
   { id: "economia", label: "Economía", icon: (s = 16) => <IconEconomy size={s} /> },
+  { id: "tips", label: "Tips", icon: (s = 16) => <span style={{ fontSize: `${s}px`, lineHeight: 1 }}>💡</span> },
   { id: "familia", label: "Familia", icon: (s = 16) => <IconFamily size={s} /> },
 ] as const;
 
@@ -89,6 +96,7 @@ export function DashboardClient({
   energyContracts = [],
   insurances = [],
   warranties = [],
+  news = { espana: [], cyl: [] },
 }: {
   members: Member[];
   currentMemberId?: number | null;
@@ -122,6 +130,7 @@ export function DashboardClient({
   energyContracts: EnergyContract[];
   insurances: FamilyInsurance[];
   warranties: Warranty[];
+  news?: { espana: NewsItem[]; cyl: NewsItem[] };
 }) {
   const activeMember = members.find((m) => m.id === currentMemberId);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -160,7 +169,8 @@ export function DashboardClient({
   // Abrir la sección de Agenda dentro de Familia
   const openFamilyAgenda = () => {
     setFamilyAgendaOpen(true);
-    goToCard(3);
+    const targetIdx = CARDS.findIndex((c) => c.id === "familia");
+    goToCard(targetIdx >= 0 ? targetIdx : 5);
     setTimeout(() => {
       agendaSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 450);
@@ -215,7 +225,9 @@ export function DashboardClient({
       const target = CARDS.findIndex(
         (c) =>
           c.id === pref ||
-          (pref === "energia" && c.id === "economia") ||
+          (pref === "cenas" && c.id === "cenas") ||
+          (pref === "tips" && c.id === "tips") ||
+          (pref === "energia" && c.id === "tips") ||
           (pref === "tickets" && c.id === "economia") ||
           (pref === "peques" && c.id === "familia") ||
           (pref === "tareas" && c.id === "familia") ||
@@ -330,18 +342,7 @@ export function DashboardClient({
               </div>
             )}
 
-            {/* 🤖 Squad Multiagente del Hogar (Mission Control · FortIA Architecture) */}
-            <AgentSquadMissionControl
-              receipts={receipts}
-              events={events}
-              perishables={perishables}
-              energyContracts={energyContracts}
-              onOpenAssistant={handleOpenAssistant}
-              onNavigateTab={(tabId) => {
-                const targetIdx = CARDS.findIndex((c) => c.id === tabId);
-                if (targetIdx >= 0) goToCard(targetIdx);
-              }}
-            />
+
 
             <div className="wall-dashboard-grid">
               {/* Columna Izquierda: Briefing + Agenda de Hoy compacta */}
@@ -351,258 +352,45 @@ export function DashboardClient({
                   todayWeather={todayWeather}
                 />
 
-                {/* Widget Rápido: Agenda de Hoy */}
-                <div
-                  className="liquid-glass wall-agenda-widget liquid-specular"
-                  style={{
-                    padding: "1rem 1.25rem",
-                    borderRadius: "var(--radius-lg)",
-                    background: "var(--liquid-glass-bg-subtle)",
-                    boxShadow: "var(--liquid-shadow-ambient), inset 0 1px 0.5px var(--liquid-specular-top)",
-                    border: "1px solid var(--apple-border)",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "0.75rem",
-                      flexWrap: "wrap",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                      <div
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "50%",
-                          background: "rgba(0, 113, 227, 0.15)",
-                          color: "var(--apple-blue)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <IconCalendar size={16} />
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                        <h3 style={{ fontSize: "0.98rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
-                          📅 Agenda de Hoy
-                        </h3>
-                        <span
-                          style={{
-                            fontSize: "0.72rem",
-                            padding: "0.12rem 0.5rem",
-                            borderRadius: "var(--radius-full)",
-                            background: todayEvents.length > 0 ? "rgba(0, 113, 227, 0.12)" : "var(--apple-surface)",
-                            color: todayEvents.length > 0 ? "var(--apple-blue)" : "var(--apple-text-secondary)",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {todayEvents.length} {todayEvents.length === 1 ? "evento" : "eventos"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={openFamilyAgenda}
-                      className="btn-ghost touch-target"
-                      style={{
-                        fontSize: "0.8rem",
-                        color: "var(--apple-blue)",
-                        fontWeight: 600,
-                        padding: "0.35rem 0.6rem",
-                        minHeight: "44px",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "0.25rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Ver agenda completa →
-                    </button>
-                  </div>
-
-                  {todayEvents.length === 0 ? (
-                    <div
-                      style={{
-                        padding: "0.85rem 1rem",
-                        textAlign: "center",
-                        borderRadius: "var(--radius-md)",
-                        background: "var(--apple-surface)",
-                        color: "var(--apple-text-secondary)",
-                        fontSize: "0.85rem",
-                        border: "1px dashed var(--apple-border)",
-                      }}
-                    >
-                      Sin eventos programados para hoy ✨
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                      {todayEvents.map((ev) => {
-                        const member = ev.member_id ? memberMap.get(ev.member_id) : null;
-                        const accent = member?.color || "var(--apple-blue)";
-                        return (
-                          <div
-                            key={ev.id}
-                            onClick={openFamilyAgenda}
-                            className="touch-target"
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              padding: "0.65rem 0.85rem",
-                              borderRadius: "var(--radius-md)",
-                              background: "var(--apple-surface)",
-                              border: "1px solid var(--apple-border)",
-                              borderLeft: `3px solid ${accent}`,
-                              cursor: "pointer",
-                              gap: "0.65rem",
-                              minHeight: "44px",
-                              transition: "all 0.15s ease",
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flex: 1, minWidth: 0 }}>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.25rem",
-                                  fontSize: "0.78rem",
-                                  fontWeight: 700,
-                                  color: accent,
-                                  flexShrink: 0,
-                                  minWidth: "64px",
-                                }}
-                              >
-                                <IconClock size={12} />
-                                <span>{ev.all_day ? "Todo el día" : timeOf(ev.starts_at)}</span>
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <span
-                                  style={{
-                                    fontSize: "0.88rem",
-                                    fontWeight: 600,
-                                    color: "var(--apple-text)",
-                                    display: "block",
-                                    whiteSpace: "nowrap",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                  }}
-                                >
-                                  {ev.title}
-                                </span>
-                                {ev.location && (
-                                  <span
-                                    style={{
-                                      fontSize: "0.74rem",
-                                      color: "var(--apple-text-secondary)",
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      gap: "0.2rem",
-                                      marginTop: "0.1rem",
-                                    }}
-                                  >
-                                    <IconLocation size={11} />
-                                    <span>{ev.location}</span>
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {member && (
-                              <span
-                                style={{
-                                  fontSize: "0.74rem",
-                                  padding: "0.15rem 0.5rem",
-                                  borderRadius: "var(--radius-full)",
-                                  background: `${member.color}15`,
-                                  color: member.color,
-                                  fontWeight: 600,
-                                  border: `1px solid ${member.color}30`,
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "0.25rem",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <span>{member.emoji}</span>
-                                <span>{member.name}</span>
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Columna Derecha: Cena de Hoy + Widget de Suministros/Economía */}
-              <div className="wall-grid-col wall-grid-col-right">
-                <DinnerCard
-                  date={today}
-                  initialPlans={dinners}
-                  schoolLunch={schoolLunch}
-                  schoolDinnerRec={schoolDinnerRec}
+                <MiniUpcomingAgenda
+                  events={events}
+                  members={members}
+                  today={today}
+                  onOpenFullAgenda={openFamilyAgenda}
                 />
 
-                {/* Widget Rápido: Economía & Suministros Naturgy */}
-                <div
-                  onClick={() => goToCard(2)}
-                  className="liquid-glass wall-card-quick-eco touch-target liquid-specular"
-                  style={{
-                    cursor: "pointer",
-                    padding: "0.95rem 1.25rem",
-                    borderRadius: "var(--radius-lg)",
-                    background: "var(--liquid-glass-bg-subtle)",
-                    borderLeft: "4px solid var(--apple-green)",
-                    boxShadow: "var(--liquid-shadow-ambient), inset 0 1px 0.5px var(--liquid-specular-top)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: "0.75rem",
-                    minHeight: "56px",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
-                    <div
-                      style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "50%",
-                        background: "rgba(52, 199, 89, 0.15)",
-                        color: "var(--apple-green)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <IconEnergy size={16} />
-                    </div>
-                    <div>
-                      <p style={{ fontWeight: 700, margin: 0, color: "var(--apple-text)", fontSize: "0.92rem" }}>
-                        Economía Familiar & Suministros Naturgy
-                      </p>
-                      <p style={{ fontSize: "0.8rem", color: "var(--apple-text-secondary)", margin: "0.15rem 0 0 0" }}>
-                        Luz fija 24h a 0.123 €/kWh · Carga recomendada de VE en Valle P2 (00:00–07:30)
-                      </p>
-                    </div>
-                  </div>
-                  <span className="badge badge-blue" style={{ fontSize: "0.78rem" }}>
-                    Ver Módulo Economía →
-                  </span>
-                </div>
+                <NewsWidget
+                  espanaNews={news?.espana || []}
+                  cylNews={news?.cyl || []}
+                />
+              </div>
+
+              {/* Columna Derecha: Clima Salamanca Ampliado + Fotografía Familiar */}
+              <div className="wall-grid-col wall-grid-col-right">
+                <WeatherDetailWidget
+                  weather={weather}
+                  todayWeather={todayWeather}
+                />
+
+                <FamilyPhotoFrame />
               </div>
             </div>
           </div>
         </div>
 
-        {/* 🃏 Tarjeta 2: Compra & Despensa */}
+        {/* 🃏 Tarjeta 2: Cenas & Menú Escolar Montessori */}
+        <div className="deck-slide">
+          <div className="deck-card">
+            <DinnerCard
+              date={today}
+              initialPlans={dinners}
+              schoolLunch={schoolLunch}
+              schoolDinnerRec={schoolDinnerRec}
+            />
+          </div>
+        </div>
+
+        {/* 🃏 Tarjeta 3: Compra & Despensa */}
         <div className="deck-slide">
           <div className="deck-card">
             <ShoppingModule
@@ -616,7 +404,7 @@ export function DashboardClient({
           </div>
         </div>
 
-        {/* 🃏 Tarjeta 3: Economía & Patrimonio Familiar (Unificada) */}
+        {/* 🃏 Tarjeta 4: Economía & Patrimonio Familiar (Unificada) */}
         <div className="deck-slide">
           <div className="deck-card">
             <EconomyModule
@@ -633,7 +421,19 @@ export function DashboardClient({
           </div>
         </div>
 
-        {/* 🃏 Tarjeta 4: Familia & Hogar (Peques, Tareas & Agenda Integradas) */}
+        {/* 🃏 Tarjeta 5: Tips & Consejos de Optimización */}
+        <div className="deck-slide">
+          <div className="deck-card">
+            <TipsModule
+              energyContracts={energyContracts}
+              insurances={insurances}
+              warranties={warranties}
+              priceComparisons={priceComparisons}
+            />
+          </div>
+        </div>
+
+        {/* 🃏 Tarjeta 6: Familia & Hogar (Peques, Tareas & Agenda Integradas) */}
         <div className="deck-slide">
           <div className="deck-card">
             {/* Sección 1: Peques (Cole & Salud) */}
@@ -917,16 +717,17 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* ── Botón Flotante Apple Intelligence (Asistente por Voz / Chat) ── */}
+      {/* ── Globo / Botón Flotante con Icono de Chatbot (Asistente por Voz y Texto) ── */}
       <button
         type="button"
         onClick={() => handleOpenAssistant()}
         className="fab-apple-ai"
-        title="Hablar o escribir al Asistente"
-        aria-label="Asistente con Inteligencia Artificial"
+        title="Hablar o escribir al Asistente del Hogar"
+        aria-label="Asistente Chatbot del Hogar"
       >
-        <IconSparkles size={16} />
+        <span style={{ fontSize: "1.1rem", display: "inline-flex", alignItems: "center" }}>💬</span>
         <span>Asistente</span>
+        <span className="status-dot-live" style={{ width: "6px", height: "6px" }} />
       </button>
 
       {/* Modales */}

@@ -120,8 +120,15 @@ export function Header({
             </button>
           )}
 
-          {/* Botón Asistente (Desktop & Tablet) */}
-          <div className="btn-apple-intelligence hide-on-mobile liquid-specular" onClick={onOpenAssistant} role="button" tabIndex={0}>
+          {/* Botón Asistente (Visible en todos los dispositivos: Móvil Vertical, Tablet y Desktop) */}
+          <div
+            className="btn-apple-intelligence liquid-specular touch-target"
+            onClick={onOpenAssistant}
+            role="button"
+            tabIndex={0}
+            title="Abrir Asistente IA"
+            aria-label="Abrir Asistente IA"
+          >
             <div className="btn-apple-intelligence-inner">
               <span className="ai-status-indicator" />
               <span>Asistente</span>
