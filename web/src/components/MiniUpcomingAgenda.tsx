@@ -69,11 +69,11 @@ export function MiniUpcomingAgenda({
     <div
       className="liquid-glass liquid-specular"
       style={{
-        padding: "1rem 1.25rem",
+        padding: "0.85rem 1rem",
         borderRadius: "var(--radius-xl)",
         display: "flex",
         flexDirection: "column",
-        gap: "0.75rem",
+        gap: "0.6rem",
       }}
     >
       {/* Cabecera del Widget con Selector de Kike / Lara y Botón + */}

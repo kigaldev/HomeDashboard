@@ -800,17 +800,17 @@ input, select, textarea, .input-field {
 
   /* Tipografías y contraste reforzados para lectura cómoda a 1-2 metros */
   .wall-kiosk-card {
-    padding: 1.6rem;
-    gap: 1.4rem;
+    padding: 0.85rem 1rem !important;
+    gap: 0.85rem;
   }
 
   .wall-kiosk-card h2 {
-    font-size: 1.22rem !important;
+    font-size: 1.15rem !important;
     letter-spacing: -0.025em;
   }
 
   .wall-kiosk-card h3 {
-    font-size: 1.08rem !important;
+    font-size: 1.02rem !important;
   }
 
   .wall-agenda-widget,
@@ -1282,4 +1282,31 @@ dialog::backdrop {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: shimmer 6s infinite linear;
+}
+
+@keyframes slideDownMenu {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ambientFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ambientPhotoZoom {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.04); }
 }

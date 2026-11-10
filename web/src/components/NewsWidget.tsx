@@ -19,11 +19,11 @@ export function NewsWidget({
     <div
       className="liquid-glass liquid-specular"
       style={{
-        padding: "1.1rem 1.25rem",
+        padding: "0.85rem 1rem",
         borderRadius: "var(--radius-xl)",
         display: "flex",
         flexDirection: "column",
-        gap: "0.85rem",
+        gap: "0.6rem",
       }}
     >
       {/* Cabecera del widget con selector de región */}
@@ -108,8 +108,8 @@ export function NewsWidget({
       </div>
 
       {/* Lista de Titulares */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-        {currentList.slice(0, 4).map((item, idx) => (
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+        {currentList.slice(0, 3).map((item, idx) => (
           <a
             key={item.id || idx}
             href={item.link}
@@ -120,8 +120,8 @@ export function NewsWidget({
               display: "flex",
               justifyContent: "space-between",
               alignItems: "flex-start",
-              gap: "0.75rem",
-              padding: "0.65rem 0.8rem",
+              gap: "0.65rem",
+              padding: "0.45rem 0.65rem",
               borderRadius: "var(--radius-md)",
               background: "var(--liquid-glass-bg-subtle)",
               border: "1px solid var(--liquid-glass-border)",

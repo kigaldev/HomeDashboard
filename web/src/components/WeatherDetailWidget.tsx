@@ -23,11 +23,11 @@ export function WeatherDetailWidget({
     <div
       className="liquid-glass liquid-specular"
       style={{
-        padding: "1.15rem 1.25rem",
+        padding: "0.85rem 1rem",
         borderRadius: "var(--radius-xl)",
         display: "flex",
         flexDirection: "column",
-        gap: "0.85rem",
+        gap: "0.65rem",
         position: "relative",
         overflow: "hidden",
       }}
@@ -38,43 +38,43 @@ export function WeatherDetailWidget({
           position: "absolute",
           top: "-30px",
           right: "-30px",
-          width: "160px",
-          height: "160px",
+          width: "140px",
+          height: "140px",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(0, 113, 227, 0.22) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(0, 113, 227, 0.2) 0%, transparent 70%)",
           filter: "blur(24px)",
           pointerEvents: "none",
         }}
       />
 
       {/* Cabecera del Clima con Temperatura Gigante y Condición */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.6rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.15rem" }}>
-            <span style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--apple-blue)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.1rem" }}>
+            <span style={{ fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--apple-blue)" }}>
               CLIMA EN VIVO
             </span>
             <span style={{ fontSize: "0.65rem", color: "var(--apple-text-tertiary)" }}>•</span>
-            <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", fontWeight: 500 }}>
+            <span style={{ fontSize: "0.7rem", color: "var(--apple-text-secondary)", fontWeight: 500 }}>
               Salamanca
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem" }}>
-            <span style={{ fontSize: "2.8rem", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--apple-text)" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "0.65rem" }}>
+            <span style={{ fontSize: "2.35rem", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--apple-text)" }}>
               {current?.temp ?? todayWeather.tMax}°
             </span>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--apple-text)" }}>
+              <span style={{ fontSize: "0.98rem", fontWeight: 700, color: "var(--apple-text)" }}>
                 {wInfo?.text || "Despejado"}
               </span>
-              <span style={{ fontSize: "0.8rem", color: "var(--apple-text-secondary)" }}>
+              <span style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)" }}>
                 Mín: {todayWeather.tMin}° · Máx: {todayWeather.tMax}°
               </span>
             </div>
           </div>
         </div>
 
-        <div style={{ fontSize: "3rem", lineHeight: 1, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.25))" }}>
+        <div style={{ fontSize: "2.5rem", lineHeight: 1, filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.25))" }}>
           {wInfo?.icon || "🌤️"}
         </div>
       </div>

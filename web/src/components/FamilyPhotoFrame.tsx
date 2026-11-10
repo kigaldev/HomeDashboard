@@ -5,7 +5,11 @@ import { IconCamera } from "./Icons";
 
 const DEFAULT_PHOTO = "/photos/familia-feliz-gallego.jpg";
 
-export function FamilyPhotoFrame() {
+export function FamilyPhotoFrame({
+  onTriggerScreensaver,
+}: {
+  onTriggerScreensaver?: () => void;
+} = {}) {
   const [photos, setPhotos] = useState<string[]>([DEFAULT_PHOTO]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [photoUrl, setPhotoUrl] = useState<string>(DEFAULT_PHOTO);
@@ -139,7 +143,7 @@ export function FamilyPhotoFrame() {
         borderRadius: "var(--radius-xl)",
         overflow: "hidden",
         position: "relative",
-        minHeight: "220px",
+        minHeight: "330px",
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-end",
@@ -274,8 +278,35 @@ export function FamilyPhotoFrame() {
           </p>
         </div>
 
-        {/* Botón para cambiar / subir fotografía al repositorio */}
-        <div>
+        {/* Botón para cambiar / subir fotografía al repositorio y pantalla completa */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          {onTriggerScreensaver && (
+            <button
+              type="button"
+              onClick={onTriggerScreensaver}
+              className="btn-ghost touch-target"
+              style={{
+                padding: "0.35rem 0.65rem",
+                borderRadius: "var(--radius-full)",
+                background: "rgba(0, 0, 0, 0.45)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                color: "#ffffff",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.3rem",
+                cursor: "pointer",
+              }}
+              title="Ver en pantalla completa (Modo Fondo de Pantalla)"
+            >
+              <span>🖼️</span>
+              <span className="hide-on-mobile">Pantalla completa</span>
+            </button>
+          )}
+
           <input
             ref={fileInputRef}
             type="file"

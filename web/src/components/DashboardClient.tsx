@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Header } from "./Header";
 import { BriefingCard } from "./BriefingCard";
 import { DinnerCard } from "./DinnerCard";
@@ -15,6 +15,7 @@ import { NewsWidget } from "./NewsWidget";
 import { WeatherDetailWidget } from "./WeatherDetailWidget";
 import { FamilyPhotoFrame } from "./FamilyPhotoFrame";
 import { MiniUpcomingAgenda } from "./MiniUpcomingAgenda";
+import { AmbientScreensaver } from "./AmbientScreensaver";
 import { AiAssistantModal } from "./AiAssistantModal";
 import { SettingsModal } from "./SettingsModal";
 import { ProfileLoginModal } from "./ProfileLoginModal";
@@ -242,9 +243,48 @@ export function DashboardClient({
     }
   }, []);
 
+  // ── Modo FONDO DE PANTALLA: Inactividad tras 30 segundos ──
+  const [isScreensaverActive, setIsScreensaverActive] = useState(false);
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      setIsScreensaverActive(true);
+    }, 30000); // 30 segundos de inactividad
+  }, []);
+
+  useEffect(() => {
+    const activityEvents = [
+      "mousedown",
+      "mousemove",
+      "touchstart",
+      "touchmove",
+      "keydown",
+      "wheel",
+      "scroll",
+      "click",
+    ];
+
+    const handleUserActivity = () => {
+      if (isScreensaverActive) {
+        setIsScreensaverActive(false);
+      }
+      resetIdleTimer();
+    };
+
+    resetIdleTimer();
+    activityEvents.forEach((ev) => window.addEventListener(ev, handleUserActivity, { passive: true }));
+
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      activityEvents.forEach((ev) => window.removeEventListener(ev, handleUserActivity));
+    };
+  }, [isScreensaverActive, resetIdleTimer]);
+
   return (
     <div className="container">
-      {/* Header compacto con estatus e identidad familiar */}
+      {/* Header compacto con estatus, selector de perfil y Menú Desplegable Hamburguesa */}
       <Header
         members={members}
         currentMemberId={currentMemberId}
@@ -254,50 +294,33 @@ export function DashboardClient({
         onOpenAssistant={() => handleOpenAssistant()}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
+        menuItems={CARDS}
+        activeTabIndex={activeCardIndex}
+        onSelectTab={goToCard}
+        onTriggerScreensaver={() => setIsScreensaverActive(true)}
+        lowStockCount={lowStockItems.length}
+        pendingTasksCount={pendingTasksCount}
       />
 
-      {/* ── Menú Superior Sticky Fácil de Acceder (Apple Pill Bar) ── */}
-      <div className="deck-sticky-header">
-        <nav className="deck-top-nav" aria-label="Tarjetas principales">
-          {CARDS.map((card, idx) => (
-            <button
-              key={card.id}
-              ref={(el) => {
-                tabBtnRefs.current[idx] = el;
-              }}
-              type="button"
-              onClick={() => goToCard(idx)}
-              className={`deck-nav-btn touch-target ${activeCardIndex === idx ? "active" : ""}`}
-            >
-              <div className="deck-nav-icon-box">
-                {card.icon(18)}
-                {card.id === "compra" && lowStockItems.length > 0 && (
-                  <span className="deck-badge-counter deck-badge-amber">
-                    {lowStockItems.length}
-                  </span>
-                )}
-                {card.id === "familia" && pendingTasksCount > 0 && (
-                  <span className="deck-badge-counter deck-badge-gray">
-                    {pendingTasksCount}
-                  </span>
-                )}
-              </div>
-              <span className="deck-nav-label">{card.label}</span>
-            </button>
-          ))}
-        </nav>
-
-        {/* Indicador de puntos de paginación sutiles */}
-        <div className="deck-dots-bar" aria-hidden="true">
-          {CARDS.map((card, idx) => (
-            <span
-              key={card.id}
-              onClick={() => goToCard(idx)}
-              className={`deck-dot ${activeCardIndex === idx ? "active" : ""}`}
-              title={`Ir a ${card.label}`}
-            />
-          ))}
-        </div>
+      {/* Indicador sutil de puntos de paginación entre tarjetas */}
+      <div
+        className="deck-dots-bar"
+        style={{
+          margin: "0.2rem auto 0.6rem auto",
+          display: "flex",
+          justifyContent: "center",
+          gap: "6px",
+        }}
+        aria-hidden="true"
+      >
+        {CARDS.map((card, idx) => (
+          <span
+            key={card.id}
+            onClick={() => goToCard(idx)}
+            className={`deck-dot ${activeCardIndex === idx ? "active" : ""}`}
+            title={`Ir a ${card.label}`}
+          />
+        ))}
       </div>
 
       {/* ── Viewport Horizontal de Tarjetas Maestras (Desplazamiento por Swipe o Tap) ── */}
@@ -311,11 +334,11 @@ export function DashboardClient({
           <div className="deck-card wall-kiosk-card">
             {lowStockItems.length > 0 && (
               <div
-                onClick={() => goToCard(1)}
+                onClick={() => goToCard(2)}
                 className="wall-alert-banner touch-target"
                 style={{
                   cursor: "pointer",
-                  padding: "0.85rem 1.25rem",
+                  padding: "0.6rem 0.95rem",
                   borderRadius: "var(--radius-lg)",
                   background: "var(--apple-surface-secondary)",
                   borderLeft: "4px solid var(--apple-orange)",
@@ -324,8 +347,8 @@ export function DashboardClient({
                   justifyContent: "space-between",
                   alignItems: "center",
                   flexWrap: "wrap",
-                  gap: "0.75rem",
-                  minHeight: "48px",
+                  gap: "0.5rem",
+                  minHeight: "42px",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
@@ -345,14 +368,23 @@ export function DashboardClient({
               </div>
             )}
 
-
-
             <div className="wall-dashboard-grid">
-              {/* Columna Izquierda: Briefing + Agenda de Hoy compacta */}
+              {/* Columna Izquierda: Fotografía Familiar Principal (+50% tamaño) + Briefing Diario */}
               <div className="wall-grid-col wall-grid-col-left">
+                <FamilyPhotoFrame onTriggerScreensaver={() => setIsScreensaverActive(true)} />
+
                 <BriefingCard
                   initialContent={latestBriefing}
                   todayWeather={todayWeather}
+                />
+              </div>
+
+              {/* Columna Derecha: Clima & Tráfico + Agenda Hoy + Noticias */}
+              <div className="wall-grid-col wall-grid-col-right">
+                <WeatherDetailWidget
+                  weather={weather}
+                  todayWeather={todayWeather}
+                  traffic={traffic}
                 />
 
                 <MiniUpcomingAgenda
@@ -366,17 +398,6 @@ export function DashboardClient({
                   espanaNews={news?.espana || []}
                   cylNews={news?.cyl || []}
                 />
-              </div>
-
-              {/* Columna Derecha: Clima Salamanca Ampliado + Fotografía Familiar */}
-              <div className="wall-grid-col wall-grid-col-right">
-                <WeatherDetailWidget
-                  weather={weather}
-                  todayWeather={todayWeather}
-                  traffic={traffic}
-                />
-
-                <FamilyPhotoFrame />
               </div>
             </div>
           </div>
@@ -752,6 +773,16 @@ export function DashboardClient({
         onClose={() => setIsProfileOpen(false)}
         members={members}
         currentMemberId={currentMemberId ?? null}
+      />
+
+      {/* ── Modo FONDO DE PANTALLA (Screensaver tras 30s de inactividad o manual) ── */}
+      <AmbientScreensaver
+        isActive={isScreensaverActive}
+        onDismiss={() => {
+          setIsScreensaverActive(false);
+          resetIdleTimer();
+        }}
+        weather={weather}
       />
     </div>
   );

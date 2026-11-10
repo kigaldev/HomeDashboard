@@ -4,6 +4,7 @@ import type { Member } from "@/lib/repo";
 import type { Weather } from "@/lib/weather";
 import { weatherLabel, kidsOutfit } from "@/lib/weather";
 import { IconSparkles, IconSettings } from "./Icons";
+import { HamburgerMenu, type NavItem } from "./HamburgerMenu";
 
 export function Header({
   members,
@@ -14,6 +15,12 @@ export function Header({
   onOpenSettings,
   onOpenAssistant,
   onOpenProfile,
+  menuItems,
+  activeTabIndex = 0,
+  onSelectTab,
+  onTriggerScreensaver,
+  lowStockCount = 0,
+  pendingTasksCount = 0,
 }: {
   members: Member[];
   currentMemberId?: number | null;
@@ -23,6 +30,12 @@ export function Header({
   onOpenSettings: () => void;
   onOpenAssistant: () => void;
   onOpenProfile?: () => void;
+  menuItems?: readonly NavItem[];
+  activeTabIndex?: number;
+  onSelectTab?: (idx: number) => void;
+  onTriggerScreensaver?: () => void;
+  lowStockCount?: number;
+  pendingTasksCount?: number;
 }) {
   const currentWeather = weather?.current;
   const todayWeather = weather?.days[0];
@@ -54,6 +67,18 @@ export function Header({
 
         {/* Acciones de la cabecera */}
         <div className="top-bar-actions">
+          {/* Menú Desplegable Hamburguesa de Secciones */}
+          {menuItems && onSelectTab && (
+            <HamburgerMenu
+              items={menuItems}
+              activeIndex={activeTabIndex}
+              onSelectIndex={onSelectTab}
+              onTriggerScreensaver={onTriggerScreensaver}
+              lowStockCount={lowStockCount}
+              pendingTasksCount={pendingTasksCount}
+            />
+          )}
+
           {/* Weather Capsule */}
           {wInfo && todayWeather && (
             <div
