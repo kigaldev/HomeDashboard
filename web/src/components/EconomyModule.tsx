@@ -303,7 +303,7 @@ export function EconomyModule({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.35rem", width: "100%", minWidth: 0 }}>
       {/* ── Cabecera Ejecutiva de Economía ── */}
-      <div className="card-apple" style={{ padding: "1.5rem" }}>
+      <div className="liquid-glass liquid-specular" style={{ padding: "1.5rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", marginBottom: "0.25rem" }}>
@@ -522,7 +522,7 @@ export function EconomyModule({
       {activeTab === "balance" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           {/* Desglose por Comercios */}
-          <div className="card-apple" style={{ padding: "1.35rem" }}>
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
             <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
               Desglose por Establecimiento Comercial
             </h3>
@@ -578,7 +578,7 @@ export function EconomyModule({
 
           {/* Desglose por Categoría con Explorador y Drag & Drop */}
           {categories.length > 0 && (
-            <div className="card-apple" style={{ padding: "1.35rem" }}>
+            <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
                 <div>
                   <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
@@ -645,16 +645,20 @@ export function EconomyModule({
                         padding: "0.85rem",
                         borderRadius: "var(--radius-md)",
                         background: isDragOver
-                          ? "var(--apple-blue-subtle)"
+                          ? "rgba(10, 132, 255, 0.22)"
                           : isSelected
-                          ? "var(--apple-surface-elevated)"
-                          : "var(--apple-surface-secondary)",
+                          ? "rgba(10, 132, 255, 0.15)"
+                          : "var(--liquid-glass-bg-subtle, rgba(255, 255, 255, 0.04))",
+                        backdropFilter: "blur(14px)",
+                        WebkitBackdropFilter: "blur(14px)",
                         border: isDragOver
                           ? "2px dashed var(--apple-blue)"
                           : isSelected
-                          ? "2px solid var(--apple-blue)"
-                          : "1px solid var(--apple-border)",
-                        boxShadow: isSelected ? "0 4px 16px rgba(0, 113, 227, 0.15)" : "none",
+                          ? "1.5px solid var(--apple-blue)"
+                          : "1px solid var(--liquid-glass-border, rgba(255, 255, 255, 0.09))",
+                        boxShadow: isSelected
+                          ? "0 4px 18px rgba(0, 113, 227, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
+                          : "inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 8px rgba(0, 0, 0, 0.2)",
                         cursor: "pointer",
                         transition: "all 0.18s ease",
                         position: "relative",
@@ -689,13 +693,11 @@ export function EconomyModule({
               {/* Panel / Cajón inferior desplegable con los productos de la categoría seleccionada */}
               {selectedCategory && (
                 <div
+                  className="liquid-glass liquid-specular"
                   style={{
                     marginTop: "1.25rem",
                     padding: "1.15rem",
                     borderRadius: "var(--radius-lg)",
-                    background: "var(--apple-surface-secondary)",
-                    border: "1px solid var(--apple-border)",
-                    boxShadow: "var(--shadow-sm)",
                     animation: "fadeSlideIn 0.25s var(--ease-spring)",
                   }}
                 >
@@ -879,7 +881,7 @@ export function EconomyModule({
       {activeTab === "energy" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           {/* Tarjeta de Contratos Activos */}
-          <div className="card-apple" style={{ padding: "1.35rem" }}>
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
               <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
                 Contratos de Suministro Energético (Naturgy)
@@ -1009,12 +1011,12 @@ export function EconomyModule({
           </div>
 
           {/* Optimización de Horarios y Equipamiento */}
-          <div className="card-apple" style={{ padding: "1.35rem" }}>
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
             <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
               Recomendaciones de Optimización de Hábitos
             </h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.85rem" }}>
-              <div style={{ padding: "0.9rem", borderRadius: "var(--radius-md)", background: "var(--apple-surface-secondary)", border: "1px solid var(--apple-border)" }}>
+              <div style={{ padding: "0.9rem", borderRadius: "var(--radius-md)", background: "var(--liquid-glass-bg-subtle)", border: "1px solid var(--liquid-glass-border)" }}>
                 <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--apple-blue)" }}>
                   Coche Eléctrico (VE)
                 </div>
@@ -1023,7 +1025,7 @@ export function EconomyModule({
                 </p>
               </div>
 
-              <div style={{ padding: "0.9rem", borderRadius: "var(--radius-md)", background: "var(--apple-surface-secondary)", border: "1px solid var(--apple-border)" }}>
+              <div style={{ padding: "0.9rem", borderRadius: "var(--radius-md)", background: "var(--liquid-glass-bg-subtle)", border: "1px solid var(--liquid-glass-border)" }}>
                 <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--apple-blue)" }}>
                   Electrodomésticos de Alto Consumo
                 </div>
@@ -1032,7 +1034,7 @@ export function EconomyModule({
                 </p>
               </div>
 
-              <div style={{ padding: "0.9rem", borderRadius: "var(--radius-md)", background: "var(--apple-surface-secondary)", border: "1px solid var(--apple-border)" }}>
+              <div style={{ padding: "0.9rem", borderRadius: "var(--radius-md)", background: "var(--liquid-glass-bg-subtle)", border: "1px solid var(--liquid-glass-border)" }}>
                 <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--apple-blue)" }}>
                   Climatización Térmica
                 </div>
@@ -1048,7 +1050,7 @@ export function EconomyModule({
       {/* ── VISTA 3: PÓLIZAS & SEGUROS ── */}
       {activeTab === "insurances" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <div className="card-apple" style={{ padding: "1.35rem" }}>
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
               <div>
                 <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
@@ -1179,7 +1181,7 @@ export function EconomyModule({
       {/* ── VISTA 4: GARANTÍAS DE COMPRAS DE VALOR ── */}
       {activeTab === "warranties" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <div className="card-apple" style={{ padding: "1.35rem" }}>
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
               <div>
                 <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
@@ -1305,7 +1307,7 @@ export function EconomyModule({
       {/* ── VISTA 5: ESCANEAR & ARCHIVO DE TICKETS ── */}
       {activeTab === "scan" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <div className="card-apple" style={{ padding: "1.35rem" }}>
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
               <div>
                 <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
@@ -1437,7 +1439,7 @@ export function EconomyModule({
       {/* ── VISTA 6: CADUCIDADES & FRESCOS ── */}
       {activeTab === "perishables" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <div className="card-apple" style={{ padding: "1.35rem" }}>
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
             <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
               Control de Caducidades & Alimentos Frescos
             </h3>

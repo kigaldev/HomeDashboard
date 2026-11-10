@@ -46,7 +46,7 @@ export function DinnerCard({
   };
 
   return (
-    <div className="glass-card" style={{ padding: "1.35rem" }}>
+    <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
       {/* Header Apple Style */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>

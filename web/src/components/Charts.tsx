@@ -18,16 +18,18 @@ import {
 // (los atributos SVG de Recharts no resuelven var() de forma fiable).
 const PALETTE = ["#0071e3", "#34c759", "#ff9500", "#af52de", "#30b0c7", "#ff3b30", "#5856d6"];
 
-const tickStyle = { fill: "var(--apple-text-secondary, #86868b)", fontSize: 11, fontWeight: 500 };
+const tickStyle = { fill: "#a1a1a6", fontSize: 12, fontWeight: 500 };
 const tooltipStyle = {
-  background: "var(--apple-surface-elevated, #1c1c1e)",
-  backgroundColor: "var(--apple-surface-elevated, #1c1c1e)",
-  border: "1px solid var(--apple-border, rgba(255,255,255,0.18))",
-  borderRadius: 12,
-  color: "var(--apple-text, #ffffff)",
+  background: "rgba(22, 24, 30, 0.94)",
+  backgroundColor: "rgba(22, 24, 30, 0.94)",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  border: "1px solid rgba(255, 255, 255, 0.16)",
+  borderRadius: 14,
+  color: "#ffffff",
   fontSize: 12,
   fontWeight: 600,
-  boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.45)",
 };
 
 export function CategoryDonutChart({
@@ -94,32 +96,33 @@ export function MonthCompareChart({
       <ResponsiveContainer>
         <BarChart
           data={data}
-          margin={{ top: 28, right: 12, left: -10, bottom: 0 }}
+          margin={{ top: 34, right: 16, left: -10, bottom: 0 }}
         >
-          <CartesianGrid vertical={false} stroke="rgba(128,128,128,0.2)" />
+          <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.07)" />
           <XAxis dataKey="name" tick={tickStyle} axisLine={false} tickLine={false} />
           <YAxis
             tick={tickStyle}
             axisLine={false}
             tickLine={false}
-            domain={[0, (dataMax: number) => Math.max(10, Math.ceil(dataMax * 1.25))]}
+            domain={[0, (dataMax: number) => Math.max(10, Math.ceil(dataMax * 1.35))]}
           />
           <Tooltip
             contentStyle={tooltipStyle}
-            cursor={{ fill: "rgba(128,128,128,0.1)" }}
+            cursor={{ fill: "rgba(255,255,255,0.06)" }}
             formatter={(v) => `${Number(v).toFixed(2)} €`}
           />
           <Bar dataKey="total" radius={[8, 8, 0, 0]}>
             <LabelList
               dataKey="total"
               position="top"
-              fill="var(--apple-text)"
-              fontSize={12}
+              fill="#ffffff"
+              fontSize={13}
               fontWeight={700}
+              offset={10}
               formatter={(v) => `${Number(v).toFixed(2)} €`}
             />
-            <Cell fill="#86868b" />
-            <Cell fill="#0071e3" />
+            <Cell fill="#636366" />
+            <Cell fill="#0a84ff" />
           </Bar>
         </BarChart>
       </ResponsiveContainer>

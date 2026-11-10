@@ -115,13 +115,11 @@ export function ManualExpenseModal({
       style={{ margin: "auto" }}
     >
       <div
-        className="glass-card"
+        className="liquid-glass liquid-specular"
         style={{
           padding: "1.75rem",
           borderRadius: "1.25rem",
-          background: "var(--apple-card-bg)",
-          border: "1px solid var(--apple-border)",
-          boxShadow: "0 20px 50px rgba(0, 0, 0, 0.4)",
+          boxShadow: "var(--liquid-shadow-elevated)",
         }}
       >
         {/* Cabecera del modal */}
@@ -330,3 +328,4 @@ export function ManualExpenseModal({
     </dialog>
   );
 }
+

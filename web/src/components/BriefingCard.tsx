@@ -56,7 +56,7 @@ export function BriefingCard({
 
   return (
     <div
-      className="glass-card"
+      className="liquid-glass liquid-specular"
       style={{
         padding: isExpanded ? "1.35rem" : "0.85rem 1.15rem",
         position: "relative",

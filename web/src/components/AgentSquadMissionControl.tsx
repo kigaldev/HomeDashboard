@@ -114,15 +114,15 @@ export function AgentSquadMissionControl({
 
   return (
     <div
-      className="glass-card squad-mission-control"
+      className="liquid-glass squad-mission-control liquid-specular"
       style={{
         borderRadius: "var(--radius-xl)",
-        background: "linear-gradient(180deg, rgba(20, 24, 33, 0.85) 0%, rgba(13, 15, 20, 0.95) 100%)",
-        border: "1px solid rgba(139, 92, 246, 0.25)",
-        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+        background: "linear-gradient(145deg, rgba(139, 92, 246, 0.09) 0%, rgba(0, 113, 227, 0.05) 50%, var(--liquid-glass-bg) 100%)",
+        border: "1px solid rgba(139, 92, 246, 0.32)",
+        boxShadow: "var(--liquid-shadow-elevated), inset 0 1.5px 1px var(--liquid-specular-top)",
         overflow: "hidden",
         marginBottom: "1rem",
-        transition: "all 0.25s ease",
+        transition: "all 0.28s var(--ease-spring)",
       }}
     >
       {/* ── Barra Superior / Toggle Colapsable ── */}
@@ -256,10 +256,13 @@ export function AgentSquadMissionControl({
                 style={{
                   padding: "0.85rem 1rem",
                   borderRadius: "var(--radius-lg)",
-                  background: selectedAgent === ag.id ? ag.bgGlow : "rgba(255, 255, 255, 0.03)",
-                  border: `1.5px solid ${selectedAgent === ag.id ? ag.color : "rgba(255, 255, 255, 0.06)"}`,
+                  background: selectedAgent === ag.id ? ag.bgGlow : "light-dark(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.04))",
+                  border: `1.5px solid ${selectedAgent === ag.id ? ag.color : "var(--apple-border)"}`,
+                  boxShadow: `inset 0 1px 0.5px var(--liquid-specular-top), 0 2px 8px rgba(0, 0, 0, 0.04)`,
+                  backdropFilter: "blur(16px)",
+                  WebkitBackdropFilter: "blur(16px)",
                   cursor: "pointer",
-                  transition: "all 0.2s ease",
+                  transition: "all 0.22s var(--ease-spring)",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",

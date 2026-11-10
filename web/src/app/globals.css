@@ -71,6 +71,25 @@
 
   /* Easing */
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Liquid Glass Color Matrix & Specular Tokens (visionOS & Apple HIG) ── */
+  --liquid-glass-bg: light-dark(rgba(255, 255, 255, 0.76), rgba(26, 28, 34, 0.72));
+  --liquid-glass-bg-subtle: light-dark(rgba(255, 255, 255, 0.52), rgba(22, 24, 30, 0.52));
+  --liquid-glass-bg-elevated: light-dark(rgba(255, 255, 255, 0.88), rgba(34, 37, 46, 0.82));
+
+  --liquid-glass-border: light-dark(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.15));
+  --liquid-glass-border-subtle: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.09));
+
+  --liquid-specular-top: light-dark(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.28));
+  --liquid-specular-rim: light-dark(rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.14));
+  --liquid-specular-bottom: light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.35));
+
+  --liquid-shadow-ambient: light-dark(0 10px 30px -10px rgba(0, 0, 0, 0.07), 0 16px 40px -12px rgba(0, 0, 0, 0.55));
+  --liquid-shadow-elevated: light-dark(0 20px 48px -12px rgba(0, 0, 0, 0.12), 0 28px 64px -14px rgba(0, 0, 0, 0.70));
+  --liquid-shadow-dock: light-dark(0 16px 40px -6px rgba(0, 0, 0, 0.14), 0 24px 50px -8px rgba(0, 0, 0, 0.65));
+
+  --liquid-blur: blur(32px) saturate(210%);
+  --liquid-blur-heavy: blur(48px) saturate(220%);
 }
 
 * {
@@ -103,14 +122,34 @@ body {
   box-sizing: border-box;
 }
 
-/* Fondo atmosférico estilo macOS Sonoma / iOS 18 */
+/* Fondo atmosférico Aurora Líquida (estilo visionOS / macOS Sequoia) */
 body {
   background-image: 
-    radial-gradient(at 15% 10%, rgba(0, 113, 227, 0.07) 0px, transparent 45%),
-    radial-gradient(at 85% 15%, rgba(175, 82, 222, 0.06) 0px, transparent 40%),
-    radial-gradient(at 50% 85%, rgba(52, 199, 89, 0.05) 0px, transparent 55%);
+    radial-gradient(ellipse at 12% 15%, rgba(0, 113, 227, 0.10) 0%, transparent 48%),
+    radial-gradient(ellipse at 88% 18%, rgba(175, 82, 222, 0.09) 0%, transparent 44%),
+    radial-gradient(ellipse at 50% 82%, rgba(52, 199, 89, 0.07) 0%, transparent 52%),
+    radial-gradient(ellipse at 78% 85%, rgba(255, 149, 0, 0.06) 0%, transparent 42%);
   background-attachment: fixed;
-  background-size: cover;
+  background-size: 130% 130%;
+  animation: liquidAtmosphereDrift 60s ease-in-out infinite alternate;
+}
+
+@keyframes liquidAtmosphereDrift {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 50% 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    animation: none;
+  }
 }
 
 a {
@@ -184,34 +223,125 @@ input, select, textarea, .input-field {
   }
 }
 
-/* ── Tarjetas Bento Glassmorphic (Apple Style) ─────────────────── */
-.glass-card {
+/* ── Tarjetas Bento Glassmorphic & Liquid Glass (visionOS 2026) ── */
+.glass-card,
+.liquid-glass {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   overflow: hidden;
-  background: var(--apple-surface);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  position: relative;
+  background: var(--liquid-glass-bg);
+  backdrop-filter: var(--liquid-blur);
+  -webkit-backdrop-filter: var(--liquid-blur);
   border: 1px solid var(--apple-border);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.25s var(--ease-spring), box-shadow 0.25s var(--ease-spring), border-color 0.2s ease;
-  position: relative;
+  box-shadow: 
+    inset 0 1px 1px 0 var(--liquid-specular-top),
+    inset 0 -1px 1px 0 var(--liquid-specular-bottom),
+    var(--liquid-shadow-ambient);
+  transition: transform 0.28s var(--ease-spring), 
+              box-shadow 0.28s var(--ease-spring), 
+              border-color 0.25s ease;
 }
 
-.glass-card:hover {
-  box-shadow: var(--shadow-md);
+.glass-card:hover,
+.liquid-glass:hover {
+  box-shadow: 
+    inset 0 1.5px 1.5px 0 var(--liquid-specular-top),
+    inset 0 -1px 1px 0 var(--liquid-specular-bottom),
+    var(--liquid-shadow-elevated);
   border-color: var(--apple-border-strong);
 }
 
+.liquid-glass-elevated {
+  position: relative;
+  background: var(--liquid-glass-bg-elevated);
+  backdrop-filter: var(--liquid-blur-heavy);
+  -webkit-backdrop-filter: var(--liquid-blur-heavy);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--apple-border-strong);
+  box-shadow: 
+    inset 0 1.5px 0.5px 0 var(--liquid-specular-top),
+    inset 0 0 0 1px var(--liquid-specular-rim),
+    inset 0 -1.5px 2px 0 var(--liquid-specular-bottom),
+    var(--liquid-shadow-elevated);
+}
+
+.liquid-dock {
+  background: light-dark(rgba(242, 242, 247, 0.82), rgba(24, 26, 32, 0.80));
+  backdrop-filter: var(--liquid-blur-heavy);
+  -webkit-backdrop-filter: var(--liquid-blur-heavy);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--apple-border-strong);
+  box-shadow: 
+    inset 0 1.2px 0.8px 0 var(--liquid-specular-top),
+    inset 0 -1px 1px 0 var(--liquid-specular-bottom),
+    var(--liquid-shadow-dock);
+  padding: 5px;
+}
+
+.liquid-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.38rem 0.85rem;
+  border-radius: var(--radius-full);
+  background: light-dark(rgba(255, 255, 255, 0.65), rgba(40, 42, 50, 0.60));
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--apple-border);
+  box-shadow: 
+    inset 0 1px 0.5px 0 var(--liquid-specular-top),
+    0 2px 8px rgba(0, 0, 0, 0.05);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--apple-text);
+  transition: all 0.2s var(--ease-spring);
+}
+
+.liquid-pill:hover {
+  background: light-dark(rgba(255, 255, 255, 0.85), rgba(50, 54, 65, 0.75));
+  transform: translateY(-0.5px);
+}
+
+.liquid-specular {
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-specular::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.03) 60%,
+    transparent 100%
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
 .card-apple {
-  background: var(--apple-surface-secondary);
+  background: var(--liquid-glass-bg);
+  backdrop-filter: var(--liquid-blur);
+  -webkit-backdrop-filter: var(--liquid-blur);
   border: 1px solid var(--apple-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 
+    inset 0 1px 1px 0 var(--liquid-specular-top),
+    inset 0 -1px 1px 0 var(--liquid-specular-bottom),
+    var(--liquid-shadow-ambient);
   color: var(--apple-text);
   overflow: hidden;
+  transition: transform 0.28s var(--ease-spring), 
+              box-shadow 0.28s var(--ease-spring), 
+              border-color 0.25s ease;
 }
 
 /* ── Cabecera / Status Island Mobile-First ───────────────────── */
@@ -369,30 +499,38 @@ input, select, textarea, .input-field {
   }
 }
 
-/* ── Apple Card Deck Carousel & Swipe Navigation ────────────── */
+/* ── Apple Card Deck Carousel & Swipe Navigation (Floating Liquid Dock) ── */
 .deck-sticky-header {
   position: sticky;
-  top: 0;
+  top: 0.5rem;
   z-index: 100;
-  background: var(--apple-bg);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  padding: 0.35rem 0 0.55rem 0;
-  margin-bottom: 1rem;
+  background: transparent;
+  padding: 0.25rem 0 0.65rem 0;
+  margin-bottom: 1.25rem;
   transition: all 0.25s var(--ease-spring);
 }
 
 .deck-top-nav {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
+  margin: 0 auto;
+  max-width: 580px;
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   padding: 5px;
-  background: light-dark(rgba(118, 118, 128, 0.12), rgba(118, 118, 128, 0.24));
+  background: light-dark(rgba(242, 242, 247, 0.78), rgba(24, 26, 32, 0.75));
+  backdrop-filter: var(--liquid-blur-heavy);
+  -webkit-backdrop-filter: var(--liquid-blur-heavy);
+  border: 1px solid var(--apple-border-strong);
   border-radius: var(--radius-full);
-  width: 100%;
+  box-shadow: 
+    inset 0 1.2px 0.8px 0 var(--liquid-specular-top),
+    inset 0 -1px 1px 0 var(--liquid-specular-bottom),
+    var(--liquid-shadow-dock);
+  width: auto;
   box-sizing: border-box;
 }
 .deck-top-nav::-webkit-scrollbar {
@@ -400,15 +538,15 @@ input, select, textarea, .input-field {
 }
 
 .deck-nav-btn {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.5rem 1.15rem;
-  min-height: 44px;
+  padding: 0.55rem 1.25rem;
+  min-height: 46px;
   border-radius: var(--radius-full);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: var(--apple-text-secondary);
   background: transparent;
@@ -424,13 +562,17 @@ input, select, textarea, .input-field {
 
 .deck-nav-btn:hover {
   color: var(--apple-text);
+  background: light-dark(rgba(0, 0, 0, 0.04), rgba(255, 255, 255, 0.05));
 }
 
 .deck-nav-btn.active {
   background: var(--apple-surface-elevated);
   color: var(--apple-text);
   font-weight: 600;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 
+    inset 0 1px 1px 0 var(--liquid-specular-top),
+    0 4px 16px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .deck-nav-icon-box {
@@ -468,7 +610,7 @@ input, select, textarea, .input-field {
   justify-content: center;
   align-items: center;
   gap: 6px;
-  margin-top: 0.45rem;
+  margin-top: 0.5rem;
 }
 
 .deck-dot {
@@ -483,27 +625,34 @@ input, select, textarea, .input-field {
 }
 
 .deck-dot.active {
-  width: 20px;
+  width: 22px;
   border-radius: 4px;
   background: var(--apple-blue);
+  box-shadow: 0 0 10px rgba(0, 113, 227, 0.4);
 }
 
-/* ── Mobile-First Smartphone Navigation (UITabBar thumb dock) ── */
+/* ── Mobile-First Smartphone Navigation (Floating Island Thumb Dock) ── */
 @media (max-width: 768px) {
   .deck-sticky-header {
     position: fixed;
     top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: calc(0.65rem + var(--safe-bottom));
+    left: 0.85rem;
+    right: 0.85rem;
     z-index: 990;
-    background: light-dark(rgba(255, 255, 255, 0.92), rgba(28, 28, 30, 0.92));
-    backdrop-filter: blur(30px) saturate(200%);
-    -webkit-backdrop-filter: blur(30px) saturate(200%);
-    border-top: 1px solid var(--apple-border);
-    padding: 0.35rem 0.5rem calc(0.45rem + var(--safe-bottom)) 0.5rem;
-    margin-bottom: 0;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+    margin: 0 auto;
+    max-width: 440px;
+    border-radius: var(--radius-full);
+    background: light-dark(rgba(255, 255, 255, 0.90), rgba(28, 30, 36, 0.88));
+    backdrop-filter: var(--liquid-blur-heavy);
+    -webkit-backdrop-filter: var(--liquid-blur-heavy);
+    border: 1px solid var(--apple-border-strong);
+    box-shadow: 
+      inset 0 1.2px 0.8px 0 var(--liquid-specular-top),
+      inset 0 -1px 1px 0 var(--liquid-specular-bottom),
+      var(--liquid-shadow-dock);
+    padding: 0.35rem 0.5rem;
+    transform: translateZ(0);
   }
 
   .deck-top-nav {
@@ -513,7 +662,11 @@ input, select, textarea, .input-field {
     background: transparent;
     padding: 0;
     gap: 0.25rem;
-    width: 100%;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    max-width: 100%;
   }
 
   .deck-nav-btn {
@@ -526,8 +679,13 @@ input, select, textarea, .input-field {
     min-height: 48px;
     font-size: 0.72rem;
     font-weight: 600;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-full);
     white-space: nowrap;
+    transition: transform 0.18s var(--ease-spring), background 0.18s ease;
+  }
+
+  .deck-nav-btn:active {
+    transform: scale(0.92);
   }
 
   .deck-nav-icon-box {
@@ -548,9 +706,9 @@ input, select, textarea, .input-field {
   }
 
   .deck-nav-btn.active {
-    background: light-dark(rgba(0, 113, 227, 0.12), rgba(10, 132, 255, 0.2));
+    background: light-dark(rgba(0, 113, 227, 0.14), rgba(10, 132, 255, 0.22));
     color: var(--apple-blue);
-    box-shadow: none;
+    box-shadow: inset 0 1px 1px 0 var(--liquid-specular-top);
   }
 
   .deck-dots-bar {
@@ -558,9 +716,9 @@ input, select, textarea, .input-field {
   }
 
   .fab-apple-ai {
-    bottom: calc(5.2rem + var(--safe-bottom));
-    right: 1rem;
-    padding: 0.65rem 1rem;
+    bottom: calc(5.4rem + var(--safe-bottom));
+    right: 1.15rem;
+    padding: 0.65rem 1.05rem;
     font-size: 0.8rem;
   }
 }
@@ -700,12 +858,15 @@ input, select, textarea, .input-field {
 .deck-card {
   width: 100%;
   box-sizing: border-box;
-  background: var(--apple-surface);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
+  background: var(--liquid-glass-bg);
+  backdrop-filter: var(--liquid-blur);
+  -webkit-backdrop-filter: var(--liquid-blur);
   border: 1px solid var(--apple-border);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
+  box-shadow: 
+    inset 0 1px 1px 0 var(--liquid-specular-top),
+    inset 0 -1px 1px 0 var(--liquid-specular-bottom),
+    var(--liquid-shadow-ambient);
   padding: 1.35rem;
   display: flex;
   flex-direction: column;
@@ -721,7 +882,7 @@ input, select, textarea, .input-field {
   }
 }
 
-/* Botón flotante Apple Intelligence para voz/chat */
+/* Botón flotante Apple Intelligence para voz/chat con Liquid Glass */
 .fab-apple-ai {
   position: fixed;
   bottom: calc(1.25rem + var(--safe-bottom));
@@ -730,23 +891,33 @@ input, select, textarea, .input-field {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  padding: 0.75rem 1.15rem;
+  padding: 0.75rem 1.25rem;
   border-radius: var(--radius-full);
-  background: light-dark(rgba(255, 255, 255, 0.92), rgba(30, 30, 32, 0.92));
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid var(--apple-border);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15), 0 0 20px rgba(0, 113, 227, 0.25);
+  background: var(--liquid-glass-bg-elevated);
+  backdrop-filter: var(--liquid-blur-heavy);
+  -webkit-backdrop-filter: var(--liquid-blur-heavy);
+  border: 1px solid var(--apple-border-strong);
+  box-shadow: 
+    inset 0 1.2px 0.8px 0 var(--liquid-specular-top),
+    0 12px 36px rgba(0, 0, 0, 0.22),
+    0 0 25px rgba(0, 113, 227, 0.3);
   color: var(--apple-text);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   cursor: pointer;
-  transition: transform 0.2s var(--ease-spring), box-shadow 0.2s ease;
+  transition: transform 0.22s var(--ease-spring), box-shadow 0.22s ease;
 }
 
 .fab-apple-ai:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2), 0 0 28px rgba(0, 113, 227, 0.35);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 
+    inset 0 1.5px 1px 0 var(--liquid-specular-top),
+    0 16px 44px rgba(0, 0, 0, 0.28),
+    0 0 32px rgba(175, 82, 222, 0.4);
+}
+
+.fab-apple-ai:active {
+  transform: scale(0.96);
 }
 
 .fab-apple-ai:active {

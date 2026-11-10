@@ -57,7 +57,7 @@ export function Header({
           {/* Weather Capsule */}
           {wInfo && todayWeather && (
             <div
-              className="weather-capsule"
+              className="weather-capsule liquid-pill liquid-specular"
               title={`Mín: ${todayWeather.tMin}° / Máx: ${todayWeather.tMax}°. Ropa: ${outfit.join(" · ")}`}
             >
               <span style={{ fontSize: "1rem" }}>{wInfo.icon}</span>
@@ -78,17 +78,18 @@ export function Header({
             <button
               type="button"
               onClick={onOpenProfile}
+              className="liquid-pill liquid-specular"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.45rem",
-                padding: activeMember ? "0.35rem 0.85rem" : "0.38rem 0.75rem",
+                padding: activeMember ? "0.38rem 0.95rem" : "0.38rem 0.85rem",
                 borderRadius: "var(--radius-full)",
-                background: activeMember ? `${activeMember.color}1e` : "var(--apple-surface-secondary)",
-                border: `1.5px solid ${activeMember ? activeMember.color : "var(--apple-border)"}`,
+                background: activeMember ? `${activeMember.color}1e` : undefined,
+                borderColor: activeMember ? `${activeMember.color}66` : undefined,
                 cursor: "pointer",
-                boxShadow: activeMember ? `0 0 12px ${activeMember.color}33` : "none",
-                transition: "all 0.15s ease",
+                boxShadow: activeMember ? `0 0 16px ${activeMember.color}33, inset 0 1px 1px var(--liquid-specular-top)` : undefined,
+                transition: "all 0.2s var(--ease-spring)",
               }}
               title={activeMember ? `Perfil activo: ${activeMember.name}. Toca para cambiar.` : "Iniciar sesión o elegir perfil"}
               aria-label="Selector de perfil"
@@ -101,16 +102,17 @@ export function Header({
                       height: "8px",
                       borderRadius: "50%",
                       background: activeMember.color,
+                      boxShadow: `0 0 8px ${activeMember.color}`,
                     }}
                   />
-                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--apple-text)" }}>
+                  <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--apple-text)" }}>
                     {activeMember.name}
                   </span>
                   <span style={{ fontSize: "0.62rem", color: activeMember.color, fontWeight: 700 }}>▼</span>
                 </>
               ) : (
                 <>
-                  <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--apple-text-secondary)" }}>
+                  <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--apple-text-secondary)" }}>
                     Perfil
                   </span>
                 </>
@@ -119,7 +121,7 @@ export function Header({
           )}
 
           {/* Botón Asistente (Desktop & Tablet) */}
-          <div className="btn-apple-intelligence hide-on-mobile" onClick={onOpenAssistant} role="button" tabIndex={0}>
+          <div className="btn-apple-intelligence hide-on-mobile liquid-specular" onClick={onOpenAssistant} role="button" tabIndex={0}>
             <div className="btn-apple-intelligence-inner">
               <span className="ai-status-indicator" />
               <span>Asistente</span>
@@ -130,7 +132,7 @@ export function Header({
           {/* Botón Ajustes */}
           <button
             onClick={onOpenSettings}
-            className="btn-settings-header"
+            className="btn-settings-header liquid-glass-elevated"
             title="Ajustes del sistema"
             aria-label="Ajustes del sistema"
           >

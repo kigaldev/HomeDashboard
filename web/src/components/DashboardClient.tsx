@@ -351,12 +351,12 @@ export function DashboardClient({
 
                 {/* Widget Rápido: Agenda de Hoy */}
                 <div
-                  className="glass-card wall-agenda-widget"
+                  className="liquid-glass wall-agenda-widget liquid-specular"
                   style={{
                     padding: "1rem 1.25rem",
                     borderRadius: "var(--radius-lg)",
-                    background: "var(--apple-surface-secondary)",
-                    boxShadow: "var(--shadow-sm)",
+                    background: "var(--liquid-glass-bg-subtle)",
+                    boxShadow: "var(--liquid-shadow-ambient), inset 0 1px 0.5px var(--liquid-specular-top)",
                     border: "1px solid var(--apple-border)",
                   }}
                 >
@@ -551,14 +551,14 @@ export function DashboardClient({
                 {/* Widget Rápido: Economía & Suministros Naturgy */}
                 <div
                   onClick={() => goToCard(2)}
-                  className="wall-card-quick-eco touch-target"
+                  className="liquid-glass wall-card-quick-eco touch-target liquid-specular"
                   style={{
                     cursor: "pointer",
                     padding: "0.95rem 1.25rem",
                     borderRadius: "var(--radius-lg)",
-                    background: "var(--apple-surface-secondary)",
+                    background: "var(--liquid-glass-bg-subtle)",
                     borderLeft: "4px solid var(--apple-green)",
-                    boxShadow: "var(--shadow-sm)",
+                    boxShadow: "var(--liquid-shadow-ambient), inset 0 1px 0.5px var(--liquid-specular-top)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",

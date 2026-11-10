@@ -463,11 +463,13 @@ TOTAL 16.50 €`;
         maxHeight: "92vh",
         display: isOpen ? "flex" : "none",
         flexDirection: "column",
-        background: "var(--apple-bg)",
-        border: "1px solid var(--apple-border-strong)",
+        background: "var(--liquid-glass-bg, rgba(26, 28, 34, 0.88))",
+        backdropFilter: "blur(32px) saturate(210%)",
+        WebkitBackdropFilter: "blur(32px) saturate(210%)",
+        border: "1px solid var(--liquid-glass-border, rgba(255, 255, 255, 0.16))",
         borderRadius: "var(--radius-xl)",
         padding: 0,
-        boxShadow: "var(--shadow-lg)",
+        boxShadow: "var(--liquid-shadow-elevated)",
         overflow: "hidden",
         color: "var(--apple-text)",
       }}
@@ -479,8 +481,8 @@ TOTAL 16.50 €`;
           justifyContent: "space-between",
           alignItems: "center",
           padding: "1rem 1.4rem",
-          background: "var(--apple-surface)",
-          borderBottom: "1px solid var(--apple-border)",
+          background: "rgba(255, 255, 255, 0.04)",
+          borderBottom: "1px solid var(--liquid-glass-border, rgba(255, 255, 255, 0.1))",
           backdropFilter: "blur(20px)",
         }}
       >
