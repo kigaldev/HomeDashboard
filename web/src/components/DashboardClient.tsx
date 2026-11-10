@@ -19,6 +19,7 @@ import { AiAssistantModal } from "./AiAssistantModal";
 import { SettingsModal } from "./SettingsModal";
 import { ProfileLoginModal } from "./ProfileLoginModal";
 import type { NewsItem } from "@/lib/news";
+import type { CommuteTraffic } from "@/lib/traffic";
 import {
   IconHome,
   IconCart,
@@ -97,6 +98,7 @@ export function DashboardClient({
   insurances = [],
   warranties = [],
   news = { espana: [], cyl: [] },
+  traffic = null,
 }: {
   members: Member[];
   currentMemberId?: number | null;
@@ -131,6 +133,7 @@ export function DashboardClient({
   insurances: FamilyInsurance[];
   warranties: Warranty[];
   news?: { espana: NewsItem[]; cyl: NewsItem[] };
+  traffic?: CommuteTraffic | null;
 }) {
   const activeMember = members.find((m) => m.id === currentMemberId);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -370,6 +373,7 @@ export function DashboardClient({
                 <WeatherDetailWidget
                   weather={weather}
                   todayWeather={todayWeather}
+                  traffic={traffic}
                 />
 
                 <FamilyPhotoFrame />

@@ -4,14 +4,17 @@ import { useState, useEffect, useRef } from "react";
 import { IconCamera } from "./Icons";
 
 export function FamilyPhotoFrame() {
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>("/IMG_3395.JPG");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("hd_family_photo");
       if (saved) setPhotoUrl(saved);
-    } catch {}
+      else setPhotoUrl("/IMG_3395.JPG");
+    } catch {
+      setPhotoUrl("/IMG_3395.JPG");
+    }
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,7 +41,7 @@ export function FamilyPhotoFrame() {
         borderRadius: "var(--radius-xl)",
         overflow: "hidden",
         position: "relative",
-        minHeight: "240px",
+        minHeight: "210px",
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-end",
@@ -70,10 +73,10 @@ export function FamilyPhotoFrame() {
             justifyContent: "center",
           }}
         >
-          <div style={{ textAlign: "center", padding: "1.5rem" }}>
-            <span style={{ fontSize: "3.5rem", display: "block", marginBottom: "0.5rem" }}>👨‍👩‍👦‍👦</span>
-            <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--apple-text)" }}>
-              Familia Soto Feliz
+          <div style={{ textAlign: "center", padding: "1.25rem" }}>
+            <span style={{ fontSize: "3rem", display: "block", marginBottom: "0.4rem" }}>👨‍👩‍👦‍👦</span>
+            <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--apple-text)" }}>
+              Familia Feliz Gallego
             </span>
             <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: "0.2rem 0 0 0" }}>
               Kike · Lara · Fabio · Bruno
@@ -97,7 +100,7 @@ export function FamilyPhotoFrame() {
         style={{
           position: "relative",
           zIndex: 2,
-          padding: "1.1rem 1.25rem",
+          padding: "0.95rem 1.15rem",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-end",
@@ -109,7 +112,7 @@ export function FamilyPhotoFrame() {
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <span style={{ fontSize: "0.95rem" }}>🏡</span>
             <h3 style={{ fontSize: "1.05rem", fontWeight: 800, margin: 0, color: "#ffffff", letterSpacing: "-0.01em" }}>
-              Familia Soto Feliz
+              Familia Feliz Gallego
             </h3>
           </div>
           <p style={{ fontSize: "0.76rem", color: "rgba(255,255,255,0.75)", margin: "0.15rem 0 0 0" }}>
@@ -154,3 +157,4 @@ export function FamilyPhotoFrame() {
     </div>
   );
 }
+

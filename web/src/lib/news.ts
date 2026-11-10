@@ -148,3 +148,4 @@ export async function getLatestNews(): Promise<{ espana: NewsItem[]; cyl: NewsIt
     cyl: cyl && cyl.length > 0 ? cyl : fallbackCyL,
   };
 }
+

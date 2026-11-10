@@ -514,13 +514,13 @@ input, select, textarea, .input-field {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
+  gap: 0.3rem;
   margin: 0 auto;
-  max-width: 580px;
+  max-width: fit-content;
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  padding: 5px;
+  padding: 4px 6px;
   background: light-dark(rgba(242, 242, 247, 0.78), rgba(24, 26, 32, 0.75));
   backdrop-filter: var(--liquid-blur-heavy);
   -webkit-backdrop-filter: var(--liquid-blur-heavy);
@@ -538,15 +538,15 @@ input, select, textarea, .input-field {
 }
 
 .deck-nav-btn {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.55rem 1.25rem;
-  min-height: 46px;
+  gap: 0.45rem;
+  padding: 0.45rem 1rem;
+  min-height: 42px;
   border-radius: var(--radius-full);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: var(--apple-text-secondary);
   background: transparent;
@@ -749,11 +749,11 @@ input, select, textarea, .input-field {
   box-sizing: border-box;
 }
 
-/* Optimización para Pantallas de Pared (1280x800, 1920x1080) en Horizontal / Kiosk */
-@media (min-width: 900px) and (orientation: landscape), (min-width: 960px) {
+/* Optimización para Pantallas de Pared (Kiosk 10", 1280x800, 1024x600, 1920x1080) en Horizontal */
+@media (min-width: 850px) and (orientation: landscape), (min-width: 960px) {
   .wall-dashboard-grid {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-    gap: 1.5rem;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+    gap: 1.15rem;
     align-items: start;
   }
 
@@ -761,41 +761,41 @@ input, select, textarea, .input-field {
     grid-column: 1 / -1;
   }
 
-  /* Barra de navegación superior amplia y táctil para marco de pared */
+  /* Barra de navegación superior equilibrada y táctil para marco de 10" */
   .deck-sticky-header {
-    padding: 0.6rem 0 0.85rem 0;
-    margin-bottom: 1.25rem;
+    padding: 0.45rem 0 0.65rem 0;
+    margin-bottom: 0.95rem;
   }
 
   .deck-top-nav {
-    max-width: 760px;
+    max-width: 840px;
     margin: 0 auto;
-    padding: 6px;
-    gap: 0.6rem;
+    padding: 5px 8px;
+    gap: 0.4rem;
     background: light-dark(rgba(118, 118, 128, 0.16), rgba(118, 118, 128, 0.3));
     box-shadow: var(--shadow-sm);
   }
 
   .deck-nav-btn {
-    min-height: 48px;
-    padding: 0.65rem 1.45rem;
-    font-size: 1.05rem;
+    min-height: 42px;
+    padding: 0.45rem 0.95rem;
+    font-size: 0.92rem;
     font-weight: 600;
-    gap: 0.65rem;
+    gap: 0.45rem;
   }
 
   .deck-nav-btn svg {
-    width: 20px !important;
-    height: 20px !important;
+    width: 18px !important;
+    height: 18px !important;
   }
 
   .deck-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
   }
 
   .deck-dot.active {
-    width: 28px;
+    width: 24px;
   }
 
   /* Tipografías y contraste reforzados para lectura cómoda a 1-2 metros */

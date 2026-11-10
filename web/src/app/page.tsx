@@ -26,6 +26,7 @@ import {
 import { getWeather } from "@/lib/weather";
 import { ensureDinnerPlans } from "@/lib/dinners";
 import { getLatestNews } from "@/lib/news";
+import { getSchoolCommuteTraffic } from "@/lib/traffic";
 import { connection } from "next/server";
 import { getActiveMemberId } from "@/lib/session";
 import { DashboardClient } from "@/components/DashboardClient";
@@ -66,6 +67,7 @@ export default async function HomePage() {
     insurances,
     warranties,
     news,
+    traffic,
   ] = await Promise.all([
     getMembers(),
     getWeather(),
@@ -89,6 +91,7 @@ export default async function HomePage() {
     getFamilyInsurances(),
     getWarranties(),
     getLatestNews(),
+    getSchoolCommuteTraffic(),
   ]);
 
   const todayWeather = weather?.days.find((d) => d.date === today) ?? null;
@@ -125,6 +128,7 @@ export default async function HomePage() {
       insurances={insurances}
       warranties={warranties}
       news={news}
+      traffic={traffic}
     />
   );
 }
