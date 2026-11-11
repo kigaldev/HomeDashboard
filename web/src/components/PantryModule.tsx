@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useRef } from "react";
 import {
   setPantryStatusAction,
   setPantryStockLevelAction,
@@ -74,6 +74,8 @@ export function PantryModule({
   // Niveles de stock optimistas en memoria para respuesta táctil y ratón instantánea (60 fps)
   const [stockLevels, setStockLevels] = useState<Record<string, number>>({});
   const [activeDragItem, setActiveDragItem] = useState<string | null>(null);
+  const [deletedNames, setDeletedNames] = useState<Set<string>>(new Set());
+  const lastCommittedRef = useRef<Record<string, number>>({});
 
   // Filtros y búsqueda
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,20 +86,90 @@ export function PantryModule({
   const [newItemName, setNewItemName] = useState("");
   const [newItemLevel, setNewItemLevel] = useState(100);
 
+  // Catálogo completo de despensa doméstica familiar (79 productos supervisados)
   const defaultPantry = [
     "Aceite de oliva",
     "Leche",
     "Huevos",
     "Café",
     "Arroz",
+    "Arroz Basmati",
     "Pasta",
+    "FIDEOS GALLO 400G",
+    "AZUCAR",
+    "GALLETAS MINI 400G",
+    "GOTAS DE CHOCOLATE",
+    "TORTITAS DE MAIZ",
+    "MASA HOJALDRE X 2",
+    "Infusión de jengibre y cúrcuma",
+    "LINDOR LECHE 100G",
+    "FILETE 1ª TERNERA",
+    "Chuleta de vacuno",
+    "Picaña de pato",
+    "JAMON CEBO",
+    "FUET ESPETEC EXTRA",
+    "Espetec",
+    "Mejillones vivos",
+    "Mejillón Fresco",
+    "FUMES PESCADO 1L",
+    "CLARA LÍQUIDA PASTEU",
+    "BANANA GRANEL",
+    "Manzana Roja 2 kg",
+    "MANZANA GOLDEN",
+    "ARÁNDANO 500 GR",
+    "KIWI ZESPRI",
+    "Kiwi rojo",
+    "MANGO BANDEJA",
+    "PIÑA EN SU JUGO",
+    "PIÑA S/AZ AÑADIDO",
+    "Caqui",
+    "KAKI CRF GRANEL",
+    "Ciruela Roja",
+    "Patata Granel",
+    "Boniato",
+    "Zanahorias",
+    "CALABACIN DADOS 450",
+    "Pimiento Tricolor",
+    "CEBOLLA CARAMELIZADA",
+    "TOAMATE CUBOS CRF",
+    "TOMATE MUTTI 130G",
+    "PEPINILLO AG GRANDE",
+    "GAZPACHO CRF 1L",
+    "LECHE ENTERA SIN 1L",
+    "Yogur",
+    "GRIEGO NATURAL LIGHT",
+    "Bífi Fruta con Trozos",
+    "Bífidus 0% 0% Fruta",
+    "Bífidus 0% 0% Cereales / Muesli",
+    "Kéfir Bebible",
+    "PETIT POCKET FRESA",
+    "Queso Cottage",
+    "Lonchas Edam",
+    "MEZCLA 4 QUESOS",
+    "QUESO CARREFOUR 250G",
+    "QUESO CARREFOUR 300G",
+    "QUESO ROQUEFORT 100G",
+    "SNACK QUESO CRF 200G",
+    "Pizza blanca de trufa",
+    "PAN MOLDE INTEGRAL",
+    "Panecillo Integral Pack 6",
+    "AGUADOY 6L",
+    "ICE TEA MELOCOTÓN 0",
     "Pañales",
     "Toallitas",
     "Detergente",
     "Papel higiénico",
+    "POUCH MY BABY BIO 4U",
+    "CREMA BEBE 150ML",
+    "QUITAMANCHAS TEXTIL",
+    "SUAVIZANTE COLONIA",
+    "Juguetes-0521537",
+    "Juguetes-0521545",
+    "Trenes Madera-0521227",
+    "DESCUENTO EN 2ª UNIDAD",
   ];
 
-  const dbNames = new Set(items.map((i) => i.name.toLowerCase()));
+  const dbNames = useMemo(() => new Set(items.map((i) => i.name.toLowerCase())), [items]);
   const allPantry: (PantryItem & { quantity_level: number })[] = useMemo(() => {
     const list: (PantryItem & { quantity_level: number })[] = items.map((i) => ({
       ...i,
@@ -122,8 +194,8 @@ export function PantryModule({
         });
       });
 
-    return list;
-  }, [items]);
+    return list.filter((i) => !deletedNames.has(i.name.toLowerCase()));
+  }, [items, dbNames, deletedNames]);
 
   const getItemLevel = (item: { name: string; quantity_level: number }) => {
     if (stockLevels[item.name] !== undefined) {
@@ -140,15 +212,37 @@ export function PantryModule({
   const handleCommitStock = (name: string, value: number) => {
     setActiveDragItem(null);
     setStockLevels((prev) => ({ ...prev, [name]: value }));
+
+    // Evitar disparar server action múltiple si el valor no ha cambiado
+    if (lastCommittedRef.current[name] === value) {
+      return;
+    }
+    lastCommittedRef.current[name] = value;
+
     startTransition(async () => {
-      await setPantryStockLevelAction(name, value);
+      try {
+        await setPantryStockLevelAction(name, value);
+      } catch (err) {
+        console.error("[PantryModule] Error guardando stock:", err);
+      }
     });
   };
 
   const handleQuickPreset = (name: string, value: number) => {
+    setActiveDragItem(null);
     setStockLevels((prev) => ({ ...prev, [name]: value }));
+
+    if (lastCommittedRef.current[name] === value) {
+      return;
+    }
+    lastCommittedRef.current[name] = value;
+
     startTransition(async () => {
-      await setPantryStockLevelAction(name, value);
+      try {
+        await setPantryStockLevelAction(name, value);
+      } catch (err) {
+        console.error("[PantryModule] Error preset stock:", err);
+      }
     });
   };
 
@@ -157,19 +251,29 @@ export function PantryModule({
     if (!newItemName.trim()) return;
     const name = newItemName.trim();
     const lvl = newItemLevel;
+    lastCommittedRef.current[name] = lvl;
     setStockLevels((prev) => ({ ...prev, [name]: lvl }));
     setNewItemName("");
     setNewItemLevel(100);
     setIsAddingOpen(false);
     startTransition(async () => {
-      await addPantryItemAction(name, lvl);
+      try {
+        await addPantryItemAction(name, lvl);
+      } catch (err) {
+        console.error("[PantryModule] Error añadiendo producto:", err);
+      }
     });
   };
 
   const handleDelete = (name: string) => {
     if (!confirm(`¿Eliminar «${name}» de la despensa supervisada?`)) return;
+    setDeletedNames((prev) => new Set([...prev, name.toLowerCase()]));
     startTransition(async () => {
-      await deletePantryItemAction(name);
+      try {
+        await deletePantryItemAction(name);
+      } catch (err) {
+        console.error("[PantryModule] Error eliminando producto:", err);
+      }
     });
   };
 
@@ -632,10 +736,8 @@ export function PantryModule({
                         step="5"
                         value={currentLevel}
                         onChange={(e) => handleSliderChange(item.name, Number(e.target.value))}
-                        onPointerUp={() => handleCommitStock(item.name, currentLevel)}
-                        onKeyUp={() => handleCommitStock(item.name, currentLevel)}
-                        onTouchEnd={() => handleCommitStock(item.name, currentLevel)}
-                        onMouseUp={() => handleCommitStock(item.name, currentLevel)}
+                        onPointerUp={(e) => handleCommitStock(item.name, Number(e.currentTarget.value))}
+                        onKeyUp={(e) => handleCommitStock(item.name, Number(e.currentTarget.value))}
                         aria-label={`Ajustar nivel de existencias de ${item.name}`}
                         style={{
                           position: "absolute",
@@ -646,6 +748,7 @@ export function PantryModule({
                           cursor: "pointer",
                           zIndex: 4,
                           margin: 0,
+                          touchAction: "pan-y",
                         }}
                       />
 

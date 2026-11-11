@@ -26,10 +26,10 @@ async function connect(): Promise<Db> {
     const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
     const pool = new Pool({
       connectionString: url,
-      max: 5,
-      idleTimeoutMillis: 5000,
+      max: 20,
+      idleTimeoutMillis: 10000,
       ssl: isLocal ? false : { rejectUnauthorized: false },
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 15000,
     });
 
     return {
@@ -105,11 +105,15 @@ export function getDb(): Promise<Db> {
   return g.__hdDb;
 }
 
-export async function q<T extends Row = Row>(sql: string, params: unknown[] = []): Promise<T[]> {
+export async function q<T extends Row = Row>(sql: string, params: unknown[] = [], retries = 1): Promise<T[]> {
   try {
     const db = await getDb();
     return await db.query<T>(sql, params);
   } catch (err) {
+    if (retries > 0) {
+      await new Promise((r) => setTimeout(r, 150));
+      return q<T>(sql, params, retries - 1);
+    }
     console.error(`[db] Error ejecutando consulta SQL: ${sql.slice(0, 80)}`, err);
     return [];
   }
