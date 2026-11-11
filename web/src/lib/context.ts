@@ -16,7 +16,8 @@ export async function daySnapshot(date: string) {
     getEnergyContracts(),
   ]);
   const byId = new Map(members.map((m) => [m.id, m]));
-  const name = (id: number | null) => (id ? byId.get(id)?.name ?? "?" : "los dos");
+  const name = (id: number | null | undefined) =>
+    id !== null && id !== undefined ? byId.get(id)?.name ?? (id === 0 ? "Ambos" : "?") : "Ambos";
   const day = weather?.days.find((d) => d.date === date) ?? null;
   const birthdays = members.filter((m) => m.birthdate && m.birthdate.slice(5) === date.slice(5));
   const tasksDue = tasks.filter((t) => !t.done && (!t.due_date || t.due_date <= date));
@@ -54,7 +55,14 @@ export function snapshotText(s: Snapshot): string {
       `Recomendaciones hoy: Coche Eléctrico (${s.energyRecs.ev.statusLabel} · Mejor: ${s.energyRecs.ev.bestHours}) | Lavadora (${s.energyRecs.washer.statusLabel}) | Calefacción (${s.energyRecs.heating.bestHours} · Ventilar 13-15h).`
     );
   }
-  if (s.run) L.push(`Cole: lleva ${s.name(s.run.dropoff_id)}, recoge ${s.name(s.run.pickup_id)}${s.run.note ? ` (${s.run.note})` : ""}`);
+  if (s.run) {
+    const runParts = [`lleva mañana: ${s.name(s.run.dropoff_id)}`];
+    if (s.run.pickup_noon_id !== null && s.run.pickup_noon_id !== undefined) {
+      runParts.push(`recoge mediodía: ${s.name(s.run.pickup_noon_id)}`);
+    }
+    runParts.push(`recoge tarde: ${s.name(s.run.pickup_id)}`);
+    L.push(`Cole: ${runParts.join(", ")}${s.run.note ? ` (${s.run.note})` : ""}`);
+  }
   L.push(`Menú del cole: ${s.lunch ?? "sin datos"}${s.dinnerRec ? ` (Cena recomendada *: ${s.dinnerRec})` : ""}`);
   L.push(
     "Agenda: " +

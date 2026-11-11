@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const emptyToUndef = (v: unknown) => (v === "" || v === null ? undefined : v);
 export const id = z.number().int().positive();
-export const optId = z.preprocess(emptyToUndef, z.coerce.number().int().positive().optional()).transform((v) => v ?? null);
+export const optId = z.preprocess(emptyToUndef, z.coerce.number().int().nonnegative().optional()).transform((v) => v ?? null);
 const optStr = (max: number) => z.preprocess(emptyToUndef, z.string().trim().max(max).optional()).transform((v) => v ?? null);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 

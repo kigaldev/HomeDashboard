@@ -9,7 +9,7 @@ import {
   getStores,
   getStaples,
   getPantry,
-  getOpenTasks,
+  getTasksWithHistory,
   getSchoolRun,
   getHealthUpcoming,
   getEventsBetween,
@@ -27,6 +27,8 @@ import { getWeather } from "@/lib/weather";
 import { ensureDinnerPlans } from "@/lib/dinners";
 import { getLatestNews } from "@/lib/news";
 import { getSchoolCommuteTraffic } from "@/lib/traffic";
+import { syncMontessoriMenu } from "@/lib/schoolMenu";
+import { generateBriefing } from "@/lib/briefing";
 import { connection } from "next/server";
 import { getActiveMemberId } from "@/lib/session";
 import { DashboardClient } from "@/components/DashboardClient";
@@ -78,7 +80,7 @@ export default async function HomePage() {
     getStores(),
     getStaples(),
     getPantry(),
-    getOpenTasks(),
+    getTasksWithHistory(),
     getSchoolRun(today),
     getHealthUpcoming(30),
     getEventsBetween(today, addDays(today, 60)),
@@ -95,8 +97,32 @@ export default async function HomePage() {
   ]);
 
   const todayWeather = weather?.days.find((d) => d.date === today) ?? null;
-  const schoolLunch = schoolMenuRow?.lunch ?? null;
-  const schoolDinnerRec = schoolMenuRow?.dinner_recommendation ?? null;
+  let schoolLunch = schoolMenuRow?.lunch ?? null;
+  let schoolDinnerRec = schoolMenuRow?.dinner_recommendation ?? null;
+
+  if (!schoolLunch) {
+    try {
+      await syncMontessoriMenu();
+      const updatedMenu = await getSchoolMenu(today);
+      if (updatedMenu) {
+        schoolLunch = updatedMenu.lunch;
+        schoolDinnerRec = updatedMenu.dinner_recommendation;
+      }
+    } catch (e) {
+      console.warn("[page] Error auto-sincronizando menú escolar:", e);
+    }
+  }
+
+  let latestBriefing = latestBriefingRow?.content ?? null;
+  if (!latestBriefing || latestBriefingRow?.for_date !== today) {
+    try {
+      const isEvening = new Date().getHours() >= 20;
+      const kind = isEvening ? "evening" : "morning";
+      latestBriefing = await generateBriefing(kind);
+    } catch (e) {
+      console.warn("[page] Error auto-generando briefing diario:", e);
+    }
+  }
 
   return (
     <DashboardClient
@@ -106,7 +132,7 @@ export default async function HomePage() {
       today={today}
       formattedDate={formattedDate}
       greeting={currentGreeting}
-      latestBriefing={latestBriefingRow?.content ?? null}
+      latestBriefing={latestBriefing}
       todayWeather={todayWeather}
       dinners={dinners}
       schoolLunch={schoolLunch}

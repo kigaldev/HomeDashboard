@@ -57,8 +57,40 @@ export async function syncMontessoriMenu(): Promise<{ success: boolean; message:
     // 4. Parsear los días y comidas del mes
     const today = isoDate();
     const currentYear = today.slice(0, 4);
-    const currentMonth = today.slice(5, 7); // "10"
     let daysUpdated = 0;
+
+    // Menú oficial de Noviembre 2026 de Montessori Salamanca con recomendación oficial de cena (*)
+    const menuItemsNovember: Record<number, { lunch: string; dinnerRec: string }> = {
+      2: { lunch: "Arroz a la napolitana + Filete de lenguadina a la plancha con ensalada fresca con maíz dulce", dinnerRec: "Verdura Huevos Patatas Fruta" },
+      3: { lunch: "Alubias pintas guisadas + Pechuga de pollo al ajillo con patatas dado", dinnerRec: "Verdura Pescado Verdura Lácteos" },
+      4: { lunch: "Judías verdes salteadas + Salchichas al horno con ensalada fresca de lechuga con tomate", dinnerRec: "Patatas Carne Pasta Fruta" },
+      5: { lunch: "Macarrones con chorizo + Merluza rebozada con limón con ensalada fresca con lechuga y cebolla", dinnerRec: "Verdura Carne Legumbres Fruta" },
+      6: { lunch: "Paella de verduras + Jamoncitos de pollo asados con ensalada", dinnerRec: "Verdura Carne Legumbres Fruta" },
+      9: { lunch: "Paella mixta + Filetes rusos caseros con parmentier de patata al romero", dinnerRec: "Verdura Pescado Verdura Fruta" },
+      10: { lunch: "Lentejas estofadas con verduras + Palometa en salsa con ensalada fresca de lechuga con tomate", dinnerRec: "Verdura Carne Pasta Fruta" },
+      11: { lunch: "Crema de verduras (eco.) + Jamoncitos de pollo asados con patatas dado", dinnerRec: "Pasta Pescado Verdura Fruta" },
+      12: { lunch: "Patatas a la riojana con chorizo + Huevos revueltos con queso fundido y ensalada fresca", dinnerRec: "Verdura Pescado Arroz Fruta" },
+      13: { lunch: "Sopa casera de cocido + Cocido completo con verdura y carne", dinnerRec: "Verdura Huevos Verdura Lácteos" },
+      16: { lunch: "Crema de calabacín (eco.) + Macarrones con boloñesa de soja", dinnerRec: "Pasta Carne Verdura Lácteos" },
+      17: { lunch: "Alubias estofadas con verduras + Medallón de salmón y calabaza con salsa de tomate", dinnerRec: "Verdura Carne Arroz Fruta" },
+      18: { lunch: "Judías verdes con tomate + Tortilla de patatas con ensalada fresca de lechuga con tomate", dinnerRec: "Pasta Carne Legumbres Lácteos" },
+      19: { lunch: "Lentejas estofadas con verduras + Delicias de bacalao con ensalada de col", dinnerRec: "Verdura Huevos Pasta Fruta" },
+      20: { lunch: "Arroz con salsa de tomate + Pechuga de pollo a la plancha con patatas dado", dinnerRec: "Verdura Pescado Verdura Fruta" },
+      23: { lunch: "Crema de zanahoria (eco.) + Merluza rebozada con limón con ensalada fresca con lechuga y zanahoria", dinnerRec: "Verdura Carne Pasta Lácteos" },
+      24: { lunch: "Lentejas a la castellana + Tortilla francesa con ensalada fresca con lechuga y cebolla", dinnerRec: "Verdura Carne Patatas Fruta" },
+      25: { lunch: "Arroz a la napolitana + Albóndigas veggie a la jardinera con ensalada fresca de lechuga con tomate", dinnerRec: "Verdura Carne Patatas Fruta" },
+      26: { lunch: "Sopa casera de cocido + Cocido completo con verdura y carne", dinnerRec: "Verdura Pescado Verdura Fruta" },
+      27: { lunch: "Espaguetis con salsa boloñesa + Abadejo al estilo griego con patatas panaderas", dinnerRec: "Verdura Carne Verdura Lácteos" },
+      30: { lunch: "Paella de verduras + Jamoncitos de pollo asados al romero con ensalada fresca con maíz dulce", dinnerRec: "Verdura Pescado Legumbres Lácteos" },
+    };
+
+    // Insertar días de Noviembre (11)
+    for (const [dayNum, item] of Object.entries(menuItemsNovember)) {
+      const dayFormatted = String(dayNum).padStart(2, "0");
+      const dateStr = `${currentYear}-11-${dayFormatted}`;
+      await setSchoolMenu(dateStr, item.lunch, item.dinnerRec);
+      daysUpdated++;
+    }
 
     // Menú base de Octubre con recomendación oficial de cena (*)
     const menuItemsOctober: Record<number, { lunch: string; dinnerRec: string }> = {
@@ -85,10 +117,10 @@ export async function syncMontessoriMenu(): Promise<{ success: boolean; message:
       30: { lunch: "Crema de verduras (eco.) + Albóndigas veggie con salsa de tomate", dinnerRec: "Patatas Pescado Verdura Lácteos" },
     };
 
-    // Si encontramos palabras clave en el texto, las insertamos en la BD para cada día
+    // Insertar días de Octubre (10)
     for (const [dayNum, item] of Object.entries(menuItemsOctober)) {
       const dayFormatted = String(dayNum).padStart(2, "0");
-      const dateStr = `${currentYear}-${currentMonth}-${dayFormatted}`;
+      const dateStr = `${currentYear}-10-${dayFormatted}`;
       await setSchoolMenu(dateStr, item.lunch, item.dinnerRec);
       daysUpdated++;
     }

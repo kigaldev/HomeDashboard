@@ -18,7 +18,14 @@ function template(kind: BriefingKind, s: Snapshot): string {
     L.push(`\n${w.icon} <b>Tiempo:</b> ${w.text}, ${s.day.tMin}° → ${s.day.tMax}°${s.day.rainProb >= 30 ? `, lluvia ${s.day.rainProb}%` : ""}`);
     L.push(`👕 <b>Peques:</b> ${kidsOutfit(s.day).join(" · ")}`);
   }
-  if (s.run) L.push(`\n🚸 <b>Cole:</b> lleva ${x(s.name(s.run.dropoff_id))} · recoge ${x(s.name(s.run.pickup_id))}${s.run.note ? ` (${x(s.run.note)})` : ""}`);
+  if (s.run) {
+    const runParts = [`lleva mañana ${x(s.name(s.run.dropoff_id))}`];
+    if (s.run.pickup_noon_id !== null && s.run.pickup_noon_id !== undefined) {
+      runParts.push(`recoge mediodía ${x(s.name(s.run.pickup_noon_id))}`);
+    }
+    runParts.push(`recoge tarde ${x(s.name(s.run.pickup_id))}`);
+    L.push(`\n🚸 <b>Cole:</b> ${runParts.join(" · ")}${s.run.note ? ` (${x(s.run.note)})` : ""}`);
+  }
   if (s.lunch) L.push(`🍽️ <b>Comen en el cole:</b> ${x(s.lunch)}`);
   if (s.dinnerRec) L.push(`⭐ <b>Cena sugerida (*):</b> ${x(s.dinnerRec)}`);
   L.push(`\n📅 <b>Agenda</b>`);

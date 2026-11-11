@@ -5,7 +5,7 @@ import {
   getActiveMemberId, setActiveMemberCookie, clearActiveMemberCookie, grantPinProof, hasPinProof,
 } from "@/lib/session";
 import {
-  parse, formObject, id as idSchema, shoppingForm, taskForm, shortText, longText, imageB64, mime,
+  parse, formObject, id as idSchema, optId, shoppingForm, taskForm, shortText, longText, imageB64, mime,
   assignments, pinSchema, optionalPinSchema,
 } from "@/lib/validation";
 import { z } from "zod";
@@ -24,6 +24,7 @@ import {
   deletePantryItem,
   addTask,
   toggleTask,
+  updateTaskAssignee,
   deleteTask,
   addEvent,
   deleteEvent,
@@ -163,6 +164,13 @@ export async function addTaskAction(formData: FormData) {
 export async function toggleTaskAction(id: number) {
   id = parse(idSchema, id);
   await toggleTask(id);
+  revalidatePath("/");
+}
+
+export async function updateTaskAssigneeAction(id: number, assigneeId: number | null) {
+  id = parse(idSchema, id);
+  assigneeId = parse(optId, assigneeId);
+  await updateTaskAssignee(id, assigneeId);
   revalidatePath("/");
 }
 

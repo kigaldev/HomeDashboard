@@ -27,8 +27,14 @@ export type ShoppingItem = {
 export type Staple = { id: number; name: string; emoji: string; store_id: number | null };
 export type PantryItem = { id: number; name: string; status: "ok" | "low" | "out"; quantity_level?: number };
 export type Task = {
-  id: number; title: string; assignee_id: number | null; due_date: string | null;
-  recurrence: "daily" | "weekly" | "monthly" | null; done: boolean;
+  id: number;
+  title: string;
+  assignee_id: number | null;
+  due_date: string | null;
+  recurrence: "daily" | "weekly" | "monthly" | null;
+  done: boolean;
+  done_at?: string | null;
+  created_at?: string | null;
 };
 export type CalEvent = {
   id: number; title: string; starts_at: string; ends_at: string | null; all_day: boolean;
@@ -350,6 +356,18 @@ export const getOpenTasks = () =>
      where not done or done_at > now() - interval '12 hours'
      order by done, due_date nulls last, created_at`,
   );
+
+export const getTasksWithHistory = () =>
+  q<Task>(
+    `select id, title, assignee_id, due_date::text, recurrence, done, done_at::text, created_at::text
+     from tasks
+     where not done or done_at >= current_date - interval '14 days'
+     order by done, due_date nulls last, created_at desc`,
+  );
+
+export async function updateTaskAssignee(id: number, assigneeId: number | null) {
+  await q("update tasks set assignee_id = $2 where id = $1", [id, assigneeId]);
+}
 
 export async function addTask(title: string, assigneeId: number | null, due: string | null, recurrence: Task["recurrence"] = null) {
   await q("insert into tasks (title, assignee_id, due_date, recurrence) values ($1,$2,$3,$4)", [
