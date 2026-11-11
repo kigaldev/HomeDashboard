@@ -349,6 +349,13 @@ export async function deletePantryItem(name: string) {
   await q("delete from pantry where lower(name) = lower($1)", [name.trim()]);
 }
 
+export async function getPantryLastUpdated(): Promise<string | null> {
+  const rows = await q<{ max_updated: string | null }>(
+    "select max(updated_at)::text as max_updated from pantry"
+  );
+  return rows[0]?.max_updated ?? null;
+}
+
 // ── Tareas ────────────────────────────────────────────────
 export const getOpenTasks = () =>
   q<Task>(

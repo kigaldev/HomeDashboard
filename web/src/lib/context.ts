@@ -77,7 +77,11 @@ export function snapshotText(s: Snapshot): string {
   );
   L.push("Cenas propuestas: " + s.dinners.map((d) => `${d.option === "mambo" ? "Mambo" : "Estándar"}: ${d.title}`).join(" | "));
   L.push("Lista de la compra: " + (s.shopping.filter((i) => !i.checked).map((i) => i.name).join(", ") || "vacía"));
-  L.push("Despensa (se acaba): " + (s.pantry.filter((p) => p.status !== "ok").map((p) => p.name).join(", ") || "nada"));
+  const availableStock = s.pantry
+    .filter((p) => p.status === "ok" && (p.quantity_level === undefined || p.quantity_level > 20))
+    .map((p) => p.name);
+  L.push("Despensa disponible (usar para cenas): " + (availableStock.join(", ") || "básicos generales"));
+  L.push("Despensa agotada/baja (no usar): " + (s.pantry.filter((p) => p.status !== "ok" || (p.quantity_level !== undefined && p.quantity_level <= 20)).map((p) => p.name).join(", ") || "nada"));
   if (s.birthdays.length) L.push("Cumpleaños hoy: " + s.birthdays.map((m) => m.name).join(", "));
   return L.join("\n");
 }

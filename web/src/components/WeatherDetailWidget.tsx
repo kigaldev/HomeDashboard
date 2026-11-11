@@ -226,12 +226,28 @@ export function WeatherDetailWidget({
               </div>
             </div>
 
-            {/* Tiempo Estimado Gigante */}
-            <div style={{ textAlign: "right" }}>
+            {/* Tiempo Estimado y Hora de Llegada */}
+            <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
               <span style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--apple-text)", letterSpacing: "-0.02em" }}>
                 {traffic.durationMinutes} min
               </span>
-              <span style={{ display: "block", fontSize: "0.64rem", color: "var(--apple-text-tertiary)" }}>
+              <span
+                style={{
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  color: "var(--apple-blue)",
+                  background: "rgba(0, 113, 227, 0.12)",
+                  padding: "0.12rem 0.45rem",
+                  borderRadius: "var(--radius-full)",
+                  marginTop: "0.15rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                }}
+              >
+                🏁 Llegada: ~{new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(new Date(Date.now() + (traffic.durationMinutes || 12) * 60000))}
+              </span>
+              <span style={{ display: "block", fontSize: "0.64rem", color: "var(--apple-text-tertiary)", marginTop: "0.1rem" }}>
                 {traffic.delayMinutes > 0 ? `+${traffic.delayMinutes} min retención` : "Tiempo habitual"}
               </span>
             </div>

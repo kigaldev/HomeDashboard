@@ -520,36 +520,70 @@ export function PantryModule({
                         </span>
                       </div>
 
-                      {/* Badge con indicador de color de rojo (0%) a verde (100%) */}
-                      <div
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "0.35rem",
-                          padding: "0.22rem 0.55rem",
-                          borderRadius: "var(--radius-full)",
-                          background: stockBg,
-                          color: stockColor,
-                          fontSize: "0.75rem",
-                          fontWeight: 700,
-                          border: `1px solid ${stockColor}40`,
-                          flexShrink: 0,
-                          letterSpacing: "-0.01em",
-                        }}
-                      >
-                        <span
+                      {/* Controles de la cabecera: Badge de Stock + Botón Papelera Eliminar */}
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+                        {/* Badge con indicador de color de rojo (0%) a verde (100%) */}
+                        <div
                           style={{
-                            width: "7px",
-                            height: "7px",
-                            borderRadius: "50%",
-                            background: stockColor,
-                            boxShadow: `0 0 6px ${stockColor}`,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.35rem",
+                            padding: "0.22rem 0.55rem",
+                            borderRadius: "var(--radius-full)",
+                            background: stockBg,
+                            color: stockColor,
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            border: `1px solid ${stockColor}40`,
+                            letterSpacing: "-0.01em",
                           }}
-                        />
-                        <span>{currentLevel}%</span>
-                        <span style={{ fontSize: "0.68rem", opacity: 0.85, fontWeight: 500 }}>
-                          · {getStockLabel(currentLevel)}
-                        </span>
+                        >
+                          <span
+                            style={{
+                              width: "7px",
+                              height: "7px",
+                              borderRadius: "50%",
+                              background: stockColor,
+                              boxShadow: `0 0 6px ${stockColor}`,
+                            }}
+                          />
+                          <span>{currentLevel}%</span>
+                          <span style={{ fontSize: "0.68rem", opacity: 0.85, fontWeight: 500 }}>
+                            · {getStockLabel(currentLevel)}
+                          </span>
+                        </div>
+
+                        {/* Botón Papelera de eliminación */}
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item.name)}
+                          disabled={isPending}
+                          title={`Eliminar «${item.name}» de la despensa`}
+                          aria-label={`Eliminar ${item.name}`}
+                          className="touch-target"
+                          style={{
+                            background: "rgba(255, 59, 48, 0.08)",
+                            border: "1px solid rgba(255, 59, 48, 0.2)",
+                            borderRadius: "var(--radius-sm)",
+                            color: "var(--apple-red)",
+                            cursor: "pointer",
+                            padding: "0.2rem 0.4rem",
+                            fontSize: "0.82rem",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            lineHeight: 1,
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "rgba(255, 59, 48, 0.22)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "rgba(255, 59, 48, 0.08)";
+                          }}
+                        >
+                          🗑️
+                        </button>
                       </div>
                     </div>
 

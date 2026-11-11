@@ -170,6 +170,56 @@ export function DinnerCard({
         </div>
       )}
 
+      {/* Si no hay comida escolar registrada para hoy (fin de semana o festivo) */}
+      {!schoolLunch && (
+        <div
+          style={{
+            marginBottom: "1.25rem",
+            padding: "0.85rem 1.15rem",
+            borderRadius: "var(--radius-lg)",
+            background: "var(--liquid-glass-bg-subtle)",
+            border: "1px solid var(--liquid-glass-border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.75rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span style={{ fontSize: "1.15rem" }}>🏫</span>
+            <div>
+              <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--apple-text)" }}>
+                Comedor Colegio Montessori
+              </span>
+              <p style={{ margin: "0.1rem 0 0 0", fontSize: "0.74rem", color: "var(--apple-text-secondary)" }}>
+                Hoy no hay comedor escolar lectivo (fin de semana o festivo). Consulta el Menú Basal completo del mes.
+              </p>
+            </div>
+          </div>
+          <a
+            href="/menus/menu_actual.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="touch-target"
+            style={{
+              fontSize: "0.74rem",
+              fontWeight: 600,
+              color: "var(--apple-blue)",
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.3rem",
+              padding: "0.3rem 0.65rem",
+              borderRadius: "var(--radius-full)",
+              background: "rgba(0, 113, 227, 0.12)",
+            }}
+          >
+            <span>📄 Ver PDF del mes ↗</span>
+          </a>
+        </div>
+      )}
+
       {/* Grid Bento de 2 Opciones (1 columna en móvil, 2 en pantallas más anchas) */}
       <div className="responsive-grid-2">
         {/* Opción Cecotec Mambo */}

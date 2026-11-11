@@ -208,6 +208,31 @@ alter table pantry add column if not exists quantity_level int not null default 
 alter table school_run_defaults add column if not exists pickup_noon_id int references members(id) on delete set null;
 alter table school_run_overrides add column if not exists pickup_noon_id int references members(id) on delete set null;
 delete from stores where name in ('Eroski', 'BM');
+
+-- Menú escolar Montessori Noviembre 2026 garantizado
+insert into school_menu (date, lunch, dinner_recommendation) values
+  ('2026-11-02', 'Arroz a la napolitana + Filete de lenguadina a la plancha con ensalada fresca con maíz dulce', 'Verdura Huevos Patatas Fruta'),
+  ('2026-11-03', 'Alubias pintas guisadas + Pechuga de pollo al ajillo con patatas dado', 'Verdura Pescado Verdura Lácteos'),
+  ('2026-11-04', 'Judías verdes salteadas + Salchichas al horno con ensalada fresca de lechuga con tomate', 'Patatas Carne Pasta Fruta'),
+  ('2026-11-05', 'Macarrones con chorizo + Merluza rebozada con limón con ensalada fresca con lechuga y cebolla', 'Verdura Carne Legumbres Fruta'),
+  ('2026-11-06', 'Paella de verduras + Jamoncitos de pollo asados con ensalada', 'Verdura Carne Legumbres Fruta'),
+  ('2026-11-09', 'Paella mixta + Filetes rusos caseros con parmentier de patata al romero', 'Verdura Pescado Verdura Fruta'),
+  ('2026-11-10', 'Lentejas estofadas con verduras + Palometa en salsa con ensalada fresca de lechuga con tomate', 'Verdura Carne Pasta Fruta'),
+  ('2026-11-11', 'Crema de verduras (eco.) + Jamoncitos de pollo asados con patatas dado', 'Pasta Pescado Verdura Fruta'),
+  ('2026-11-12', 'Patatas a la riojana con chorizo + Huevos revueltos con queso fundido y ensalada fresca', 'Verdura Pescado Arroz Fruta'),
+  ('2026-11-13', 'Sopa casera de cocido + Cocido completo con verdura y carne', 'Verdura Huevos Verdura Lácteos'),
+  ('2026-11-16', 'Crema de calabacín (eco.) + Macarrones con boloñesa de soja', 'Pasta Carne Verdura Lácteos'),
+  ('2026-11-17', 'Alubias estofadas con verduras + Medallón de salmón y calabaza con salsa de tomate', 'Verdura Carne Arroz Fruta'),
+  ('2026-11-18', 'Judías verdes con tomate + Tortilla de patatas con ensalada fresca de lechuga con tomate', 'Pasta Carne Legumbres Lácteos'),
+  ('2026-11-19', 'Lentejas estofadas con verduras + Delicias de bacalao con ensalada de col', 'Verdura Huevos Pasta Fruta'),
+  ('2026-11-20', 'Arroz con salsa de tomate + Pechuga de pollo a la plancha con patatas dado', 'Verdura Pescado Verdura Fruta'),
+  ('2026-11-23', 'Crema de zanahoria (eco.) + Merluza rebozada con limón con ensalada fresca con lechuga y zanahoria', 'Verdura Carne Pasta Lácteos'),
+  ('2026-11-24', 'Lentejas a la castellana + Tortilla francesa con ensalada fresca con lechuga y cebolla', 'Verdura Carne Patatas Fruta'),
+  ('2026-11-25', 'Arroz a la napolitana + Albóndigas veggie a la jardinera con ensalada fresca de lechuga con tomate', 'Verdura Carne Patatas Fruta'),
+  ('2026-11-26', 'Sopa casera de cocido + Cocido completo con verdura y carne', 'Verdura Pescado Verdura Fruta'),
+  ('2026-11-27', 'Espaguetis con salsa boloñesa + Abadejo al estilo griego con patatas panaderas', 'Verdura Carne Verdura Lácteos'),
+  ('2026-11-30', 'Paella de verduras + Jamoncitos de pollo asados al romero con ensalada fresca con maíz dulce', 'Verdura Pescado Legumbres Lácteos')
+on conflict (date) do update set lunch=excluded.lunch, dinner_recommendation=excluded.dinner_recommendation;
 `;
 
 /**

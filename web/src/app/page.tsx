@@ -22,6 +22,7 @@ import {
   getFamilyInsurances,
   getWarranties,
   syncFrequentStaples,
+  getPantryLastUpdated,
 } from "@/lib/repo";
 import { getWeather } from "@/lib/weather";
 import { ensureDinnerPlans } from "@/lib/dinners";
@@ -70,6 +71,7 @@ export default async function HomePage() {
     warranties,
     news,
     traffic,
+    lastPantryUpdate,
   ] = await Promise.all([
     getMembers(),
     getWeather(),
@@ -94,7 +96,12 @@ export default async function HomePage() {
     getWarranties(),
     getLatestNews(),
     getSchoolCommuteTraffic(),
+    getPantryLastUpdated(),
   ]);
+
+  const pantryNeedsInventory =
+    !lastPantryUpdate ||
+    Date.now() - new Date(lastPantryUpdate).getTime() > 7 * 24 * 60 * 60 * 1000;
 
   const todayWeather = weather?.days.find((d) => d.date === today) ?? null;
   let schoolLunch = schoolMenuRow?.lunch ?? null;
@@ -155,6 +162,7 @@ export default async function HomePage() {
       warranties={warranties}
       news={news}
       traffic={traffic}
+      pantryNeedsInventory={pantryNeedsInventory}
     />
   );
 }

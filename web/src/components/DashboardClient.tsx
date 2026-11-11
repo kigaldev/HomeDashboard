@@ -101,6 +101,7 @@ export function DashboardClient({
   warranties = [],
   news = { espana: [], cyl: [] },
   traffic = null,
+  pantryNeedsInventory = false,
 }: {
   members: Member[];
   currentMemberId?: number | null;
@@ -136,6 +137,7 @@ export function DashboardClient({
   warranties: Warranty[];
   news?: { espana: NewsItem[]; cyl: NewsItem[] };
   traffic?: CommuteTraffic | null;
+  pantryNeedsInventory?: boolean;
 }) {
   const activeMember = members.find((m) => m.id === currentMemberId);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -345,9 +347,48 @@ export function DashboardClient({
         {/* 🃏 Tarjeta 1: Hoy (Centro de Mando) */}
         <div className="deck-slide">
           <div className="deck-card wall-kiosk-card">
+            {/* Advertencia obligatoria: Inventario de Despensa (> 7 días sin actualizar) */}
+            {pantryNeedsInventory && (
+              <div
+                onClick={() => goToCard(3)}
+                className="wall-alert-banner touch-target"
+                style={{
+                  cursor: "pointer",
+                  padding: "0.65rem 1rem",
+                  borderRadius: "var(--radius-lg)",
+                  background: "rgba(255, 149, 0, 0.12)",
+                  border: "1px solid rgba(255, 149, 0, 0.35)",
+                  borderLeft: "4px solid var(--apple-orange)",
+                  boxShadow: "var(--liquid-shadow-ambient)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                  minHeight: "44px",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" }}>
+                  <span style={{ fontSize: "1.2rem" }}>📋</span>
+                  <div>
+                    <p style={{ fontWeight: 700, color: "var(--apple-text)", margin: 0 }}>
+                      Inventario de Despensa necesario · Más de 7 días sin actualizar
+                    </p>
+                    <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+                      Es el momento de realizar un inventario de la despensa para que el asistente y las cenas se ajusten a las existencias reales.
+                    </p>
+                  </div>
+                </div>
+                <span className="badge badge-amber" style={{ fontSize: "0.76rem" }}>
+                  Hacer Inventario →
+                </span>
+              </div>
+            )}
+
             {lowStockItems.length > 0 && (
               <div
-                onClick={() => goToCard(2)}
+                onClick={() => goToCard(3)}
                 className="wall-alert-banner touch-target"
                 style={{
                   cursor: "pointer",

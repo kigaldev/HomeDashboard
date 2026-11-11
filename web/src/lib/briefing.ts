@@ -43,7 +43,7 @@ function template(kind: BriefingKind, s: Snapshot): string {
   }
   const mambo = s.dinners.find((d) => d.option === "mambo");
   const std = s.dinners.find((d) => d.option === "estandar");
-  L.push(`\n🍲 <b>Cena</b>`);
+  L.push(`\n🍲 <b>Cena</b> (100% con despensa familiar)`);
   if (mambo) L.push(`• Con Mambo: ${x(mambo.title)}`);
   if (std) L.push(`• Estándar: ${x(std.title)}`);
   const pending = s.shopping.filter((i) => !i.checked).length;
@@ -76,7 +76,7 @@ export async function generateBriefing(kind: BriefingKind): Promise<string> {
         content:
           "Eres el asistente de una familia con dos niños pequeños. Escribe en español, tono cálido y práctico, " +
           "máximo 2 frases y sin emojis al principio. Destaca SOLO lo más importante o lo que requiere preparación " +
-          "(lluvia, citas médicas, quién recoge, algo que comprar). No repitas todo el listado.",
+          "(lluvia, citas médicas, quién recoge, cena ajustada a las existencias de la despensa, algo que comprar). No repitas todo el listado.",
       },
       { role: "user", content: `${kind === "morning" ? "Resumen para empezar el día" : "Resumen para preparar mañana"}:\n${snapshotText(s)}` },
     ],

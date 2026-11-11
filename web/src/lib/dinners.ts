@@ -136,9 +136,19 @@ function catsIn(text: string | null): Set<Cat> {
   return s;
 }
 
-function pick(list: Recipe[], avoid: Set<Cat>, recent: Set<string>, seed: number): Recipe {
+function pick(list: Recipe[], avoid: Set<Cat>, recent: Set<string>, seed: number, availableNames: string[] = []): Recipe {
   const ok = list.filter((r) => !avoid.has(r.cat) && !recent.has(r.title));
   const pool = ok.length ? ok : list;
+  if (availableNames.length > 0) {
+    const availLower = availableNames.map((n) => n.toLowerCase());
+    const matchesStock = pool.filter((r) => {
+      const text = (r.title + " " + r.description).toLowerCase();
+      return availLower.some((name) => text.includes(name));
+    });
+    if (matchesStock.length > 0) {
+      return matchesStock[seed % matchesStock.length];
+    }
+  }
   return pool[seed % pool.length];
 }
 
@@ -168,6 +178,10 @@ export async function ensureDinnerPlans(date: string, force = false) {
   const avoid = catsIn(lunch);
   const allergies = members.map((m) => m.allergies).filter(Boolean).join(", ");
 
+  const availablePantry = pantry.filter((p) => p.status === "ok" && (p.quantity_level === undefined || p.quantity_level > 20));
+  const availableNames = availablePantry.map((p) => p.name);
+  const outOrLow = pantry.filter((p) => p.status !== "ok" || (p.quantity_level !== undefined && p.quantity_level <= 20)).map((p) => p.name);
+
   // 1) Intento con IA local: tiene en cuenta despensa, menú del cole, recomendación (*) y regla baja en hidratos
   const ai = parseJson<{ mambo: { title: string; description: string }; estandar: { title: string; description: string } }>(
     await llm(
@@ -176,12 +190,15 @@ export async function ensureDinnerPlans(date: string, force = false) {
           role: "system",
           content:
             "Eres el planificador nutricional de cenas de una familia con 2 niños pequeños (Fabio de 3 años y Bruno de 1 año). Respondes SOLO con JSON válido en español.\n" +
-            "REGLAS NUTRICIONALES ESTRICTAS PARA LAS CENAS:\n" +
-            "1. Cero carbohidratos simples: NUNCA sugieras pasta blanca, macarrones, espaguetis, arroz blanco, fideos o pizza.\n" +
-            "2. Mínimos hidratos de carbono por la noche. Si se incluye algún hidrato, debe ser COMPLEJO y en porción moderada (boniato, calabaza, lentejas rojas, garbanzos, o pequeña guarnición de patata al vapor).\n" +
-            "3. Protagonismo de proteínas de alta calidad (pescado blanco/azul, huevos, pollo, pavo, ternera) y verduras/hortalizas abundantes.\n" +
-            "4. Comidas aptas para niños de 0 a 5 años (fáciles de masticar, sin espinas, suaves).\n" +
-            "5. Dos opciones: una para robot Cecotec Mambo (con tiempo/temperatura/velocidad) y otra estándar (sartén/horno/plancha). Máx 30 min.",
+            "REGLAS NUTRICIONALES Y DE DESPENSA ESTRICTAS:\n" +
+            "1. INVENTARIO DE DESPENSA OBLIGATORIO: Basa las dos cenas ÚNICAMENTE en los productos disponibles en la despensa familiar: " +
+            (availableNames.length ? availableNames.join(", ") : "huevos, merluza, pollo, verduras variadas, patatas") + ".\n" +
+            "NO sugieras platos con ingredientes principales agotados o con poco stock (" + (outOrLow.join(", ") || "ninguno agotado") + ").\n" +
+            "2. Cero carbohidratos simples: NUNCA sugieras pasta blanca, macarrones, espaguetis, arroz blanco, fideos o pizza.\n" +
+            "3. Mínimos hidratos de carbono por la noche. Si se incluye algún hidrato, debe ser COMPLEJO y en porción moderada (boniato, calabaza, lentejas rojas, garbanzos, o pequeña guarnición de patata al vapor).\n" +
+            "4. Protagonismo de proteínas de alta calidad (pescado blanco/azul, huevos, pollo, pavo, ternera) y verduras/hortalizas abundantes.\n" +
+            "5. Comidas aptas para niños de 0 a 5 años (fáciles de masticar, sin espinas, suaves).\n" +
+            "6. Dos opciones: una para robot Cecotec Mambo (con tiempo/temperatura/velocidad) y otra estándar (sartén/horno/plancha). Máx 30 min.",
         },
         {
           role: "user",
@@ -190,7 +207,8 @@ export async function ensureDinnerPlans(date: string, force = false) {
             (dinnerRec ? `Recomendación oficial del cole (*): ${dinnerRec} (prioriza esta combinación).\n` : "") +
             `Evita repetir la misma proteína del mediodía.\n` +
             `Cenas recientes (no repetir): ${[...recent].join("; ") || "ninguna"}.\n` +
-            `En la despensa queda poco de: ${pantry.filter((p) => p.status !== "ok").map((p) => p.name).join(", ") || "nada"}.\n` +
+            `Productos DISPONIBLES en despensa: ${availableNames.join(", ") || "todos disponibles"}.\n` +
+            `Productos AGOTADOS/BAJOS en despensa (no usar): ${outOrLow.join(", ") || "ninguno"}.\n` +
             `Alergias: ${allergies || "ninguna"}.\n` +
             'Formato exacto: {"mambo":{"title":"…","description":"…"},"estandar":{"title":"…","description":"…"}}',
         },
@@ -202,11 +220,11 @@ export async function ensureDinnerPlans(date: string, force = false) {
   const seed = seedOf(date);
   let mambo = ai?.mambo?.title && !hasDisallowedCarbs(ai.mambo.title, ai.mambo.description)
     ? ai.mambo
-    : pick(MAMBO, avoid, recent, seed);
+    : pick(MAMBO, avoid, recent, seed, availableNames);
 
   let estandar = ai?.estandar?.title && !hasDisallowedCarbs(ai.estandar.title, ai.estandar.description)
     ? ai.estandar
-    : pick(STANDARD, avoid, recent, seed + 3);
+    : pick(STANDARD, avoid, recent, seed + 3, availableNames);
 
   // Asegurar que ninguna de las opciones seleccionadas tenga carbohidratos simples
   if (hasDisallowedCarbs(mambo.title, mambo.description)) {
