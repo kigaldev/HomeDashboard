@@ -52,7 +52,7 @@ export function ShoppingModule({
   const [showAddForm, setShowAddForm] = useState(false);
   const [showStoreFilters, setShowStoreFilters] = useState(false);
   const [showStaples, setShowStaples] = useState(false);
-  const [showPendingList, setShowPendingList] = useState(false);
+  const [showPendingList, setShowPendingList] = useState(true);
 
   // Optimización de cesta
   const [optimization, setOptimization] = useState<BasketOptimizationResult | null>(null);
@@ -149,200 +149,277 @@ export function ShoppingModule({
     });
   };
 
-  // Render individual item row con diseño vertical mobile-first
+function getShoppingItemEmoji(name: string, staplesList: Staple[] = []): string {
+  const clean = name.trim().toLowerCase();
+  const matchedStaple = staplesList.find((s) => s.name.trim().toLowerCase() === clean);
+  if (matchedStaple?.emoji) return matchedStaple.emoji;
+  if (clean.includes("leche")) return "🥛";
+  if (clean.includes("huevo")) return "🥚";
+  if (clean.includes("aceite")) return "🫒";
+  if (clean.includes("café") || clean.includes("cafe")) return "☕";
+  if (clean.includes("arroz")) return "🍚";
+  if (clean.includes("pasta") || clean.includes("macarron") || clean.includes("espaguet")) return "🍝";
+  if (clean.includes("pan") || clean.includes("tostad") || clean.includes("barra")) return "🥖";
+  if (clean.includes("pañal") || clean.includes("panal")) return "🧷";
+  if (clean.includes("toallit")) return "🧻";
+  if (clean.includes("detergente") || clean.includes("suavizante") || clean.includes("lavavajill")) return "🫧";
+  if (clean.includes("higiénico") || clean.includes("higienico") || clean.includes("papel")) return "🧻";
+  if (clean.includes("agua") || clean.includes("zumo") || clean.includes("refresco")) return "🧃";
+  if (clean.includes("fruta") || clean.includes("manzana") || clean.includes("platano") || clean.includes("plátano") || clean.includes("naranja") || clean.includes("fresa") || clean.includes("pera")) return "🍎";
+  if (clean.includes("verdura") || clean.includes("tomate") || clean.includes("cebolla") || clean.includes("lechuga") || clean.includes("zanahoria") || clean.includes("patata") || clean.includes("calabacín") || clean.includes("calabacin") || clean.includes("judia") || clean.includes("pimiento")) return "🥦";
+  if (clean.includes("pescado") || clean.includes("atun") || clean.includes("atún") || clean.includes("salmon") || clean.includes("salmón") || clean.includes("merluza") || clean.includes("gallo") || clean.includes("lenguado") || clean.includes("bacalao")) return "🐟";
+  if (clean.includes("carne") || clean.includes("pollo") || clean.includes("ternera") || clean.includes("cerdo") || clean.includes("pavo") || clean.includes("lomo") || clean.includes("hamburguesa") || clean.includes("salchicha") || clean.includes("filete")) return "🥩";
+  if (clean.includes("yogur") || clean.includes("queso") || clean.includes("quesito") || clean.includes("mantequilla")) return "🧀";
+  if (clean.includes("galleta") || clean.includes("cereal") || clean.includes("chocolate") || clean.includes("dulce")) return "🍪";
+  if (clean.includes("legumbre") || clean.includes("lenteja") || clean.includes("garbanzo") || clean.includes("alubia")) return "🫘";
+  if (clean.includes("cerveza") || clean.includes("vino")) return "🍷";
+  if (clean.includes("champu") || clean.includes("champú") || clean.includes("gel") || clean.includes("jabon") || clean.includes("jabón") || clean.includes("pasta dental") || clean.includes("dientes")) return "🧴";
+  if (clean.includes("dalsy") || clean.includes("apiretal") || clean.includes("suero") || clean.includes("medic")) return "💊";
+  return "🛒";
+}
+
+  // Render individual item card optimizado para smartphone (estilo despensa con botón de carrito a la derecha)
   const renderItemCard = (item: ShoppingItem) => {
     const st = item.store_id ? storeMap.get(item.store_id) : null;
     const author = item.added_by ? memberMap.get(item.added_by) : null;
     const isStaple = stapleNamesSet.has(item.name.trim().toLowerCase());
+    const emoji = getShoppingItemEmoji(item.name, staples);
 
     return (
       <div
         key={item.id}
+        className="liquid-glass"
         style={{
           display: "flex",
-          flexDirection: "column",
-          gap: "0.5rem",
-          padding: "0.75rem 0.9rem",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "0.75rem",
+          padding: "0.85rem 1rem",
           background: item.checked
             ? "rgba(255, 255, 255, 0.02)"
             : item.in_cart
-            ? "rgba(52, 199, 89, 0.08)"
-            : "var(--apple-surface)",
-          borderRadius: "var(--radius-md)",
+            ? "rgba(52, 199, 89, 0.12)"
+            : "var(--liquid-glass-bg-subtle, rgba(255, 255, 255, 0.04))",
+          borderRadius: "var(--radius-lg)",
           border: item.checked
-            ? "1px solid rgba(255, 255, 255, 0.05)"
+            ? "1px solid rgba(255, 255, 255, 0.06)"
             : item.in_cart
-            ? "1px solid rgba(52, 199, 89, 0.35)"
-            : "1px solid var(--apple-border)",
+            ? "1.5px solid rgba(52, 199, 89, 0.5)"
+            : "1px solid var(--liquid-glass-border, rgba(255, 255, 255, 0.1))",
+          boxShadow: item.in_cart
+            ? "0 4px 14px rgba(52, 199, 89, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.1)"
+            : "0 2px 8px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06)",
           opacity: item.checked ? 0.45 : 1,
-          transition: "all 0.15s var(--ease-spring)",
+          transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+          position: "relative",
         }}
       >
-        {/* Fila superior: Checkbox grande táctil + Nombre completo (sin truncar) + Store Badge */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem", width: "100%" }}>
+        {/* Lado izquierdo + centro: Checkbox táctil + Emoji grande + Datos del producto */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 0 }}>
+          {/* Checkbox circular táctil grande (32px x 32px) */}
           <button
             type="button"
             onClick={() => startTransition(() => toggleShoppingAction(item.id))}
+            className="touch-target"
             style={{
-              width: "26px",
-              height: "26px",
+              width: "32px",
+              height: "32px",
               borderRadius: "50%",
               border: item.checked
                 ? "2px solid var(--apple-green)"
                 : item.in_cart
                 ? "2px solid var(--apple-green)"
-                : "2px solid var(--apple-border-strong)",
-              background: item.checked ? "var(--apple-green)" : "transparent",
+                : "2px solid var(--apple-border-strong, rgba(255, 255, 255, 0.28))",
+              background: item.checked ? "var(--apple-green)" : "rgba(255, 255, 255, 0.04)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
               flexShrink: 0,
-              marginTop: "2px",
               transition: "all 0.15s ease",
             }}
             title={item.checked ? "Desmarcar" : "Completar compra"}
+            aria-label={item.checked ? `Desmarcar ${item.name}` : `Marcar ${item.name} como comprado`}
           >
-            {item.checked && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            {item.checked ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-            )}
+            ) : item.in_cart ? (
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--apple-green)" }} />
+            ) : null}
           </button>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <span
-              style={{
-                fontSize: "0.96rem",
-                fontWeight: item.in_cart ? 600 : 500,
-                color: item.checked ? "var(--apple-text-tertiary)" : item.in_cart ? "var(--apple-green)" : "var(--apple-text)",
-                textDecoration: item.checked ? "line-through" : "none",
-                lineHeight: "1.35",
-                display: "block",
-                wordBreak: "break-word",
-              }}
-            >
-              {item.name}
-            </span>
-            {item.quantity && item.quantity !== "1" && (
-              <span style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginTop: "0.15rem", display: "inline-block" }}>
-                Cantidad: {item.quantity}
-              </span>
-            )}
-          </div>
-
-          {/* Badge de Supermercado */}
-          {st && (
-            <span
-              style={{
-                fontSize: "0.72rem",
-                padding: "0.2rem 0.55rem",
-                borderRadius: "var(--radius-full)",
-                background: `${st.color}18`,
-                color: st.color,
-                fontWeight: 600,
-                border: `1px solid ${st.color}33`,
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}
-            >
-              {st.name}
-            </span>
-          )}
-        </div>
-
-        {/* Fila inferior de acciones: Botón "En el carro", Quién lo añadió, Favorito y Eliminar */}
-        {!item.checked && (
+          {/* Icono Grande del Producto (ejemplo despensa) */}
           <div
             style={{
+              width: "42px",
+              height: "42px",
+              borderRadius: "var(--radius-md)",
+              background: "rgba(255, 255, 255, 0.06)",
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              paddingTop: "0.45rem",
-              borderTop: "1px solid var(--apple-border)",
-              marginTop: "0.15rem",
-              gap: "0.5rem",
+              justifyContent: "center",
+              fontSize: "1.55rem",
+              flexShrink: 0,
+              boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.1)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
-              {/* Toggle de carro */}
-              <button
-                type="button"
-                onClick={() => startTransition(() => toggleInCartAction(item.id))}
-                disabled={isPending}
+            {emoji}
+          </div>
+
+          {/* Texto y datos */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+              <span
                 style={{
-                  background: item.in_cart ? "var(--apple-green)" : "rgba(255, 255, 255, 0.06)",
-                  color: item.in_cart ? "#fff" : "var(--apple-text-secondary)",
-                  border: item.in_cart ? "1px solid var(--apple-green)" : "1px solid var(--apple-border)",
-                  borderRadius: "var(--radius-full)",
-                  padding: "0.3rem 0.75rem",
-                  fontSize: "0.76rem",
-                  fontWeight: 600,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  cursor: "pointer",
-                  minHeight: "32px",
-                  transition: "all 0.15s ease",
+                  fontSize: "1.05rem",
+                  fontWeight: 700,
+                  color: item.checked ? "var(--apple-text-tertiary)" : item.in_cart ? "var(--apple-green)" : "var(--apple-text)",
+                  textDecoration: item.checked ? "line-through" : "none",
+                  lineHeight: "1.3",
+                  wordBreak: "break-word",
                 }}
               >
-                <span>🛒</span>
-                <span>{item.in_cart ? "En el carro" : "+ Carro"}</span>
-              </button>
+                {item.name}
+              </span>
 
-              {/* Badge autor */}
-              {author && (
+              {/* Estrella básico */}
+              {!item.checked && (
+                <button
+                  type="button"
+                  onClick={() => handleToggleItemStaple(item)}
+                  disabled={isPending}
+                  className="btn-ghost"
+                  title={isStaple ? "Quitar de básicos" : "Guardar como básico habitual"}
+                  style={{
+                    padding: "0.1rem 0.25rem",
+                    fontSize: "0.85rem",
+                    color: isStaple ? "#f59e0b" : "var(--apple-text-tertiary)",
+                    opacity: isStaple ? 1 : 0.4,
+                    cursor: "pointer",
+                  }}
+                >
+                  {isStaple ? "⭐" : "☆"}
+                </button>
+              )}
+            </div>
+
+            {/* Badges de soporte: Cantidad, Tienda, Autor */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginTop: "0.2rem", flexWrap: "wrap" }}>
+              {item.quantity && item.quantity !== "1" && (
+                <span
+                  style={{
+                    fontSize: "0.74rem",
+                    fontWeight: 600,
+                    color: "var(--apple-text-secondary)",
+                    background: "rgba(255, 255, 255, 0.06)",
+                    padding: "0.1rem 0.4rem",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  Cant: {item.quantity}
+                </span>
+              )}
+
+              {st && (
                 <span
                   style={{
                     fontSize: "0.72rem",
-                    padding: "0.2rem 0.5rem",
+                    padding: "0.12rem 0.5rem",
                     borderRadius: "var(--radius-full)",
-                    background: `${author.color}15`,
-                    color: author.color,
-                    fontWeight: 500,
-                    border: `1px solid ${author.color}30`,
+                    background: `${st.color}20`,
+                    color: st.color,
+                    fontWeight: 700,
+                    border: `1px solid ${st.color}40`,
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "0.25rem",
+                  }}
+                >
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: st.color }} />
+                  {st.name}
+                </span>
+              )}
+
+              {author && (
+                <span
+                  style={{
+                    fontSize: "0.7rem",
+                    color: "var(--apple-text-tertiary)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.2rem",
                   }}
                 >
                   <span>{author.emoji}</span>
                   <span>{author.name}</span>
                 </span>
               )}
-
-              {/* Favorito / Básico */}
-              <button
-                type="button"
-                onClick={() => handleToggleItemStaple(item)}
-                disabled={isPending}
-                className="btn-ghost"
-                title={isStaple ? "Quitar de básicos" : "Guardar como básico"}
-                style={{
-                  padding: "0.25rem 0.45rem",
-                  fontSize: "0.95rem",
-                  color: isStaple ? "#f59e0b" : "var(--apple-text-tertiary)",
-                  minHeight: "32px",
-                  minWidth: "32px",
-                }}
-              >
-                {isStaple ? "⭐" : "☆"}
-              </button>
             </div>
+          </div>
+        </div>
 
-            {/* Eliminar con target táctil cómodo */}
+        {/* LADO DERECHO: BOTÓN DEL CARRITO A LA DERECHA (PULGAR SMARTPHONE A UNA MANO) */}
+        {!item.checked && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
+            {/* Botón Carrito Grande Ergonómico */}
             <button
-              onClick={() => startTransition(() => deleteShoppingAction(item.id))}
-              className="btn-ghost"
+              type="button"
+              onClick={() => startTransition(() => toggleInCartAction(item.id))}
+              disabled={isPending}
+              className="touch-target"
               style={{
+                minWidth: "88px",
+                height: "46px",
+                borderRadius: "var(--radius-lg)",
+                background: item.in_cart
+                  ? "var(--apple-green)"
+                  : "var(--liquid-glass-bg-subtle, rgba(255, 255, 255, 0.08))",
+                color: item.in_cart ? "#ffffff" : "var(--apple-text)",
+                border: item.in_cart
+                  ? "1px solid var(--apple-green)"
+                  : "1px solid var(--liquid-glass-border, rgba(255, 255, 255, 0.16))",
+                boxShadow: item.in_cart
+                  ? "0 3px 12px rgba(52, 199, 89, 0.45)"
+                  : "0 2px 6px rgba(0, 0, 0, 0.2)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.4rem",
+                padding: "0 0.8rem",
+                cursor: "pointer",
+                userSelect: "none",
+                transition: "all 0.2s var(--ease-spring)",
+              }}
+              title={item.in_cart ? "Quitar del carro físico" : "Añadir al carro físico"}
+              aria-label={item.in_cart ? `Quitar ${item.name} del carrito` : `Meter ${item.name} en el carrito`}
+            >
+              <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>🛒</span>
+              <span style={{ fontSize: "0.8rem", fontWeight: 700, letterSpacing: "-0.01em" }}>
+                {item.in_cart ? "En carro" : "+ Carro"}
+              </span>
+            </button>
+
+            {/* Botón eliminar discreto */}
+            <button
+              type="button"
+              onClick={() => startTransition(() => deleteShoppingAction(item.id))}
+              className="btn-ghost touch-target"
+              style={{
+                width: "30px",
+                height: "30px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "var(--radius-sm)",
                 color: "var(--apple-text-tertiary)",
                 fontSize: "0.85rem",
-                padding: "0.35rem 0.6rem",
-                borderRadius: "var(--radius-sm)",
-                minHeight: "32px",
-                minWidth: "32px",
+                opacity: 0.55,
+                padding: 0,
               }}
-              title="Eliminar producto"
+              title={`Eliminar ${item.name}`}
+              aria-label={`Eliminar ${item.name}`}
             >
               ✕
             </button>
@@ -353,185 +430,132 @@ export function ShoppingModule({
   };
 
   return (
-    <div className="glass-card" style={{ padding: "1.1rem 0.95rem" }}>
-      {/* ── Cabecera Principal ── */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: "0.95rem",
-          gap: "0.75rem",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
-          <div
-            className="squircle-icon"
-            style={{
-              background: "var(--apple-blue-subtle)",
-              color: "var(--apple-blue)",
-              width: "40px",
-              height: "40px",
-              borderRadius: "12px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "1.2rem",
-            }}
-          >
-            🛒
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <h2 style={{ fontSize: "1.15rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
-                Lista de la Compra
-              </h2>
-              <span
-                style={{
-                  fontSize: "0.72rem",
-                  padding: "0.15rem 0.55rem",
-                  borderRadius: "var(--radius-full)",
-                  background: "var(--apple-green-subtle)",
-                  color: "var(--apple-green)",
-                  fontWeight: 600,
-                }}
-              >
-                {pendingCount} pendientes
-              </span>
-            </div>
-            <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.15rem" }}>
-              Gestión inteligente por supermercados
-            </p>
-          </div>
-        </div>
-
-        {/* Acciones principales de cabecera */}
-        <div style={{ display: "flex", gap: "0.45rem", alignItems: "center", flexWrap: "wrap" }}>
-          <button
-            onClick={handleRunOptimizer}
-            disabled={isPending || isOptimizing || pendingCount === 0}
-            className="btn-secondary"
-            style={{
-              fontSize: "0.78rem",
-              padding: "0.4rem 0.75rem",
-              background: "rgba(59, 130, 246, 0.12)",
-              color: "var(--apple-blue)",
-              border: "1px solid rgba(59, 130, 246, 0.3)",
-              fontWeight: 600,
-              borderRadius: "var(--radius-full)",
-            }}
-            title="Analiza precios entre supermercados y optimiza el ahorro"
-          >
-            <span>{isOptimizing ? "⏳" : "⚡"}</span>
-            <span>{isOptimizing ? "Calculando..." : "Optimizar Súper"}</span>
-          </button>
-
-          <button
-            onClick={() =>
-              startTransition(async () => {
-                await generateSaturdayShoppingAction();
-              })
-            }
-            disabled={isPending}
-            className="btn-primary"
-            style={{
-              fontSize: "0.78rem",
-              padding: "0.4rem 0.75rem",
-              background: "var(--apple-green)",
-              boxShadow: "0 3px 10px rgba(52, 199, 89, 0.3)",
-              borderRadius: "var(--radius-full)",
-            }}
-            title="Añade ingredientes de las cenas y básicos gastados para la compra del sábado"
-          >
-            <span>🧺</span>
-            <span>Compra Sábado</span>
-          </button>
-
-          <button
-            onClick={() => setIsTicketModalOpen(true)}
-            className="btn-secondary"
-            style={{
-              fontSize: "0.78rem",
-              padding: "0.4rem 0.75rem",
-              background: "var(--apple-blue-subtle)",
-              color: "var(--apple-blue)",
-              border: "1px solid var(--apple-blue)",
-              fontWeight: 600,
-              borderRadius: "var(--radius-full)",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.3rem",
-            }}
-            title="Escanear ticket de compra para tachar lo comprado y actualizar despensa"
-          >
-            <IconCamera size={14} />
-            <span>Escanear Ticket</span>
-          </button>
-
-          <button
-            onClick={() => setIsManualExpenseOpen(true)}
-            className="btn-secondary"
-            style={{
-              fontSize: "0.78rem",
-              padding: "0.4rem 0.75rem",
-              background: "rgba(255, 255, 255, 0.08)",
-              color: "var(--apple-text)",
-              border: "1px solid var(--apple-border)",
-              fontWeight: 600,
-              borderRadius: "var(--radius-full)",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.3rem",
-            }}
-            title="Añadir un gasto o ticket manual sin foto"
-          >
-            <span>➕</span>
-            <span>Gasto Manual</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── Barra de Progreso de Compra en el Súper ── */}
-      {pendingCount > 0 && (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+      {/* ── TARJETA 1: Herramientas y Gestión de Compra ── */}
+      <div className="liquid-glass" style={{ padding: "1.1rem 1rem", borderRadius: "var(--radius-xl)" }}>
+        {/* Cabecera de Herramientas */}
         <div
           style={{
-            background: "var(--apple-surface-secondary)",
-            borderRadius: "var(--radius-md)",
-            padding: "0.65rem 0.85rem",
-            marginBottom: "0.95rem",
-            border: "1px solid var(--apple-border)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "0.85rem",
+            gap: "0.75rem",
+            flexWrap: "wrap",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.76rem", marginBottom: "0.35rem" }}>
-            <span style={{ color: "var(--apple-text-secondary)" }}>
-              🛒 En el carro físico: <b>{inCartCount}</b> de {pendingCount}
-            </span>
-            <span style={{ fontWeight: 600, color: inCartCount > 0 ? "var(--apple-green)" : "var(--apple-text-secondary)" }}>
-              {Math.round((inCartCount / pendingCount) * 100)}%
-            </span>
-          </div>
-          <div
-            style={{
-              width: "100%",
-              height: "6px",
-              background: "rgba(255, 255, 255, 0.08)",
-              borderRadius: "3px",
-              overflow: "hidden",
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
             <div
+              className="squircle-icon"
               style={{
-                width: `${Math.round((inCartCount / pendingCount) * 100)}%`,
-                height: "100%",
-                background: "var(--apple-green)",
-                borderRadius: "3px",
-                transition: "width 0.3s ease",
+                background: "var(--apple-blue-subtle)",
+                color: "var(--apple-blue)",
+                width: "38px",
+                height: "38px",
+                borderRadius: "11px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.15rem",
               }}
-            />
+            >
+              🛍️
+            </div>
+            <div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0, color: "var(--apple-text)" }}>
+                Herramientas de Compra
+              </h2>
+              <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+                Tickets, optimizador y supermercados
+              </p>
+            </div>
+          </div>
+
+          {/* Acciones principales de cabecera */}
+          <div style={{ display: "flex", gap: "0.45rem", alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={handleRunOptimizer}
+              disabled={isPending || isOptimizing || pendingCount === 0}
+              className="btn-secondary touch-target"
+              style={{
+                fontSize: "0.78rem",
+                padding: "0.38rem 0.7rem",
+                background: "rgba(59, 130, 246, 0.12)",
+                color: "var(--apple-blue)",
+                border: "1px solid rgba(59, 130, 246, 0.3)",
+                fontWeight: 600,
+                borderRadius: "var(--radius-full)",
+              }}
+              title="Analiza precios entre supermercados y optimiza el ahorro"
+            >
+              <span>{isOptimizing ? "⏳" : "⚡"}</span>
+              <span>{isOptimizing ? "Calculando..." : "Optimizar Súper"}</span>
+            </button>
+
+            <button
+              onClick={() =>
+                startTransition(async () => {
+                  await generateSaturdayShoppingAction();
+                })
+              }
+              disabled={isPending}
+              className="btn-primary touch-target"
+              style={{
+                fontSize: "0.78rem",
+                padding: "0.38rem 0.7rem",
+                background: "var(--apple-green)",
+                boxShadow: "0 2px 8px rgba(52, 199, 89, 0.3)",
+                borderRadius: "var(--radius-full)",
+              }}
+              title="Añade ingredientes de las cenas y básicos gastados para la compra del sábado"
+            >
+              <span>🧺</span>
+              <span>Compra Sábado</span>
+            </button>
+
+            <button
+              onClick={() => setIsTicketModalOpen(true)}
+              className="btn-secondary touch-target"
+              style={{
+                fontSize: "0.78rem",
+                padding: "0.38rem 0.7rem",
+                background: "var(--apple-blue-subtle)",
+                color: "var(--apple-blue)",
+                border: "1px solid var(--apple-blue)",
+                fontWeight: 600,
+                borderRadius: "var(--radius-full)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}
+              title="Escanear ticket de compra para tachar lo comprado y actualizar despensa"
+            >
+              <IconCamera size={14} />
+              <span>Escanear Ticket</span>
+            </button>
+
+            <button
+              onClick={() => setIsManualExpenseOpen(true)}
+              className="btn-secondary touch-target"
+              style={{
+                fontSize: "0.78rem",
+                padding: "0.38rem 0.7rem",
+                background: "rgba(255, 255, 255, 0.08)",
+                color: "var(--apple-text)",
+                border: "1px solid var(--apple-border)",
+                fontWeight: 600,
+                borderRadius: "var(--radius-full)",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}
+              title="Añadir un gasto o ticket manual sin foto"
+            >
+              <span>➕</span>
+              <span>Gasto Manual</span>
+            </button>
           </div>
         </div>
-      )}
 
       {/* Feedback de Optimización */}
       {optimizeFeedback && (
@@ -1119,81 +1143,154 @@ export function ShoppingModule({
           </div>
         )}
       </div>
+      </div> {/* Fin de Tarjeta 1: Herramientas y Gestión */}
 
-      {/* ── Lista de Productos Pendientes (Cabecera Colapsable con Chevron) ── */}
-      <div style={{ marginBottom: "1.1rem" }}>
+      {/* ══════════════════════════════════════════════════════════════════════
+          TARJETA 2: LISTA DE LA COMPRA (Separada, Destacada y Ergonómica Mobile)
+          ══════════════════════════════════════════════════════════════════════ */}
+      <div
+        className="liquid-glass liquid-specular"
+        style={{
+          padding: "1.25rem 1.05rem",
+          borderRadius: "var(--radius-xl)",
+          boxShadow: "var(--liquid-shadow-ambient)",
+        }}
+      >
+        {/* Cabecera de la Tarjeta Lista de la Compra */}
         <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setShowPendingList(!showPendingList)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setShowPendingList(!showPendingList);
-            }
-          }}
-          aria-expanded={showPendingList}
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "0.65rem 0.95rem",
-            borderRadius: "var(--radius-md)",
-            background: "var(--apple-surface-secondary)",
-            border: "1px solid var(--apple-border)",
-            cursor: "pointer",
-            userSelect: "none",
-            marginBottom: showPendingList ? "0.65rem" : "0",
+            marginBottom: "0.85rem",
+            flexWrap: "wrap",
+            gap: "0.6rem",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-            <span style={{ fontSize: "1rem" }}>📋</span>
-            <span style={{ fontSize: "0.86rem", fontWeight: 700, color: "var(--apple-text)" }}>
-              Lista de Productos
-            </span>
-            <span
+          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+            <div
+              className="squircle-icon"
               style={{
-                fontSize: "0.72rem",
-                padding: "0.15rem 0.55rem",
-                borderRadius: "var(--radius-full)",
-                background: filteredPendingItems.length > 0 ? "var(--apple-green-subtle)" : "var(--apple-surface)",
-                color: filteredPendingItems.length > 0 ? "var(--apple-green)" : "var(--apple-text-secondary)",
-                fontWeight: 600,
+                background: "var(--apple-green-subtle)",
+                color: "var(--apple-green)",
+                width: "42px",
+                height: "42px",
+                borderRadius: "12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.35rem",
               }}
             >
-              {filteredPendingItems.length} {filteredPendingItems.length === 1 ? "pendiente" : "pendientes"}
-            </span>
+              🛒
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+                <h2 style={{ fontSize: "1.2rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0, color: "var(--apple-text)" }}>
+                  Lista de la compra
+                </h2>
+                <span
+                  style={{
+                    fontSize: "0.74rem",
+                    padding: "0.18rem 0.6rem",
+                    borderRadius: "var(--radius-full)",
+                    background: filteredPendingItems.length > 0 ? "var(--apple-green-subtle)" : "rgba(255, 255, 255, 0.08)",
+                    color: filteredPendingItems.length > 0 ? "var(--apple-green)" : "var(--apple-text-secondary)",
+                    fontWeight: 700,
+                  }}
+                >
+                  {filteredPendingItems.length} {filteredPendingItems.length === 1 ? "pendiente" : "pendientes"}
+                </span>
+              </div>
+              <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.12rem" }}>
+                {selectedStore === "all"
+                  ? "Todos los supermercados · Pulsa 🛒 a la derecha para meter al carro"
+                  : `Filtrado por: ${storeMap.get(selectedStore as number)?.name || "Tienda"}`}
+              </p>
+            </div>
           </div>
 
-          <div
+          {/* Botón para colapsar/expandir si el usuario lo desea */}
+          <button
+            type="button"
+            onClick={() => setShowPendingList(!showPendingList)}
+            className="btn-ghost touch-target"
             style={{
-              display: "flex",
-              alignItems: "center",
+              fontSize: "0.78rem",
+              padding: "0.35rem 0.65rem",
+              borderRadius: "var(--radius-full)",
+              background: "rgba(255, 255, 255, 0.05)",
               color: "var(--apple-text-secondary)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
             }}
           >
-            {showPendingList ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
-          </div>
+            <span>{showPendingList ? "Plegar" : "Desplegar"}</span>
+            {showPendingList ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+          </button>
         </div>
 
+        {/* ── Barra de Progreso del Carrito en Vivo ── */}
+        {pendingCount > 0 && (
+          <div
+            style={{
+              background: "rgba(255, 255, 255, 0.04)",
+              borderRadius: "var(--radius-md)",
+              padding: "0.65rem 0.85rem",
+              marginBottom: "1rem",
+              border: "1px solid var(--apple-border)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.76rem", marginBottom: "0.35rem" }}>
+              <span style={{ color: "var(--apple-text-secondary)" }}>
+                🛒 En el carro físico: <b>{inCartCount}</b> de {pendingCount}
+              </span>
+              <span style={{ fontWeight: 700, color: inCartCount > 0 ? "var(--apple-green)" : "var(--apple-text-secondary)" }}>
+                {Math.round((inCartCount / pendingCount) * 100)}%
+              </span>
+            </div>
+            <div
+              style={{
+                width: "100%",
+                height: "6px",
+                background: "rgba(255, 255, 255, 0.08)",
+                borderRadius: "3px",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.round((inCartCount / pendingCount) * 100)}%`,
+                  height: "100%",
+                  background: "var(--apple-green)",
+                  borderRadius: "3px",
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Listado de Productos Pendientes */}
         {showPendingList && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
             {filteredPendingItems.length === 0 ? (
               <div
                 style={{
                   padding: "2rem 1rem",
                   textAlign: "center",
-                  background: "var(--apple-surface-secondary)",
+                  background: "rgba(255, 255, 255, 0.02)",
                   borderRadius: "var(--radius-lg)",
                   border: "1px dashed var(--apple-border)",
                 }}
               >
                 <div style={{ fontSize: "2rem", marginBottom: "0.35rem" }}>🎉</div>
-                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--apple-text)" }}>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--apple-text)" }}>
                   {selectedStore === "all" ? "¡No hay nada pendiente para comprar!" : "No hay pendientes en esta tienda"}
                 </div>
                 <div style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
-                  Añade productos con el botón superior o pídeselo a Pepe en Telegram.
+                  Añade productos desde las herramientas superiores o con Pepe en Telegram.
                 </div>
               </div>
             ) : (
@@ -1201,57 +1298,57 @@ export function ShoppingModule({
             )}
           </div>
         )}
-      </div>
 
-      {/* ── Sección de Productos Comprados (Colapsable y Limpiable) ── */}
-      {checkedCount > 0 && (
-        <div
-          style={{
-            borderTop: "1px solid var(--apple-border)",
-            paddingTop: "0.85rem",
-            marginTop: "0.5rem",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-            <button
-              type="button"
-              onClick={() => setShowCompleted(!showCompleted)}
-              className="btn-ghost"
-              style={{
-                fontSize: "0.82rem",
-                fontWeight: 600,
-                color: "var(--apple-text-secondary)",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
-              }}
-            >
-              <span>{showCompleted ? "▼" : "▶"}</span>
-              <span>Comprados ({checkedCount})</span>
-            </button>
+        {/* ── Sección de Productos Comprados (Colapsable y Limpiable al pie) ── */}
+        {checkedCount > 0 && (
+          <div
+            style={{
+              borderTop: "1px solid var(--apple-border)",
+              paddingTop: "0.9rem",
+              marginTop: "1.1rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => setShowCompleted(!showCompleted)}
+                className="btn-ghost"
+                style={{
+                  fontSize: "0.82rem",
+                  fontWeight: 600,
+                  color: "var(--apple-text-secondary)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                }}
+              >
+                <span>{showCompleted ? "▼" : "▶"}</span>
+                <span>Comprados ({checkedCount})</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => startTransition(() => clearCheckedShoppingAction())}
-              disabled={isPending}
-              className="btn-ghost"
-              style={{
-                fontSize: "0.76rem",
-                color: "var(--apple-red)",
-                padding: "0.2rem 0.55rem",
-              }}
-            >
-              Limpiar comprados
-            </button>
-          </div>
-
-          {showCompleted && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", marginTop: "0.45rem" }}>
-              {checkedItems.map(renderItemCard)}
+              <button
+                type="button"
+                onClick={() => startTransition(() => clearCheckedShoppingAction())}
+                disabled={isPending}
+                className="btn-ghost"
+                style={{
+                  fontSize: "0.76rem",
+                  color: "var(--apple-red)",
+                  padding: "0.2rem 0.55rem",
+                }}
+              >
+                Limpiar comprados
+              </button>
             </div>
-          )}
-        </div>
-      )}
+
+            {showCompleted && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginTop: "0.55rem" }}>
+                {checkedItems.map(renderItemCard)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── Modal Unificado de Gestión de Ticket (Cámara & Acciones) ── */}
       <TicketManagerModal
