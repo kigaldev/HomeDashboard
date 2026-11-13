@@ -51,77 +51,6 @@ interface SpotifyPlayerInstance {
   nextTrack: () => Promise<void>;
 }
 
-// Playlists familiares destacadas para el Kiosk
-const SPOTIFY_FAMILY_PLAYLISTS = [
-  {
-    id: "37i9dQZF1DXdgnkgkP09Hg",
-    title: "Peques Fabio & Bruno",
-    subtitle: "Cantajuegos, Disney & Canciones Infantiles",
-    emoji: "👶",
-    color: "#ff9500",
-  },
-  {
-    id: "37i9dQZF1DX4WYpdgoIcn6",
-    title: "Cocina & Cenas",
-    subtitle: "Acoustic chill, Bossa Nova y Pop suave",
-    emoji: "🍳",
-    color: "#34c759",
-  },
-  {
-    id: "37i9dQZF1DXcBWIGoYBM5M",
-    title: "Café & Mañanas",
-    subtitle: "Música positiva para empezar el día",
-    emoji: "☕",
-    color: "#007aff",
-  },
-  {
-    id: "37i9dQZF1DX8s9hdYrVJim",
-    title: "Pop Español & Éxitos",
-    subtitle: "Los mejores temas para disfrutar en casa",
-    emoji: "💃",
-    color: "#af52de",
-  },
-  {
-    id: "37i9dQZF1DWZd79rJ6a7lp",
-    title: "Buenas Noches & Relax",
-    subtitle: "Sonidos tranquilos y melodías para dormir",
-    emoji: "🌙",
-    color: "#5856d6",
-  },
-];
-
-// Vídeos y canales sugeridos para YouTube (modo invitado)
-const YOUTUBE_CATEGORIES = [
-  {
-    id: "peques",
-    name: "👶 Peques (Fabio & Bruno)",
-    videos: [
-      { id: "QZ0gqJ3-33k", title: "Pocoyó - Episodios Completos", channel: "Pocoyó Español" },
-      { id: "e_04ZrNroTo", title: "La Vaca Lola y canciones de La Granja", channel: "El Reino Infantil" },
-      { id: "1a8pI65emDE", title: "Cantajuego - Grandes Éxitos", channel: "CantaJuegoVEVO" },
-      { id: "hT_nvWreIhg", title: "Peppa Pig en Español Latino/Castellano", channel: "Peppa Pig Español Oficial" },
-    ],
-  },
-  {
-    id: "cocina",
-    name: "🍳 Cocina & Recetas",
-    videos: [
-      { id: "jfKfPfyJRdk", title: "Lo-Fi Hip Hop Radio - Beats to relax/study", channel: "Lofi Girl" },
-      { id: "5qap5aO4i9A", title: "Bossa Nova Cafe Instrumental", channel: "Cafe Music BGM" },
-      { id: "21X5lGlDOfg", title: "Recetas Fáciles y Rápidas para Cenas", channel: "Karlos Arguiñano" },
-      { id: "kJQP7kiw5Fk", title: "Cocina Tradicional y Tapas", channel: "Directo al Paladar" },
-    ],
-  },
-  {
-    id: "directo",
-    name: "📰 Noticias & Directos",
-    videos: [
-      { id: "dQw4w9WgXcQ", title: "RTVE Noticias 24 Horas Directo", channel: "RTVE Noticias" },
-      { id: "live_salamanca", title: "Cámaras en Directo Plaza Mayor Salamanca", channel: "Salamanca RTV" },
-    ],
-  },
-];
-
 // Marcadores rápidos estilo Chrome para el Kiosk
 const CHROME_BOOKMARKS = [
   { name: "Google", url: "https://www.google.com/webhp?igu=1", icon: "🔍", canEmbed: true },
@@ -135,7 +64,7 @@ const CHROME_BOOKMARKS = [
 ];
 
 export function MultimediaModule() {
-  const [activeTab, setActiveTab] = useState<MultimediaTab>("spotify");
+  const [activeTab, setActiveTab] = useState<MultimediaTab>("youtube");
 
   // ── ESTADOS DE SPOTIFY CONNECT ──
   const [spotifyToken, setSpotifyToken] = useState<string>("");
@@ -144,15 +73,24 @@ export function MultimediaModule() {
   const [spotifyDeviceId, setSpotifyDeviceId] = useState<string | null>(null);
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
   const [spotifyPlayerState, setSpotifyPlayerState] = useState<any>(null);
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("37i9dQZF1DXdgnkgkP09Hg");
+  const [spotifyQuery, setSpotifyQuery] = useState("");
+  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState<string>(
+    "https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M?utm_source=generator&theme=0"
+  );
   const [spotifyVolume, setSpotifyVolume] = useState<number>(80);
   const [isMuted, setIsMuted] = useState(false);
   const playerRef = useRef<SpotifyPlayerInstance | null>(null);
 
-  // ── ESTADOS DE YOUTUBE ──
+  // ── ESTADOS DE YOUTUBE (BUSCADOR OPTIMIZADO Y SIN RECOMENDACIONES) ──
   const [youtubeQuery, setYoutubeQuery] = useState("");
-  const [currentVideoId, setCurrentVideoId] = useState<string>("5qap5aO4i9A"); // Bossa Nova Cafe por defecto
-  const [activeYoutubeCategory, setActiveYoutubeCategory] = useState<string>("peques");
+  const [youtubeEmbedUrl, setYoutubeEmbedUrl] = useState<string>(
+    "https://www.youtube-nocookie.com/embed?listType=search&list=musica+relajante&autoplay=0&rel=0&modestbranding=1"
+  );
+  const [currentPlayingTitle, setCurrentPlayingTitle] = useState<string>("Buscador de YouTube listo");
+  const [youtubeSuggestions, setYoutubeSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [recentYoutubeSearches, setRecentYoutubeSearches] = useState<string[]>([]);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // ── ESTADOS DEL NAVEGADOR CHROME ──
   const [browserUrlInput, setBrowserUrlInput] = useState("https://es.m.wikipedia.org");
@@ -162,16 +100,123 @@ export function MultimediaModule() {
   const [isLoadingBrowser, setIsLoadingBrowser] = useState(false);
   const [browserIframeBlocked, setBrowserIframeBlocked] = useState(false);
 
-  // Cargar token guardado de Spotify
+  // Cargar token guardado de Spotify y búsquedas recientes de YouTube
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("kiosk_spotify_token");
-      if (saved) {
-        setSpotifyToken(saved);
-        setTokenInput(saved);
+      const savedToken = localStorage.getItem("kiosk_spotify_token");
+      if (savedToken) {
+        setSpotifyToken(savedToken);
+        setTokenInput(savedToken);
+      }
+      try {
+        const savedSearches = localStorage.getItem("kiosk_yt_recent_searches");
+        if (savedSearches) {
+          setRecentYoutubeSearches(JSON.parse(savedSearches));
+        }
+      } catch (err) {
+        console.warn("Error leyendo búsquedas recientes de YouTube:", err);
       }
     }
   }, []);
+
+  // Cerrar sugerencias al hacer clic fuera
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Autocompletado en vivo para el buscador de YouTube
+  useEffect(() => {
+    if (!youtubeQuery.trim() || youtubeQuery.length < 2) {
+      setYoutubeSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(
+            youtubeQuery.trim()
+          )}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data?.[1])) {
+            setYoutubeSuggestions(data[1].slice(0, 6));
+          }
+        }
+      } catch {
+        // Fallback silencioso si la API de sugerencias está restringida
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [youtubeQuery]);
+
+  // Ejecutar búsqueda de YouTube manteniéndose 100% dentro de la pestaña
+  const executeYoutubeSearch = (searchTerm: string) => {
+    const clean = searchTerm.trim();
+    if (!clean) return;
+
+    setShowSuggestions(false);
+    setYoutubeQuery(clean);
+
+    // Guardar en historial de búsquedas recientes del Kiosk (hasta 6)
+    setRecentYoutubeSearches((prev) => {
+      const updated = [clean, ...prev.filter((s) => s.toLowerCase() !== clean.toLowerCase())].slice(0, 6);
+      try {
+        localStorage.setItem("kiosk_yt_recent_searches", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 1. Si es un enlace directo a un vídeo de YouTube
+    const urlMatch = clean.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+    if (urlMatch && urlMatch[1]) {
+      const videoId = urlMatch[1];
+      setYoutubeEmbedUrl(`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`);
+      setCurrentPlayingTitle(`Vídeo: ${videoId}`);
+      return;
+    }
+
+    // 2. Si es un ID directo de 11 caracteres (ej: 5qap5aO4i9A)
+    if (/^[\w-]{11}$/.test(clean)) {
+      setYoutubeEmbedUrl(`https://www.youtube-nocookie.com/embed/${clean}?autoplay=1&rel=0&modestbranding=1`);
+      setCurrentPlayingTitle(`Vídeo ID: ${clean}`);
+      return;
+    }
+
+    // 3. Búsqueda por palabras clave: se reproduce directamente embebido en la pestaña
+    setYoutubeEmbedUrl(
+      `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(
+        clean
+      )}&autoplay=1&rel=0&modestbranding=1`
+    );
+    setCurrentPlayingTitle(`Búsqueda: ${clean}`);
+  };
+
+  const handleYoutubeFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    executeYoutubeSearch(youtubeQuery);
+  };
+
+  const handleClearYoutubeSearch = () => {
+    setYoutubeQuery("");
+    setYoutubeSuggestions([]);
+    setShowSuggestions(false);
+  };
+
+  const handleClearRecentSearches = () => {
+    setRecentYoutubeSearches([]);
+    try {
+      localStorage.removeItem("kiosk_yt_recent_searches");
+    } catch {}
+  };
 
   // Inicializar Spotify Web Playback SDK
   useEffect(() => {
@@ -284,22 +329,27 @@ export function MultimediaModule() {
     setIsTokenModalOpen(false);
   };
 
-  // Manejar búsqueda de YouTube
-  const handleYoutubeSearch = (e: React.FormEvent) => {
+  // Cargar playlist o track de Spotify desde URL o ID
+  const handleSpotifyLoadUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!youtubeQuery.trim()) return;
+    if (!spotifyQuery.trim()) return;
 
-    const query = youtubeQuery.trim();
-    // Si pegan una URL de youtube directa
-    const urlMatch = query.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-    if (urlMatch && urlMatch[1]) {
-      setCurrentVideoId(urlMatch[1]);
-      setYoutubeQuery("");
+    let q = spotifyQuery.trim();
+    // Convertir enlace normal de Spotify a embed
+    if (q.includes("open.spotify.com/")) {
+      const parts = q.split("open.spotify.com/")[1]?.split("?")[0];
+      if (parts) {
+        setSpotifyEmbedUrl(`https://open.spotify.com/embed/${parts}?utm_source=generator&theme=0`);
+        setSpotifyQuery("");
+        return;
+      }
+    }
+    // Si meten un ID directo
+    if (/^[a-zA-Z0-9]{22}$/.test(q)) {
+      setSpotifyEmbedUrl(`https://open.spotify.com/embed/playlist/${q}?utm_source=generator&theme=0`);
+      setSpotifyQuery("");
       return;
     }
-
-    // Si es una búsqueda de texto, usamos la búsqueda embebida de YouTube
-    setCurrentVideoId("");
   };
 
   // Navegación estilo Chrome
@@ -307,12 +357,10 @@ export function MultimediaModule() {
     let url = rawUrl.trim();
     if (!url) return;
 
-    // Si no tiene protocolo y parece dominio
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       if (url.includes(".") && !url.includes(" ")) {
         url = "https://" + url;
       } else {
-        // Búsqueda en DuckDuckGo / Google
         url = `https://duckduckgo.com/?q=${encodeURIComponent(url)}`;
       }
     }
@@ -322,7 +370,6 @@ export function MultimediaModule() {
     setIsLoadingBrowser(true);
     setBrowserIframeBlocked(false);
 
-    // Actualizar historial
     const newHist = browserHistory.slice(0, historyIndex + 1);
     newHist.push(url);
     setBrowserHistory(newHist);
@@ -391,16 +438,16 @@ export function MultimediaModule() {
             className="squircle-icon"
             style={{
               background:
-                activeTab === "spotify"
-                  ? "rgba(30, 215, 96, 0.15)"
-                  : activeTab === "youtube"
+                activeTab === "youtube"
                   ? "rgba(255, 0, 0, 0.15)"
+                  : activeTab === "spotify"
+                  ? "rgba(30, 215, 96, 0.15)"
                   : "rgba(0, 122, 255, 0.15)",
               color:
-                activeTab === "spotify"
-                  ? "#1ed760"
-                  : activeTab === "youtube"
+                activeTab === "youtube"
                   ? "#ff3b30"
+                  : activeTab === "spotify"
+                  ? "#1ed760"
                   : "#007aff",
               width: "40px",
               height: "40px",
@@ -411,10 +458,10 @@ export function MultimediaModule() {
               fontSize: "1.2rem",
             }}
           >
-            {activeTab === "spotify" ? (
-              <IconMusic size={20} />
-            ) : activeTab === "youtube" ? (
+            {activeTab === "youtube" ? (
               <IconTv size={20} />
+            ) : activeTab === "spotify" ? (
+              <IconMusic size={20} />
             ) : (
               <IconGlobe size={20} />
             )}
@@ -424,7 +471,7 @@ export function MultimediaModule() {
               Centro Multimedia & Web Kiosk
             </h2>
             <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
-              Spotify Connect · YouTube en modo invitado · Navegador Web Chrome
+              YouTube integrado · Spotify Connect (SDK) · Navegador Chrome
             </p>
           </div>
         </div>
@@ -440,26 +487,6 @@ export function MultimediaModule() {
             border: "1px solid rgba(255, 255, 255, 0.1)",
           }}
         >
-          <button
-            onClick={() => setActiveTab("spotify")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              padding: "0.45rem 1rem",
-              borderRadius: "var(--radius-full)",
-              border: "none",
-              background: activeTab === "spotify" ? "#1ed760" : "transparent",
-              color: activeTab === "spotify" ? "#000000" : "var(--apple-text-secondary)",
-              fontWeight: activeTab === "spotify" ? 700 : 500,
-              fontSize: "0.85rem",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-          >
-            <IconMusic size={15} />
-            Spotify
-          </button>
           <button
             onClick={() => setActiveTab("youtube")}
             style={{
@@ -479,6 +506,26 @@ export function MultimediaModule() {
           >
             <IconTv size={15} />
             YouTube
+          </button>
+          <button
+            onClick={() => setActiveTab("spotify")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              padding: "0.45rem 1rem",
+              borderRadius: "var(--radius-full)",
+              border: "none",
+              background: activeTab === "spotify" ? "#1ed760" : "transparent",
+              color: activeTab === "spotify" ? "#000000" : "var(--apple-text-secondary)",
+              fontWeight: activeTab === "spotify" ? 700 : 500,
+              fontSize: "0.85rem",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <IconMusic size={15} />
+            Spotify
           </button>
           <button
             onClick={() => setActiveTab("browser")}
@@ -504,7 +551,256 @@ export function MultimediaModule() {
       </div>
 
       {/* ═════════════════════════════════════════════════════════════════ */}
-      {/* 🎵 1. PESTAÑA: SPOTIFY CONNECT & WEB PLAYBACK SDK                */}
+      {/* 🎥 1. PESTAÑA: YOUTUBE (SIN RECOMENDACIONES, BUSCADOR OPTIMIZADO)  */}
+      {/* ═════════════════════════════════════════════════════════════════ */}
+      {activeTab === "youtube" && (
+        <div>
+          {/* Buscador inteligente con sugerencias y ejecución embebida directa */}
+          <div ref={searchContainerRef} style={{ position: "relative", marginBottom: "0.85rem" }}>
+            <form
+              onSubmit={handleYoutubeFormSubmit}
+              style={{
+                display: "flex",
+                gap: "0.5rem",
+              }}
+            >
+              <div
+                style={{
+                  position: "relative",
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <IconSearch
+                  size={18}
+                  style={{
+                    position: "absolute",
+                    left: "14px",
+                    color: "var(--apple-text-secondary)",
+                  }}
+                />
+                <input
+                  type="text"
+                  value={youtubeQuery}
+                  onFocus={() => setShowSuggestions(true)}
+                  onChange={(e) => {
+                    setYoutubeQuery(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  placeholder="Escribe lo que quieras ver o pega un enlace de YouTube..."
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem 2.4rem 0.75rem 2.6rem",
+                    borderRadius: "var(--radius-full)",
+                    background: "rgba(0, 0, 0, 0.4)",
+                    border: "1px solid rgba(255, 255, 255, 0.18)",
+                    color: "#ffffff",
+                    fontSize: "0.92rem",
+                    outline: "none",
+                    boxShadow: "inset 0 2px 4px rgba(0, 0, 0, 0.4)",
+                  }}
+                />
+                {youtubeQuery && (
+                  <button
+                    type="button"
+                    onClick={handleClearYoutubeSearch}
+                    style={{
+                      position: "absolute",
+                      right: "14px",
+                      background: "rgba(255, 255, 255, 0.15)",
+                      border: "none",
+                      color: "#ffffff",
+                      borderRadius: "50%",
+                      width: "20px",
+                      height: "20px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      fontSize: "0.75rem",
+                    }}
+                    title="Borrar texto"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{
+                  borderRadius: "var(--radius-full)",
+                  padding: "0 1.4rem",
+                  background: "#ff3b30",
+                  color: "#ffffff",
+                  border: "none",
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+              >
+                <IconSearch size={16} />
+                Buscar
+              </button>
+            </form>
+
+            {/* Desplegable flotante de autocompletado en vivo */}
+            {showSuggestions && youtubeSuggestions.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  left: 0,
+                  right: 0,
+                  background: "rgba(22, 22, 24, 0.95)",
+                  backdropFilter: "blur(20px)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  borderRadius: "14px",
+                  boxShadow: "0 12px 30px rgba(0, 0, 0, 0.6)",
+                  zIndex: 100,
+                  overflow: "hidden",
+                }}
+              >
+                {youtubeSuggestions.map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => executeYoutubeSearch(suggestion)}
+                    style={{
+                      width: "100%",
+                      padding: "0.65rem 1rem",
+                      background: "transparent",
+                      border: "none",
+                      borderBottom:
+                        idx < youtubeSuggestions.length - 1 ? "1px solid rgba(255, 255, 255, 0.05)" : "none",
+                      color: "#ffffff",
+                      textAlign: "left",
+                      fontSize: "0.85rem",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.6rem",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <IconSearch size={14} style={{ opacity: 0.5 }} />
+                    <span>{suggestion}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Búsquedas recientes del usuario (solo lo que la familia busca, sin recomendaciones fijas) */}
+          {recentYoutubeSearches.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.45rem",
+                overflowX: "auto",
+                paddingBottom: "0.6rem",
+                marginBottom: "0.6rem",
+              }}
+            >
+              <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", whiteSpace: "nowrap" }}>
+                🕒 Recientes:
+              </span>
+              {recentYoutubeSearches.map((term, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => executeYoutubeSearch(term)}
+                  style={{
+                    padding: "0.25rem 0.65rem",
+                    borderRadius: "var(--radius-full)",
+                    background: "rgba(255, 255, 255, 0.06)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    color: "#ffffff",
+                    fontSize: "0.75rem",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                  }}
+                >
+                  {term}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={handleClearRecentSearches}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--apple-text-tertiary)",
+                  fontSize: "0.7rem",
+                  cursor: "pointer",
+                  marginLeft: "0.25rem",
+                  whiteSpace: "nowrap",
+                }}
+                title="Borrar historial reciente"
+              >
+                (limpiar)
+              </button>
+            </div>
+          )}
+
+          {/* Barra de Estado del Reproductor YouTube */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "0.4rem 0.75rem",
+              background: "rgba(0, 0, 0, 0.25)",
+              borderRadius: "10px",
+              marginBottom: "0.65rem",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
+            }}
+          >
+            <span style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", fontWeight: 500 }}>
+              📺 {currentPlayingTitle}
+            </span>
+            <span style={{ fontSize: "0.72rem", color: "#34c759", fontWeight: 600 }}>
+              ● Reproducción integrada en Kiosk
+            </span>
+          </div>
+
+          {/* Reproductor Embebido de YouTube (100% en la pestaña, sin ventanas emergentes) */}
+          <div
+            style={{
+              borderRadius: "16px",
+              overflow: "hidden",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              background: "#000000",
+              aspectRatio: "16 / 9",
+              width: "100%",
+              minHeight: "360px",
+              maxHeight: "560px",
+              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.6)",
+            }}
+          >
+            <iframe
+              src={youtubeEmbedUrl}
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              title="YouTube Kiosk Player"
+              style={{ width: "100%", height: "100%", display: "block", border: "none" }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════════════ */}
+      {/* 🎵 2. PESTAÑA: SPOTIFY CONNECT & WEB PLAYBACK SDK                */}
       {/* ═════════════════════════════════════════════════════════════════ */}
       {activeTab === "spotify" && (
         <div>
@@ -542,8 +838,8 @@ export function MultimediaModule() {
                 </span>
                 <p style={{ fontSize: "0.73rem", color: "var(--apple-text-secondary)", margin: 0 }}>
                   {isSpotifyConnected
-                    ? "Puedes enviar música directamente desde la app de Spotify en tu móvil tocando el icono de altavoz"
-                    : "Selecciona una playlist familiar abajo o vincula tu cuenta para usar Spotify Connect"}
+                    ? "Puedes transferir música directamente desde la app de Spotify en tu móvil tocando el icono de altavoz"
+                    : "Usa el reproductor directo abajo o vincula tu cuenta para transferir música desde el móvil"}
                 </p>
               </div>
             </div>
@@ -705,113 +1001,9 @@ export function MultimediaModule() {
             </div>
           ) : null}
 
-          {/* Selector de Playlists Familiares de 1 Toque */}
-          <div style={{ marginBottom: "1rem" }}>
-            <span
-              style={{
-                fontSize: "0.78rem",
-                fontWeight: 700,
-                color: "var(--apple-text-secondary)",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                display: "block",
-                marginBottom: "0.6rem",
-              }}
-            >
-              Listas de Reproducción Rápidas
-            </span>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: "0.65rem",
-                marginBottom: "1rem",
-              }}
-            >
-              {SPOTIFY_FAMILY_PLAYLISTS.map((pl) => {
-                const isSelected = selectedPlaylistId === pl.id;
-                return (
-                  <button
-                    key={pl.id}
-                    onClick={() => setSelectedPlaylistId(pl.id)}
-                    style={{
-                      background: isSelected ? "rgba(30, 215, 96, 0.15)" : "rgba(255, 255, 255, 0.05)",
-                      border: `1px solid ${isSelected ? "#1ed760" : "rgba(255, 255, 255, 0.1)"}`,
-                      borderRadius: "14px",
-                      padding: "0.75rem",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.65rem",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <span style={{ fontSize: "1.5rem" }}>{pl.emoji}</span>
-                    <div style={{ overflow: "hidden" }}>
-                      <div
-                        style={{
-                          fontSize: "0.85rem",
-                          fontWeight: 700,
-                          color: isSelected ? "#1ed760" : "#ffffff",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {pl.title}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "0.7rem",
-                          color: "var(--apple-text-secondary)",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {pl.subtitle}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Reproductor Embebido Spotify (Garantiza reproducción inmediata sin fricción) */}
-          <div
-            style={{
-              borderRadius: "16px",
-              overflow: "hidden",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              background: "#000000",
-              boxShadow: "0 8px 30px rgba(0, 0, 0, 0.4)",
-            }}
-          >
-            <iframe
-              src={`https://open.spotify.com/embed/playlist/${selectedPlaylistId}?utm_source=generator&theme=0`}
-              width="100%"
-              height="352"
-              frameBorder="0"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy"
-              title="Spotify Embed Player"
-              style={{ display: "block" }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* ═════════════════════════════════════════════════════════════════ */}
-      {/* 🎥 2. PESTAÑA: YOUTUBE (CUENTA DE INVITADO)                       */}
-      {/* ═════════════════════════════════════════════════════════════════ */}
-      {activeTab === "youtube" && (
-        <div>
-          {/* Buscador de YouTube para Kiosk */}
+          {/* Buscador / Carga rápida de Playlist o Álbum de Spotify */}
           <form
-            onSubmit={handleYoutubeSearch}
+            onSubmit={handleSpotifyLoadUrl}
             style={{
               display: "flex",
               gap: "0.5rem",
@@ -826,19 +1018,19 @@ export function MultimediaModule() {
                 alignItems: "center",
               }}
             >
-              <IconSearch
+              <IconMusic
                 size={16}
                 style={{
                   position: "absolute",
                   left: "14px",
-                  color: "var(--apple-text-secondary)",
+                  color: "#1ed760",
                 }}
               />
               <input
                 type="text"
-                value={youtubeQuery}
-                onChange={(e) => setYoutubeQuery(e.target.value)}
-                placeholder="Buscar en YouTube o pegar enlace (ej: Pocoyo, canciones infantiles, recetas...)"
+                value={spotifyQuery}
+                onChange={(e) => setSpotifyQuery(e.target.value)}
+                placeholder="Pega cualquier enlace de playlist o álbum de Spotify..."
                 style={{
                   width: "100%",
                   padding: "0.65rem 1rem 0.65rem 2.4rem",
@@ -857,139 +1049,37 @@ export function MultimediaModule() {
               style={{
                 borderRadius: "var(--radius-full)",
                 padding: "0 1.25rem",
-                background: "#ff3b30",
-                color: "#ffffff",
+                background: "#1ed760",
+                color: "#000000",
                 border: "none",
-                fontWeight: 600,
+                fontWeight: 700,
                 fontSize: "0.85rem",
               }}
             >
-              Buscar
+              Cargar
             </button>
           </form>
 
-          {/* Categorías Rápidas Infantiles y Familiares */}
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-            {YOUTUBE_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveYoutubeCategory(cat.id)}
-                style={{
-                  padding: "0.4rem 0.85rem",
-                  borderRadius: "var(--radius-full)",
-                  border: `1px solid ${
-                    activeYoutubeCategory === cat.id ? "#ff3b30" : "rgba(255, 255, 255, 0.12)"
-                  }`,
-                  background: activeYoutubeCategory === cat.id ? "rgba(255, 59, 48, 0.18)" : "rgba(255, 255, 255, 0.05)",
-                  color: activeYoutubeCategory === cat.id ? "#ff3b30" : "var(--apple-text-secondary)",
-                  fontSize: "0.8rem",
-                  fontWeight: activeYoutubeCategory === cat.id ? 700 : 500,
-                  cursor: "pointer",
-                }}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Canales y vídeos de la categoría activa */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: "0.6rem",
-              marginBottom: "1rem",
-            }}
-          >
-            {YOUTUBE_CATEGORIES.find((c) => c.id === activeYoutubeCategory)?.videos.map((vid) => (
-              <button
-                key={vid.id}
-                onClick={() => setCurrentVideoId(vid.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.65rem",
-                  padding: "0.65rem 0.85rem",
-                  borderRadius: "12px",
-                  background: currentVideoId === vid.id ? "rgba(255, 59, 48, 0.15)" : "rgba(255, 255, 255, 0.04)",
-                  border: `1px solid ${
-                    currentVideoId === vid.id ? "#ff3b30" : "rgba(255, 255, 255, 0.08)"
-                  }`,
-                  textAlign: "left",
-                  cursor: "pointer",
-                }}
-              >
-                <span style={{ fontSize: "1.2rem", color: "#ff3b30" }}>▶</span>
-                <div style={{ overflow: "hidden" }}>
-                  <div
-                    style={{
-                      fontSize: "0.82rem",
-                      fontWeight: 600,
-                      color: "#ffffff",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {vid.title}
-                  </div>
-                  <div style={{ fontSize: "0.7rem", color: "var(--apple-text-secondary)" }}>{vid.channel}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Reproductor Embebido de YouTube */}
+          {/* Reproductor Embebido Spotify (Sin fricción) */}
           <div
             style={{
               borderRadius: "16px",
               overflow: "hidden",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
               background: "#000000",
-              aspectRatio: "16 / 9",
-              width: "100%",
-              maxHeight: "440px",
-              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
+              boxShadow: "0 8px 30px rgba(0, 0, 0, 0.4)",
             }}
           >
-            {currentVideoId ? (
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&rel=0&modestbranding=1`}
-                width="100%"
-                height="100%"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                title="YouTube Video Player"
-              />
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  color: "var(--apple-text-secondary)",
-                  flexDirection: "column",
-                  gap: "0.75rem",
-                }}
-              >
-                <IconSearch size={32} />
-                <p style={{ margin: 0, fontSize: "0.9rem" }}>
-                  Buscando en YouTube... Puedes seleccionar un vídeo de arriba o abrir la búsqueda completa.
-                </p>
-                <button
-                  onClick={() =>
-                    openInExternalTab(`https://www.youtube.com/results?search_query=${encodeURIComponent(youtubeQuery)}`)
-                  }
-                  className="btn btn-secondary"
-                  style={{ borderRadius: "var(--radius-full)" }}
-                >
-                  <IconExternalLink size={15} style={{ marginRight: "0.3rem" }} />
-                  Abrir resultados en YouTube
-                </button>
-              </div>
-            )}
+            <iframe
+              src={spotifyEmbedUrl}
+              width="100%"
+              height="380"
+              frameBorder="0"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              loading="lazy"
+              title="Spotify Embed Player"
+              style={{ display: "block" }}
+            />
           </div>
         </div>
       )}
