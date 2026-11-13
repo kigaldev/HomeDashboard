@@ -11,6 +11,7 @@ import { KidsModule } from "./KidsModule";
 import { CalendarModule } from "./CalendarModule";
 import { EconomyModule } from "./EconomyModule";
 import { TipsModule } from "./TipsModule";
+import { MultimediaModule } from "./MultimediaModule";
 import { NewsWidget } from "./NewsWidget";
 import { WeatherDetailWidget } from "./WeatherDetailWidget";
 import { FamilyPhotoFrame } from "./FamilyPhotoFrame";
@@ -64,6 +65,7 @@ const CARDS = [
   { id: "economia", label: "Economía", icon: (s = 16) => <IconEconomy size={s} /> },
   { id: "tips", label: "Tips", icon: (s = 16) => <span style={{ fontSize: `${s}px`, lineHeight: 1 }}>💡</span> },
   { id: "familia", label: "Familia", icon: (s = 16) => <IconFamily size={s} /> },
+  { id: "multimedia", label: "Multimedia", icon: (s = 16) => <span style={{ fontSize: `${s}px`, lineHeight: 1 }}>🎵</span> },
 ] as const;
 
 export function DashboardClient({
@@ -798,6 +800,13 @@ export function DashboardClient({
                 />
               )}
             </div>
+          </div>
+        </div>
+
+        {/* 🃏 Tarjeta 8: Centro Multimedia & Web Kiosk (Spotify Connect, YouTube, Navegador Chrome) */}
+        <div className="deck-slide">
+          <div className="deck-card">
+            <MultimediaModule />
           </div>
         </div>
       </div>

@@ -23,6 +23,24 @@ import {
   Bot,
   Activity,
   Layers,
+  Music,
+  Tv,
+  Globe,
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  Search,
+  ExternalLink,
+  ArrowLeft,
+  ArrowRight,
+  RotateCw,
+  Maximize2,
+  Radio,
+  Compass,
+  Bookmark,
   type LucideIcon,
 } from "lucide-react";
 
@@ -58,3 +76,21 @@ export const IconPieChart = wrap(PieChart);
 export const IconBot = wrap(Bot);
 export const IconActivity = wrap(Activity);
 export const IconLayers = wrap(Layers);
+export const IconMusic = wrap(Music);
+export const IconTv = wrap(Tv);
+export const IconGlobe = wrap(Globe);
+export const IconPlay = wrap(Play);
+export const IconPause = wrap(Pause);
+export const IconSkipBack = wrap(SkipBack);
+export const IconSkipForward = wrap(SkipForward);
+export const IconVolume2 = wrap(Volume2);
+export const IconVolumeX = wrap(VolumeX);
+export const IconSearch = wrap(Search);
+export const IconExternalLink = wrap(ExternalLink);
+export const IconArrowLeft = wrap(ArrowLeft);
+export const IconArrowRight = wrap(ArrowRight);
+export const IconRotateCw = wrap(RotateCw);
+export const IconMaximize2 = wrap(Maximize2);
+export const IconRadio = wrap(Radio);
+export const IconCompass = wrap(Compass);
+export const IconBookmark = wrap(Bookmark);
