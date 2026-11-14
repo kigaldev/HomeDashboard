@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { searchYoutubeAction } from "@/app/actions";
+import type { YoutubeSearchResult } from "@/lib/youtube";
 import {
   IconMusic,
   IconTv,
@@ -16,11 +18,9 @@ import {
   IconArrowLeft,
   IconArrowRight,
   IconRotateCw,
-  IconRadio,
-  IconBookmark,
 } from "./Icons";
 
-type MultimediaTab = "spotify" | "youtube" | "browser";
+type MultimediaTab = "youtube" | "spotify" | "browser";
 
 // Declaración global para la API de Spotify Web Playback SDK
 declare global {
@@ -51,20 +51,19 @@ interface SpotifyPlayerInstance {
   nextTrack: () => Promise<void>;
 }
 
-// Marcadores rápidos estilo Chrome para el Kiosk
-const CHROME_BOOKMARKS = [
-  { name: "Google", url: "https://www.google.com/webhp?igu=1", icon: "🔍", canEmbed: true },
-  { name: "Wikipedia", url: "https://es.m.wikipedia.org", icon: "📚", canEmbed: true },
-  { name: "AEMET Tiempo", url: "https://www.aemet.es", icon: "🌦️", canEmbed: false },
-  { name: "La Gaceta Salamanca", url: "https://www.lagacetadesalamanca.es", icon: "📰", canEmbed: false },
-  { name: "Col. Montessori", url: "https://www.colegiomontessorisalamanca.com", icon: "🏫", canEmbed: false },
-  { name: "Directo al Paladar", url: "https://www.directoalpaladar.com", icon: "🍳", canEmbed: false },
-  { name: "Mercadona", url: "https://tienda.mercadona.es", icon: "🛒", canEmbed: false },
-  { name: "Home Assistant", url: "http://homeassistant.local:8123", icon: "🏠", canEmbed: false },
-];
-
 export function MultimediaModule() {
   const [activeTab, setActiveTab] = useState<MultimediaTab>("youtube");
+
+  // ── ESTADOS DE YOUTUBE ──
+  const [youtubeQuery, setYoutubeQuery] = useState("");
+  const [currentVideoId, setCurrentVideoId] = useState<string>("QZ0gqJ3-33k"); // Pocoyó por defecto
+  const [currentVideoTitle, setCurrentVideoTitle] = useState<string>("Pocoyó - Episodios Completos");
+  const [searchResults, setSearchResults] = useState<YoutubeSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [youtubeSuggestions, setYoutubeSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [recentYoutubeSearches, setRecentYoutubeSearches] = useState<string[]>([]);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // ── ESTADOS DE SPOTIFY CONNECT ──
   const [spotifyToken, setSpotifyToken] = useState<string>("");
@@ -81,24 +80,12 @@ export function MultimediaModule() {
   const [isMuted, setIsMuted] = useState(false);
   const playerRef = useRef<SpotifyPlayerInstance | null>(null);
 
-  // ── ESTADOS DE YOUTUBE (BUSCADOR OPTIMIZADO Y SIN RECOMENDACIONES) ──
-  const [youtubeQuery, setYoutubeQuery] = useState("");
-  const [youtubeEmbedUrl, setYoutubeEmbedUrl] = useState<string>(
-    "https://www.youtube-nocookie.com/embed?listType=search&list=musica+relajante&autoplay=0&rel=0&modestbranding=1"
-  );
-  const [currentPlayingTitle, setCurrentPlayingTitle] = useState<string>("Buscador de YouTube listo");
-  const [youtubeSuggestions, setYoutubeSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [recentYoutubeSearches, setRecentYoutubeSearches] = useState<string[]>([]);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-
-  // ── ESTADOS DEL NAVEGADOR CHROME ──
-  const [browserUrlInput, setBrowserUrlInput] = useState("https://es.m.wikipedia.org");
-  const [currentIframeUrl, setCurrentIframeUrl] = useState("https://es.m.wikipedia.org");
-  const [browserHistory, setBrowserHistory] = useState<string[]>(["https://es.m.wikipedia.org"]);
+  // ── ESTADOS DEL NAVEGADOR GOOGLE ──
+  const GOOGLE_HOME_URL = "https://www.google.com/webhp?igu=1";
+  const [browserUrlInput, setBrowserUrlInput] = useState(GOOGLE_HOME_URL);
+  const [currentIframeUrl, setCurrentIframeUrl] = useState(GOOGLE_HOME_URL);
+  const [browserHistory, setBrowserHistory] = useState<string[]>([GOOGLE_HOME_URL]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [isLoadingBrowser, setIsLoadingBrowser] = useState(false);
-  const [browserIframeBlocked, setBrowserIframeBlocked] = useState(false);
 
   // Cargar token guardado de Spotify y búsquedas recientes de YouTube
   useEffect(() => {
@@ -114,7 +101,7 @@ export function MultimediaModule() {
           setRecentYoutubeSearches(JSON.parse(savedSearches));
         }
       } catch (err) {
-        console.warn("Error leyendo búsquedas recientes de YouTube:", err);
+        console.warn("Error leyendo búsquedas recientes:", err);
       }
     }
   }, []);
@@ -158,13 +145,14 @@ export function MultimediaModule() {
     return () => clearTimeout(timer);
   }, [youtubeQuery]);
 
-  // Ejecutar búsqueda de YouTube manteniéndose 100% dentro de la pestaña
-  const executeYoutubeSearch = (searchTerm: string) => {
+  // Ejecutar búsqueda real de YouTube (100% dentro de la pestaña)
+  const executeYoutubeSearch = async (searchTerm: string) => {
     const clean = searchTerm.trim();
     if (!clean) return;
 
     setShowSuggestions(false);
     setYoutubeQuery(clean);
+    setIsSearching(true);
 
     // Guardar en historial de búsquedas recientes del Kiosk (hasta 6)
     setRecentYoutubeSearches((prev) => {
@@ -175,29 +163,20 @@ export function MultimediaModule() {
       return updated;
     });
 
-    // 1. Si es un enlace directo a un vídeo de YouTube
-    const urlMatch = clean.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-    if (urlMatch && urlMatch[1]) {
-      const videoId = urlMatch[1];
-      setYoutubeEmbedUrl(`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`);
-      setCurrentPlayingTitle(`Vídeo: ${videoId}`);
-      return;
-    }
+    try {
+      const results = await searchYoutubeAction(clean);
+      setSearchResults(results);
 
-    // 2. Si es un ID directo de 11 caracteres (ej: 5qap5aO4i9A)
-    if (/^[\w-]{11}$/.test(clean)) {
-      setYoutubeEmbedUrl(`https://www.youtube-nocookie.com/embed/${clean}?autoplay=1&rel=0&modestbranding=1`);
-      setCurrentPlayingTitle(`Vídeo ID: ${clean}`);
-      return;
+      // Si hay resultados, reproducir automáticamente el primer vídeo en el reproductor embebido
+      if (results.length > 0) {
+        setCurrentVideoId(results[0].id);
+        setCurrentVideoTitle(results[0].title);
+      }
+    } catch (err) {
+      console.error("[YouTube Search] Error:", err);
+    } finally {
+      setIsSearching(false);
     }
-
-    // 3. Búsqueda por palabras clave: se reproduce directamente embebido en la pestaña
-    setYoutubeEmbedUrl(
-      `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(
-        clean
-      )}&autoplay=1&rel=0&modestbranding=1`
-    );
-    setCurrentPlayingTitle(`Búsqueda: ${clean}`);
   };
 
   const handleYoutubeFormSubmit = (e: React.FormEvent) => {
@@ -259,7 +238,7 @@ export function MultimediaModule() {
         });
 
         player.addListener("authentication_error", ({ message }) => {
-          console.warn("[Spotify Connect] Error de autenticación (token caducado):", message);
+          console.warn("[Spotify Connect] Error de autenticación:", message);
           setIsSpotifyConnected(false);
         });
 
@@ -335,7 +314,6 @@ export function MultimediaModule() {
     if (!spotifyQuery.trim()) return;
 
     let q = spotifyQuery.trim();
-    // Convertir enlace normal de Spotify a embed
     if (q.includes("open.spotify.com/")) {
       const parts = q.split("open.spotify.com/")[1]?.split("?")[0];
       if (parts) {
@@ -344,7 +322,6 @@ export function MultimediaModule() {
         return;
       }
     }
-    // Si meten un ID directo
     if (/^[a-zA-Z0-9]{22}$/.test(q)) {
       setSpotifyEmbedUrl(`https://open.spotify.com/embed/playlist/${q}?utm_source=generator&theme=0`);
       setSpotifyQuery("");
@@ -352,23 +329,22 @@ export function MultimediaModule() {
     }
   };
 
-  // Navegación estilo Chrome
+  // Navegación estilo Chrome enfocada exclusivamente en Google
   const navigateTo = (rawUrl: string) => {
     let url = rawUrl.trim();
     if (!url) return;
 
+    // Si es una búsqueda de texto (sin protocolo ni puntos), buscar directamente en Google
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       if (url.includes(".") && !url.includes(" ")) {
         url = "https://" + url;
       } else {
-        url = `https://duckduckgo.com/?q=${encodeURIComponent(url)}`;
+        url = `https://www.google.com/search?igu=1&q=${encodeURIComponent(url)}`;
       }
     }
 
     setBrowserUrlInput(url);
     setCurrentIframeUrl(url);
-    setIsLoadingBrowser(true);
-    setBrowserIframeBlocked(false);
 
     const newHist = browserHistory.slice(0, historyIndex + 1);
     newHist.push(url);
@@ -383,7 +359,6 @@ export function MultimediaModule() {
       const url = browserHistory[nextIdx];
       setBrowserUrlInput(url);
       setCurrentIframeUrl(url);
-      setBrowserIframeBlocked(false);
     }
   };
 
@@ -394,17 +369,19 @@ export function MultimediaModule() {
       const url = browserHistory[nextIdx];
       setBrowserUrlInput(url);
       setCurrentIframeUrl(url);
-      setBrowserIframeBlocked(false);
     }
   };
 
   const handleBrowserReload = () => {
-    setIsLoadingBrowser(true);
     const curr = currentIframeUrl;
     setCurrentIframeUrl("");
     setTimeout(() => {
       setCurrentIframeUrl(curr);
     }, 50);
+  };
+
+  const handleBrowserGoHome = () => {
+    navigateTo(GOOGLE_HOME_URL);
   };
 
   const handleBrowserSubmit = (e: React.FormEvent) => {
@@ -471,7 +448,7 @@ export function MultimediaModule() {
               Centro Multimedia & Web Kiosk
             </h2>
             <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
-              YouTube integrado · Spotify Connect (SDK) · Navegador Chrome
+              Buscador de YouTube · Spotify Connect (SDK) · Google Navegador
             </p>
           </div>
         </div>
@@ -545,13 +522,13 @@ export function MultimediaModule() {
             }}
           >
             <IconGlobe size={15} />
-            Chrome Web
+            Google Web
           </button>
         </div>
       </div>
 
       {/* ═════════════════════════════════════════════════════════════════ */}
-      {/* 🎥 1. PESTAÑA: YOUTUBE (SIN RECOMENDACIONES, BUSCADOR OPTIMIZADO)  */}
+      {/* 🎥 1. PESTAÑA: YOUTUBE (SIN RECOMENDACIONES, RESULTADOS REALES)   */}
       {/* ═════════════════════════════════════════════════════════════════ */}
       {activeTab === "youtube" && (
         <div>
@@ -588,7 +565,7 @@ export function MultimediaModule() {
                     setYoutubeQuery(e.target.value);
                     setShowSuggestions(true);
                   }}
-                  placeholder="Escribe lo que quieras ver o pega un enlace de YouTube..."
+                  placeholder="Escribe lo que quieras buscar en YouTube (ej. Pocoyó, canciones infantiles, recetas, música...)"
                   style={{
                     width: "100%",
                     padding: "0.75rem 2.4rem 0.75rem 2.6rem",
@@ -628,6 +605,7 @@ export function MultimediaModule() {
               </div>
               <button
                 type="submit"
+                disabled={isSearching}
                 className="btn btn-primary"
                 style={{
                   borderRadius: "var(--radius-full)",
@@ -637,14 +615,15 @@ export function MultimediaModule() {
                   border: "none",
                   fontWeight: 700,
                   fontSize: "0.9rem",
-                  cursor: "pointer",
+                  cursor: isSearching ? "wait" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   gap: "0.4rem",
+                  opacity: isSearching ? 0.7 : 1,
                 }}
               >
                 <IconSearch size={16} />
-                Buscar
+                {isSearching ? "Buscando..." : "Buscar"}
               </button>
             </form>
 
@@ -704,7 +683,7 @@ export function MultimediaModule() {
                 alignItems: "center",
                 gap: "0.45rem",
                 overflowX: "auto",
-                paddingBottom: "0.6rem",
+                paddingBottom: "0.5rem",
                 marginBottom: "0.6rem",
               }}
             >
@@ -750,27 +729,6 @@ export function MultimediaModule() {
             </div>
           )}
 
-          {/* Barra de Estado del Reproductor YouTube */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "0.4rem 0.75rem",
-              background: "rgba(0, 0, 0, 0.25)",
-              borderRadius: "10px",
-              marginBottom: "0.65rem",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
-            }}
-          >
-            <span style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", fontWeight: 500 }}>
-              📺 {currentPlayingTitle}
-            </span>
-            <span style={{ fontSize: "0.72rem", color: "#34c759", fontWeight: 600 }}>
-              ● Reproducción integrada en Kiosk
-            </span>
-          </div>
-
           {/* Reproductor Embebido de YouTube (100% en la pestaña, sin ventanas emergentes) */}
           <div
             style={{
@@ -780,13 +738,14 @@ export function MultimediaModule() {
               background: "#000000",
               aspectRatio: "16 / 9",
               width: "100%",
-              minHeight: "360px",
-              maxHeight: "560px",
+              minHeight: "340px",
+              maxHeight: "520px",
               boxShadow: "0 10px 30px rgba(0, 0, 0, 0.6)",
+              marginBottom: "1rem",
             }}
           >
             <iframe
-              src={youtubeEmbedUrl}
+              src={`https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&rel=0&modestbranding=1`}
               width="100%"
               height="100%"
               frameBorder="0"
@@ -796,6 +755,153 @@ export function MultimediaModule() {
               style={{ width: "100%", height: "100%", display: "block", border: "none" }}
             />
           </div>
+
+          {/* Título del vídeo en reproducción */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "0.5rem 0.85rem",
+              background: "rgba(0, 0, 0, 0.3)",
+              borderRadius: "12px",
+              marginBottom: "1rem",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "0.85rem",
+                color: "#ffffff",
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              ▶ {currentVideoTitle}
+            </span>
+            <span style={{ fontSize: "0.72rem", color: "#34c759", fontWeight: 600, flexShrink: 0, marginLeft: "1rem" }}>
+              ● Reproduciendo en Kiosk
+            </span>
+          </div>
+
+          {/* Listado de Resultados Reales de la Búsqueda (Toca para reproducir al instante) */}
+          {searchResults.length > 0 && (
+            <div>
+              <div
+                style={{
+                  fontSize: "0.78rem",
+                  fontWeight: 700,
+                  color: "var(--apple-text-secondary)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: "0.65rem",
+                }}
+              >
+                Resultados de la Búsqueda ({searchResults.length} vídeos encontrados · Toca para reproducir)
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: "0.75rem",
+                }}
+              >
+                {searchResults.map((item) => {
+                  const isCurrent = currentVideoId === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setCurrentVideoId(item.id);
+                        setCurrentVideoTitle(item.title);
+                      }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        background: isCurrent ? "rgba(255, 59, 48, 0.18)" : "rgba(255, 255, 255, 0.04)",
+                        border: `1px solid ${isCurrent ? "#ff3b30" : "rgba(255, 255, 255, 0.08)"}`,
+                        borderRadius: "14px",
+                        overflow: "hidden",
+                        padding: "0.5rem",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        gap: "0.5rem",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {/* Miniatura */}
+                      <div
+                        style={{
+                          position: "relative",
+                          width: "100%",
+                          aspectRatio: "16 / 9",
+                          borderRadius: "10px",
+                          overflow: "hidden",
+                          background: "#000000",
+                        }}
+                      >
+                        <img
+                          src={item.thumbnail}
+                          alt={item.title}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                        {item.duration && (
+                          <span
+                            style={{
+                              position: "absolute",
+                              bottom: "6px",
+                              right: "6px",
+                              background: "rgba(0, 0, 0, 0.8)",
+                              color: "#ffffff",
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              padding: "0.15rem 0.4rem",
+                              borderRadius: "4px",
+                            }}
+                          >
+                            {item.duration}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Título y canal */}
+                      <div>
+                        <div
+                          style={{
+                            fontSize: "0.82rem",
+                            fontWeight: 600,
+                            color: isCurrent ? "#ff3b30" : "#ffffff",
+                            lineHeight: 1.3,
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {item.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "0.72rem",
+                            color: "var(--apple-text-secondary)",
+                            marginTop: "0.2rem",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {item.channel}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1085,7 +1191,7 @@ export function MultimediaModule() {
       )}
 
       {/* ═════════════════════════════════════════════════════════════════ */}
-      {/* 🌐 3. PESTAÑA: NAVEGADOR WEB ESTILO CHROME                        */}
+      {/* 🌐 3. PESTAÑA: NAVEGADOR GOOGLE (SIN RECOMENDACIONES, SOLO GOOGLE)*/}
       {/* ═════════════════════════════════════════════════════════════════ */}
       {activeTab === "browser" && (
         <div>
@@ -1099,7 +1205,7 @@ export function MultimediaModule() {
               border: "1px solid rgba(255, 255, 255, 0.12)",
               borderRadius: "14px",
               padding: "0.5rem 0.75rem",
-              marginBottom: "0.75rem",
+              marginBottom: "0.85rem",
             }}
           >
             {/* Controles de navegación */}
@@ -1154,9 +1260,30 @@ export function MultimediaModule() {
               >
                 <IconRotateCw size={15} />
               </button>
+              <button
+                onClick={handleBrowserGoHome}
+                style={{
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  padding: "0.3rem 0.6rem",
+                  borderRadius: "var(--radius-full)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  marginLeft: "0.2rem",
+                }}
+                title="Volver a Google"
+              >
+                <span>🔍</span>
+                <span>Google</span>
+              </button>
             </div>
 
-            {/* Omnibox / Barra de Direcciones estilo Chrome */}
+            {/* Omnibox / Barra de Búsqueda de Google */}
             <form onSubmit={handleBrowserSubmit} style={{ flex: 1, display: "flex", alignItems: "center" }}>
               <div
                 style={{
@@ -1174,7 +1301,7 @@ export function MultimediaModule() {
                   type="text"
                   value={browserUrlInput}
                   onChange={(e) => setBrowserUrlInput(e.target.value)}
-                  placeholder="Escribe una dirección web o busca en Google..."
+                  placeholder="Buscar en Google o escribir URL..."
                   style={{
                     flex: 1,
                     background: "transparent",
@@ -1187,7 +1314,7 @@ export function MultimediaModule() {
               </div>
             </form>
 
-            {/* Abrir en pestaña nativa del Kiosk */}
+            {/* Abrir en pestaña nativa del Kiosk si el usuario lo desea */}
             <button
               onClick={() => openInExternalTab(browserUrlInput)}
               className="btn btn-secondary"
@@ -1200,60 +1327,14 @@ export function MultimediaModule() {
                 gap: "0.3rem",
                 flexShrink: 0,
               }}
-              title="Abrir en pantalla completa o pestaña externa"
+              title="Abrir en pantalla completa externa"
             >
               <IconExternalLink size={14} />
               <span>Abrir</span>
             </button>
           </div>
 
-          {/* Marcadores Rápidos Familiares (1 toque para navegar) */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.45rem",
-              overflowX: "auto",
-              paddingBottom: "0.6rem",
-              marginBottom: "0.6rem",
-            }}
-          >
-            <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", marginRight: "0.3rem" }}>
-              ⭐ Favoritos:
-            </span>
-            {CHROME_BOOKMARKS.map((bm) => (
-              <button
-                key={bm.name}
-                onClick={() => {
-                  if (bm.canEmbed) {
-                    navigateTo(bm.url);
-                  } else {
-                    openInExternalTab(bm.url);
-                  }
-                }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  padding: "0.3rem 0.65rem",
-                  borderRadius: "var(--radius-full)",
-                  background: "rgba(255, 255, 255, 0.06)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  color: "#ffffff",
-                  fontSize: "0.75rem",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                }}
-              >
-                <span>{bm.icon}</span>
-                <span>{bm.name}</span>
-                {!bm.canEmbed && <IconExternalLink size={11} style={{ opacity: 0.6 }} />}
-              </button>
-            ))}
-          </div>
-
-          {/* Visor IFrame Web */}
+          {/* Visor IFrame de Google Web */}
           <div
             style={{
               position: "relative",
@@ -1261,60 +1342,17 @@ export function MultimediaModule() {
               overflow: "hidden",
               border: "1px solid rgba(255, 255, 255, 0.12)",
               background: "#ffffff",
-              height: "540px",
+              height: "560px",
               boxShadow: "0 10px 30px rgba(0, 0, 0, 0.4)",
             }}
           >
-            {/* Aviso informativo de seguridad de navegación embebida */}
-            {browserIframeBlocked && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "rgba(18, 18, 18, 0.95)",
-                  color: "#ffffff",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "2rem",
-                  textAlign: "center",
-                  zIndex: 10,
-                }}
-              >
-                <div style={{ fontSize: "2.5rem", marginBottom: "0.8rem" }}>🛡️</div>
-                <h3 style={{ fontSize: "1.1rem", margin: "0 0 0.5rem 0" }}>Protección de seguridad del sitio web</h3>
-                <p style={{ fontSize: "0.85rem", color: "var(--apple-text-secondary)", maxWidth: "480px" }}>
-                  Por políticas de seguridad (X-Frame-Options), algunas webs como Google o periódicos impiden cargarse
-                  dentro de otra aplicación. Puedes abrirla inmediatamente a pantalla completa con un toque:
-                </p>
-                <button
-                  onClick={() => openInExternalTab(currentIframeUrl)}
-                  className="btn btn-primary"
-                  style={{
-                    marginTop: "1rem",
-                    borderRadius: "var(--radius-full)",
-                    padding: "0.6rem 1.4rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <IconExternalLink size={16} />
-                  Abrir en el Navegador del Kiosk
-                </button>
-              </div>
-            )}
-
             <iframe
               src={currentIframeUrl}
               width="100%"
               height="100%"
               frameBorder="0"
               sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-              title="Chrome Kiosk Browser"
-              onError={() => setBrowserIframeBlocked(true)}
-              onLoad={() => setIsLoadingBrowser(false)}
+              title="Google Kiosk Browser"
               style={{ width: "100%", height: "100%", border: "none" }}
             />
           </div>

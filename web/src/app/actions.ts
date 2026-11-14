@@ -713,4 +713,11 @@ export async function addRecipeIngredientsToShoppingAction(ingredients: string[]
   revalidatePath("/");
 }
 
+// ── Multimedia & YouTube ──────────────────────────────────────────
+export async function searchYoutubeAction(query: string) {
+  const { searchYoutubeVideos } = await import("@/lib/youtube");
+  return await searchYoutubeVideos(query);
+}
+
+
 
