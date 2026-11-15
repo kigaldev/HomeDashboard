@@ -2,18 +2,20 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import { runAgentInstructionAction, processReceiptImageAction } from "@/app/actions";
-import { IconSparkles } from "./Icons";
+import { IconSparkles, IconVolume2, IconVolumeX, IconMic, IconMicOff } from "./Icons";
 
 export function AiAssistantModal({
   isOpen,
   onClose,
   initialPrompt = "",
   initialFile = null,
+  startWithVoice = false,
 }: {
   isOpen: boolean;
   onClose: () => void;
   initialPrompt?: string;
   initialFile?: File | null;
+  startWithVoice?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -22,6 +24,10 @@ export function AiAssistantModal({
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
+  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const wasVoiceInputRef = useRef(false);
 
   useEffect(() => {
     if (initialPrompt && isOpen) {
@@ -64,29 +70,66 @@ export function AiAssistantModal({
         recognition.lang = "es-ES";
 
         recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
+          const transcript = event.results[0]?.[0]?.transcript;
           if (transcript) {
             setInput(transcript);
             setIsListening(false);
-            handleSend(transcript);
+            wasVoiceInputRef.current = true;
+            handleSend(transcript, true);
           }
         };
 
-        recognition.onerror = () => setIsListening(false);
+        recognition.onerror = (e: any) => {
+          setIsListening(false);
+          if (e?.error === "not-allowed") {
+            setVoiceError(
+              "Permiso de micrófono bloqueado. Toca el candado o icono de permisos en la barra del navegador para permitir el micrófono a Pepe."
+            );
+          } else if (e?.error !== "no-speech") {
+            console.warn("Speech recognition error:", e?.error);
+          }
+        };
+
         recognition.onend = () => setIsListening(false);
         recognitionRef.current = recognition;
       }
     }
   }, []);
 
+  // Iniciar escucha automática por voz si se abrió desde el botón de micrófono
+  useEffect(() => {
+    if (isOpen && startWithVoice) {
+      const t = setTimeout(() => {
+        if (recognitionRef.current && !isListening) {
+          try {
+            setInput("");
+            setVoiceError(null);
+            stopSpeaking();
+            wasVoiceInputRef.current = true;
+            recognitionRef.current.start();
+            setIsListening(true);
+          } catch {
+            // Ya iniciado
+          }
+        }
+      }, 250);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen, startWithVoice]);
+
   const toggleVoice = () => {
     if (!recognitionRef.current) return;
     if (isListening) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch {}
       setIsListening(false);
     } else {
       setInput("");
+      setVoiceError(null);
+      stopSpeaking();
       try {
+        wasVoiceInputRef.current = true;
         recognitionRef.current.start();
         setIsListening(true);
       } catch (err) {
@@ -98,11 +141,37 @@ export function AiAssistantModal({
   const speakText = (text: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
-    const cleanText = text.replace(/[*#_`]/g, "");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const cleanText = text
+      .replace(/[*#_`]/g, "")
+      .replace(/•/g, "")
+      .replace(/https?:\/\/\S+/g, "")
+      .trim();
+    if (!cleanText) return;
+    const utterance = new SpeechSynthesisUtterance(cleanText.slice(0, 350));
     utterance.lang = "es-ES";
     utterance.rate = 1.05;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
     window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    if (recognitionRef.current && isListening) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      setIsListening(false);
+    }
+    stopSpeaking();
+    onClose();
   };
 
   useEffect(() => {
@@ -123,7 +192,7 @@ export function AiAssistantModal({
         rect.left <= event.clientX &&
         event.clientX <= rect.left + rect.width;
       if (!isInside) {
-        onClose();
+        handleCloseModal();
       }
     };
 
@@ -131,13 +200,17 @@ export function AiAssistantModal({
     return () => dialog.removeEventListener("click", handleBackdropClick);
   }, [isOpen, onClose]);
 
-  const handleSend = (textToSend?: string) => {
+  const handleSend = (textToSend?: string, fromVoice: boolean = false) => {
     const q = (textToSend || input).trim();
     if (!q || isPending) return;
 
     setMessages((prev) => [...prev, { role: "user", text: q }]);
     if (!textToSend) setInput("");
     setLastAction(null);
+    setVoiceError(null);
+
+    const isVoice = fromVoice || wasVoiceInputRef.current;
+    wasVoiceInputRef.current = false;
 
     startTransition(async () => {
       try {
@@ -152,6 +225,9 @@ export function AiAssistantModal({
         ]);
         if (res.actionExecuted) {
           setLastAction(res.actionExecuted.description);
+        }
+        if (isVoice && voiceReplyEnabled) {
+          speakText(res.message);
         }
       } catch {
         setMessages((prev) => [
@@ -282,21 +358,141 @@ export function AiAssistantModal({
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="btn-ghost"
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          {/* Botón Silenciar/Activar Voz de Pepe */}
+          <button
+            type="button"
+            onClick={() => {
+              if (isSpeaking) stopSpeaking();
+              setVoiceReplyEnabled(!voiceReplyEnabled);
+            }}
+            className="btn-ghost"
+            style={{
+              padding: "0.3rem 0.65rem",
+              borderRadius: "var(--radius-full)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              fontSize: "0.75rem",
+              background: voiceReplyEnabled ? "rgba(0, 113, 227, 0.15)" : "var(--apple-surface-secondary)",
+              color: voiceReplyEnabled ? "var(--apple-blue)" : "var(--apple-text-tertiary)",
+              border: "1px solid var(--apple-border)",
+            }}
+            title={voiceReplyEnabled ? "Respuesta por voz activada (Toca para silenciar)" : "Respuesta por voz desactivada (Toca para activar)"}
+          >
+            {voiceReplyEnabled ? <IconVolume2 size={15} /> : <IconVolumeX size={15} />}
+            <span>{voiceReplyEnabled ? "Voz activa" : "Silencio"}</span>
+          </button>
+
+          <button
+            onClick={handleCloseModal}
+            className="btn-ghost"
+            style={{
+              width: "32px",
+              height: "32px",
+              borderRadius: "50%",
+              padding: 0,
+              justifyContent: "center",
+              fontSize: "1.1rem",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      {/* Banner de escucha activa de voz */}
+      {isListening && (
+        <div
           style={{
-            width: "32px",
-            height: "32px",
-            borderRadius: "50%",
-            padding: 0,
-            justifyContent: "center",
-            fontSize: "1.1rem",
+            padding: "0.65rem 1rem",
+            marginBottom: "0.75rem",
+            borderRadius: "var(--radius-md)",
+            background: "linear-gradient(135deg, rgba(255, 59, 48, 0.15), rgba(255, 149, 0, 0.15))",
+            border: "1px solid rgba(255, 59, 48, 0.4)",
+            color: "var(--apple-text)",
+            fontSize: "0.85rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.5rem",
+            boxShadow: "0 0 16px rgba(255, 59, 48, 0.2)",
           }}
         >
-          ✕
-        </button>
-      </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <span className="pulse-indicator" style={{ background: "#FF3B30", width: "10px", height: "10px" }} />
+            <span style={{ fontWeight: 600 }}>🎙️ Pepe te está escuchando...</span>
+            <span style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)" }}>
+              (Habla claro hacia la tablet)
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={toggleVoice}
+            className="btn-secondary"
+            style={{ padding: "0.2rem 0.6rem", fontSize: "0.75rem", borderRadius: "var(--radius-full)" }}
+          >
+            Detener
+          </button>
+        </div>
+      )}
+
+      {/* Banner de respuesta de Pepe hablando en voz alta */}
+      {isSpeaking && (
+        <div
+          onClick={stopSpeaking}
+          style={{
+            padding: "0.6rem 0.95rem",
+            marginBottom: "0.75rem",
+            borderRadius: "var(--radius-md)",
+            background: "rgba(0, 113, 227, 0.15)",
+            border: "1px solid rgba(0, 113, 227, 0.4)",
+            color: "var(--apple-blue)",
+            fontSize: "0.85rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            cursor: "pointer",
+            fontWeight: 600,
+          }}
+          title="Toca para silenciar"
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span>🔊</span>
+            <span>Pepe está respondiendo en voz alta...</span>
+          </div>
+          <span style={{ fontSize: "0.75rem", textDecoration: "underline" }}>Pausar voz</span>
+        </div>
+      )}
+
+      {/* Banner de error de permisos de micrófono si procede */}
+      {voiceError && (
+        <div
+          style={{
+            padding: "0.6rem 0.95rem",
+            marginBottom: "0.75rem",
+            borderRadius: "var(--radius-md)",
+            background: "rgba(255, 59, 48, 0.12)",
+            border: "1px solid rgba(255, 59, 48, 0.35)",
+            color: "var(--apple-red)",
+            fontSize: "0.825rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.5rem",
+          }}
+        >
+          <span>⚠️ {voiceError}</span>
+          <button
+            type="button"
+            onClick={() => setVoiceError(null)}
+            className="btn-ghost"
+            style={{ padding: "0.1rem 0.4rem", fontSize: "0.75rem" }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Banner de última acción ejecutada con estilo Apple */}
       {lastAction && (

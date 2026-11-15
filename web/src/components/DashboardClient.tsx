@@ -151,14 +151,16 @@ export function DashboardClient({
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [assistantInitialPrompt, setAssistantInitialPrompt] = useState("");
   const [assistantInitialFile, setAssistantInitialFile] = useState<File | null>(null);
+  const [assistantStartWithVoice, setAssistantStartWithVoice] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const quickCameraInputRef = useRef<HTMLInputElement>(null);
   const quickGalleryInputRef = useRef<HTMLInputElement>(null);
 
-  const handleOpenAssistant = (prompt?: string, file?: File | null) => {
+  const handleOpenAssistant = (prompt?: string, file?: File | null, startWithVoice?: boolean) => {
     setAssistantInitialPrompt(prompt || "");
     setAssistantInitialFile(file || null);
+    setAssistantStartWithVoice(Boolean(startWithVoice));
     setIsAssistantOpen(true);
   };
 
@@ -889,6 +891,33 @@ export function DashboardClient({
           🖼️
         </button>
 
+        {/* Acceso Directo por Voz a Pepe (Micrófono) */}
+        <button
+          type="button"
+          onClick={() => handleOpenAssistant("", null, true)}
+          style={{
+            width: "42px",
+            height: "42px",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "1.2rem",
+            background: "linear-gradient(135deg, rgba(255, 59, 48, 0.85), rgba(255, 149, 0, 0.85))",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            boxShadow: "0 6px 20px rgba(255, 59, 48, 0.4)",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            color: "#ffffff",
+          }}
+          title="Hablar directamente con Pepe por voz (Micrófono)"
+          aria-label="Hablar por voz con Pepe"
+        >
+          🎙️
+        </button>
+
         <button
           type="button"
           onClick={() => handleOpenAssistant()}
@@ -908,9 +937,11 @@ export function DashboardClient({
         onClose={() => {
           setIsAssistantOpen(false);
           setAssistantInitialFile(null);
+          setAssistantStartWithVoice(false);
         }}
         initialPrompt={assistantInitialPrompt}
         initialFile={assistantInitialFile}
+        startWithVoice={assistantStartWithVoice}
       />
 
       <SettingsModal

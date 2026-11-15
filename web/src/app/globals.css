@@ -218,8 +218,8 @@ input, select, textarea, .input-field {
 
 @media (min-width: 768px) {
   .container {
-    max-width: 1280px;
-    padding: max(1.1rem, var(--safe-top)) 1.5rem 2.25rem 1.5rem;
+    max-width: 1420px;
+    padding: max(0.85rem, var(--safe-top)) 1.25rem 2rem 1.25rem;
   }
 }
 

@@ -38,6 +38,9 @@ import {
   ArrowRight,
   RotateCw,
   Maximize2,
+  Minimize2,
+  Mic,
+  MicOff,
   Radio,
   Compass,
   Bookmark,
@@ -91,6 +94,9 @@ export const IconArrowLeft = wrap(ArrowLeft);
 export const IconArrowRight = wrap(ArrowRight);
 export const IconRotateCw = wrap(RotateCw);
 export const IconMaximize2 = wrap(Maximize2);
+export const IconMinimize2 = wrap(Minimize2);
+export const IconMic = wrap(Mic);
+export const IconMicOff = wrap(MicOff);
 export const IconRadio = wrap(Radio);
 export const IconCompass = wrap(Compass);
 export const IconBookmark = wrap(Bookmark);

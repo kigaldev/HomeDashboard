@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import type { Member } from "@/lib/repo";
 import type { Weather } from "@/lib/weather";
 import { weatherLabel, kidsOutfit } from "@/lib/weather";
-import { IconSparkles, IconSettings } from "./Icons";
+import { IconSparkles, IconSettings, IconMaximize2, IconMinimize2 } from "./Icons";
 import { HamburgerMenu, type NavItem } from "./HamburgerMenu";
 
 export function Header({
@@ -42,6 +43,25 @@ export function Header({
   const wInfo = currentWeather ? weatherLabel(currentWeather.code) : null;
   const outfit = todayWeather ? kidsOutfit(todayWeather) : [];
   const activeMember = members.find((m) => m.id === currentMemberId);
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (typeof document === "undefined") return;
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
 
   return (
     <header className="top-bar">
@@ -160,6 +180,16 @@ export function Header({
               <IconSparkles size={14} />
             </div>
           </div>
+
+          {/* Botón Pantalla Completa (Ocultar barras del navegador en Tablet) */}
+          <button
+            onClick={toggleFullscreen}
+            className="btn-settings-header liquid-glass-elevated"
+            title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa (Ocultar navegador)"}
+            aria-label="Pantalla completa"
+          >
+            {isFullscreen ? <IconMinimize2 size={16} /> : <IconMaximize2 size={16} />}
+          </button>
 
           {/* Botón Ajustes */}
           <button
