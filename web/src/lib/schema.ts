@@ -223,8 +223,19 @@ alter table school_run_overrides add column if not exists pickup_noon_id int ref
 alter table family_insurances add column if not exists document_url text;
 alter table warranties add column if not exists document_url text;
 delete from stores where name in ('Eroski', 'BM');
-delete from family_insurances;
-delete from warranties;
+
+-- Contratos de energía base (Naturgy Luz y Gas) si la tabla está vacía
+insert into energy_contracts (service, provider, tariff_name, access_toll, energy_price_kwh, power_p1_kw, power_p2_kw, fixed_monthly_price, notes, metadata)
+select 'electricity', 'Naturgy', 'Tarifa Por Uso Luz', '2.0TD', 0.1230, 0.1230, 0.0615, null,
+   'Precio fijo de energía 24h garantizado 12 meses. Potencia P1 (Punta: 08:00-00:00 lun-vie) y P2 (Valle: 00:00-08:00 lun-vie y 24h fines de semana). Carga de VE recomendada en P2 para evitar sobrecostes de potencia y disparos de ICP.',
+   '{"ev_recommended_hours": "00:00 - 07:30", "appliances_avoid_hours": ["13:30-15:00", "20:30-22:30"], "battery_kwh_standard": 50, "ev_charger_power_kw": 3.7}'::jsonb
+where not exists (select 1 from energy_contracts where service = 'electricity');
+
+insert into energy_contracts (service, provider, tariff_name, access_toll, energy_price_kwh, power_p1_kw, power_p2_kw, fixed_monthly_price, notes, metadata)
+select 'gas', 'Naturgy', 'Tarifa Por Uso Gas', 'RL.2', 0.0899, null, null, 9.55,
+   'Tarifa fija 24h para calefacción de gas y ACS (peaje RL.2). Optimización térmica adaptada a Salamanca: 20°C día y 17.5°C noche. Ventilación óptima de 13:00 a 15:00.',
+   '{"comfort_temp": 20.0, "eco_temp": 17.5, "ventilation_hours": "13:00 - 15:00", "boiler_kw_avg": 9.0}'::jsonb
+where not exists (select 1 from energy_contracts where service = 'gas');
 
 -- Menú escolar Montessori Noviembre 2026 garantizado
 insert into school_menu (date, lunch, dinner_recommendation) values

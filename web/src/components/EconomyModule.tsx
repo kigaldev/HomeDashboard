@@ -1739,13 +1739,16 @@ export function EconomyModule({
               const isSupermarket = (name?: string | null) =>
                 supermarketKeywords.some((sm) => (name || "").toLowerCase().includes(sm));
 
-              const withTicketCount = receipts.filter((r) => Boolean(r.photo_url)).length;
-              const manualCount = receipts.filter((r) => !r.photo_url || r.raw_text?.startsWith("Gasto manual")).length;
+              const isManualReceipt = (r: Receipt) => Boolean(r.raw_text?.startsWith("Gasto manual"));
+              const isScannedReceipt = (r: Receipt) => !isManualReceipt(r);
+
+              const withTicketCount = receipts.filter(isScannedReceipt).length;
+              const manualCount = receipts.filter(isManualReceipt).length;
               const supermarketCount = receipts.filter((r) => isSupermarket(r.store_name || r.company_name)).length;
 
               const filteredReceipts = receipts.filter((r) => {
-                if (ticketFilter === "with_ticket") return Boolean(r.photo_url);
-                if (ticketFilter === "manual") return !r.photo_url || r.raw_text?.startsWith("Gasto manual");
+                if (ticketFilter === "with_ticket") return isScannedReceipt(r);
+                if (ticketFilter === "manual") return isManualReceipt(r);
                 if (ticketFilter === "supermarket") return isSupermarket(r.store_name || r.company_name);
                 return true;
               });
@@ -1866,7 +1869,7 @@ export function EconomyModule({
                       </div>
                     ) : (
                       filteredReceipts.map((r) => {
-                        const isManual = !r.photo_url || r.raw_text?.startsWith("Gasto manual");
+                        const isManual = isManualReceipt(r);
                         const displayName = r.store_name || r.company_name || "Comercio";
 
                         return (
