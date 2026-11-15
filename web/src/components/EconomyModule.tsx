@@ -11,6 +11,7 @@ import type {
   Warranty,
   UtilityBill,
   MonthlyExpenses,
+  RecurringExpense,
 } from "@/lib/repo";
 import type { DayWeather } from "@/lib/weather";
 import type { ReceiptReconciliationResult } from "@/lib/receiptShared";
@@ -29,6 +30,8 @@ import {
   deleteWarrantyAction,
   deleteReceiptAction,
   deleteUtilityBillAction,
+  toggleRecurringExpenseActiveAction,
+  deleteRecurringExpenseAction,
   updateReceiptItemCategoryAction,
 } from "@/app/actions";
 import {
@@ -69,6 +72,7 @@ export function EconomyModule({
     receipts_total: 0,
     utilities_total: 0,
     insurances_total: 0,
+    recurring_total: 0,
     by_store: [],
     by_category: [],
     items: [],
@@ -80,6 +84,7 @@ export function EconomyModule({
   insurances = [],
   warranties = [],
   utilityBills = [],
+  recurringExpenses = [],
 }: {
   receipts: Receipt[];
   perishables: PerishableAlert[];
@@ -91,8 +96,10 @@ export function EconomyModule({
   insurances: FamilyInsurance[];
   warranties: Warranty[];
   utilityBills?: UtilityBill[];
+  recurringExpenses?: RecurringExpense[];
 }) {
-  const [activeTab, setActiveTab] = useState<"balance" | "energy" | "insurances" | "warranties" | "scan" | "perishables">("balance");
+  const [activeTab, setActiveTab] = useState<"balance" | "energy" | "recurring" | "insurances" | "warranties" | "scan" | "perishables">("balance");
+  const [manualExpenseType, setManualExpenseType] = useState<"supermarket" | "general" | "recurring">("supermarket");
   const [isPending, startTransition] = useTransition();
 
   // Estados interactivos para Categorías y Drag & Drop
@@ -412,6 +419,12 @@ export function EconomyModule({
                 <span>🛒 Compras: {(monthlyExpenses.receipts_total ?? 0).toFixed(0)} €</span>
                 <span>·</span>
                 <span>💡 Suministros: {(monthlyExpenses.utilities_total ?? 0).toFixed(0)} €</span>
+                {Boolean(monthlyExpenses.recurring_total && monthlyExpenses.recurring_total > 0) && (
+                  <>
+                    <span>·</span>
+                    <span>🔄 Fijos: {(monthlyExpenses.recurring_total ?? 0).toFixed(0)} €</span>
+                  </>
+                )}
                 {Boolean(monthlyExpenses.insurances_total && monthlyExpenses.insurances_total > 0) && (
                   <>
                     <span>·</span>
@@ -515,6 +528,14 @@ export function EconomyModule({
             style={{ fontSize: "0.82rem", padding: "0.4rem 0.95rem" }}
           >
             Suministros & Energía
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("recurring")}
+            className={`tab-btn ${activeTab === "recurring" ? "active" : ""}`}
+            style={{ fontSize: "0.82rem", padding: "0.4rem 0.95rem" }}
+          >
+            Gastos Fijos & Hipoteca ({recurringExpenses.length})
           </button>
           <button
             type="button"
@@ -1328,7 +1349,275 @@ export function EconomyModule({
         </div>
       )}
 
-      {/* ── VISTA 3: PÓLIZAS & SEGUROS ── */}
+      {/* ── VISTA 3: GASTOS FIJOS, HIPOTECA & INVERSIONES ── */}
+      {activeTab === "recurring" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.15rem", flexWrap: "wrap", gap: "0.75rem" }}>
+              <div>
+                <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
+                  Gastos Fijos, Hipoteca & Inversiones Periódicas
+                </h3>
+                <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.15rem" }}>
+                  Compromisos recurrentes (hipoteca, inversiones, cuota de comunidad...) que se contabilizan automáticamente cada mes.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setManualExpenseType("recurring");
+                  setIsManualExpenseOpen(true);
+                }}
+                className="btn-primary"
+                style={{ fontSize: "0.8rem", padding: "0.45rem 1rem", gap: "0.35rem" }}
+              >
+                <IconPlus size={14} />
+                <span>Añadir Gasto Fijo</span>
+              </button>
+            </div>
+
+            {/* Tarjeta de Resumen de Compromiso Fijo */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "0.85rem",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <div
+                style={{
+                  padding: "1rem",
+                  borderRadius: "var(--radius-lg)",
+                  background: "var(--apple-surface-secondary)",
+                  border: "1px solid var(--apple-border)",
+                }}
+              >
+                <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
+                  Total Compromiso Mensual Fijo
+                </div>
+                <div style={{ fontSize: "1.45rem", fontWeight: 800, color: "var(--apple-text)", marginTop: "0.25rem" }}>
+                  {(recurringExpenses ?? [])
+                    .filter((r) => r.active)
+                    .reduce((acc, r) => {
+                      const amt = r.amount || 0;
+                      if (r.frequency === "2_plazos") return acc + (amt * 2) / 12;
+                      if (r.frequency === "3_plazos") return acc + (amt * 3) / 12;
+                      if (r.frequency === "trimestral") return acc + (amt * 4) / 12;
+                      if (r.frequency === "anual") return acc + amt / 12;
+                      return acc + amt;
+                    }, 0)
+                    .toFixed(2)}{" "}
+                  € <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--apple-text-secondary)" }}>/ mes</span>
+                </div>
+                <div style={{ fontSize: "0.74rem", color: "var(--apple-green)", marginTop: "0.2rem", fontWeight: 600 }}>
+                  ✓ Se suma de forma automática a los totales y gráficos mensuales
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "1rem",
+                  borderRadius: "var(--radius-lg)",
+                  background: "var(--apple-surface-secondary)",
+                  border: "1px solid var(--apple-border)",
+                }}
+              >
+                <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
+                  Gastos Fijos Activos
+                </div>
+                <div style={{ fontSize: "1.45rem", fontWeight: 800, color: "var(--apple-text)", marginTop: "0.25rem" }}>
+                  {(recurringExpenses ?? []).filter((r) => r.active).length}{" "}
+                  <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--apple-text-secondary)" }}>de {(recurringExpenses ?? []).length} registrados</span>
+                </div>
+                <div style={{ fontSize: "0.74rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
+                  Puedes pausar o reactivar cualquier cuota en cualquier momento
+                </div>
+              </div>
+            </div>
+
+            {/* Listado de Gastos Fijos */}
+            {(!recurringExpenses || recurringExpenses.length === 0) ? (
+              <div
+                style={{
+                  padding: "2.5rem 1.5rem",
+                  textAlign: "center",
+                  borderRadius: "var(--radius-lg)",
+                  background: "rgba(255, 255, 255, 0.02)",
+                  border: "1px dashed var(--apple-border)",
+                }}
+              >
+                <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏠 📈 🏢</div>
+                <h4 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
+                  No tienes gastos fijos periódicos registrados todavía
+                </h4>
+                <p style={{ fontSize: "0.82rem", color: "var(--apple-text-secondary)", margin: "0.4rem 0 1rem 0" }}>
+                  Añade aquí la hipoteca, aportaciones a fondos de inversión, cuota de la comunidad, seguro de moto o coche fraccionado, etc., y se contabilizarán automáticamente a partir del mes que indiques.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManualExpenseType("recurring");
+                    setIsManualExpenseOpen(true);
+                  }}
+                  className="btn-primary"
+                  style={{ fontSize: "0.82rem", padding: "0.5rem 1.15rem", gap: "0.35rem" }}
+                >
+                  <IconPlus size={14} />
+                  <span>Añadir Primer Gasto Fijo</span>
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {recurringExpenses.map((rec) => {
+                  let freqDesc = "Cobro mensual";
+                  let monthlyEquivalent = rec.amount;
+                  if (rec.frequency === "2_plazos") {
+                    freqDesc = `Fraccionado en 2 mensualidades (${rec.amount.toFixed(2)} €/cuota)`;
+                    monthlyEquivalent = (rec.amount * 2) / 12;
+                  } else if (rec.frequency === "3_plazos") {
+                    freqDesc = `Fraccionado en 3 mensualidades (${rec.amount.toFixed(2)} €/cuota)`;
+                    monthlyEquivalent = (rec.amount * 3) / 12;
+                  } else if (rec.frequency === "trimestral") {
+                    freqDesc = `Trimestral (${rec.amount.toFixed(2)} €/cuota)`;
+                    monthlyEquivalent = (rec.amount * 4) / 12;
+                  } else if (rec.frequency === "anual") {
+                    freqDesc = `Pago único anual (${rec.amount.toFixed(2)} €/año)`;
+                    monthlyEquivalent = rec.amount / 12;
+                  }
+
+                  const categoryEmoji =
+                    rec.category.includes("Hipoteca") || rec.category.includes("Vivienda")
+                      ? "🏠"
+                      : rec.category.includes("Inversión") || rec.category.includes("Ahorro")
+                      ? "📈"
+                      : rec.category.includes("Comunidad")
+                      ? "🏢"
+                      : rec.category.includes("Colegio") || rec.category.includes("Educación")
+                      ? "🎓"
+                      : rec.category.includes("Seguro")
+                      ? "🏍️"
+                      : rec.category.includes("Suscripción")
+                      ? "💳"
+                      : "🔄";
+
+                  return (
+                    <div
+                      key={rec.id}
+                      style={{
+                        padding: "1rem 1.2rem",
+                        borderRadius: "var(--radius-lg)",
+                        background: rec.active ? "var(--apple-surface-secondary)" : "rgba(255, 255, 255, 0.02)",
+                        border: "1px solid var(--apple-border)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "0.85rem",
+                        opacity: rec.active ? 1 : 0.6,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                        <div
+                          style={{
+                            width: "2.4rem",
+                            height: "2.4rem",
+                            borderRadius: "0.65rem",
+                            background: "rgba(94, 92, 230, 0.15)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "1.25rem",
+                          }}
+                        >
+                          {categoryEmoji}
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                            <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--apple-text)" }}>
+                              {rec.title}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "0.68rem",
+                                fontWeight: 600,
+                                padding: "0.15rem 0.5rem",
+                                borderRadius: "var(--radius-full)",
+                                background: "rgba(94, 92, 230, 0.15)",
+                                color: "#af52de",
+                              }}
+                            >
+                              {rec.category}
+                            </span>
+                            {!rec.active && (
+                              <span
+                                style={{
+                                  fontSize: "0.68rem",
+                                  fontWeight: 600,
+                                  padding: "0.15rem 0.5rem",
+                                  borderRadius: "var(--radius-full)",
+                                  background: "rgba(255, 255, 255, 0.1)",
+                                  color: "var(--apple-text-tertiary)",
+                                }}
+                              >
+                                Pausado
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.25rem" }}>
+                            {rec.provider && <strong>{rec.provider} · </strong>}
+                            {freqDesc} · Desde: {rec.start_month}
+                            {rec.day_of_month ? ` (día ${rec.day_of_month})` : ""}
+                          </div>
+                          {rec.notes && (
+                            <div style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)", marginTop: "0.2rem" }}>
+                              {rec.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--apple-text)" }}>
+                            {rec.amount.toFixed(2)} €
+                          </div>
+                          <div style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)" }}>
+                            {rec.frequency === "mensual" ? "/ mes" : `~${monthlyEquivalent.toFixed(2)} €/mes`}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "0.35rem" }}>
+                          <button
+                            type="button"
+                            onClick={() => startTransition(() => toggleRecurringExpenseActiveAction(rec.id))}
+                            className="btn-secondary"
+                            style={{ fontSize: "0.74rem", padding: "0.3rem 0.65rem" }}
+                            title={rec.active ? "Pausar gasto" : "Reactivar gasto"}
+                          >
+                            {rec.active ? "Pausar" : "Activar"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => startTransition(() => deleteRecurringExpenseAction(rec.id))}
+                            className="btn-ghost"
+                            style={{ width: "28px", height: "28px", borderRadius: "50%", padding: 0, justifyContent: "center", color: "var(--apple-text-tertiary)" }}
+                            title="Eliminar gasto periódico"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── VISTA 4: PÓLIZAS & SEGUROS ── */}
       {activeTab === "insurances" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
@@ -1338,7 +1627,7 @@ export function EconomyModule({
                   Pólizas de Seguros Familiares
                 </h3>
                 <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
-                  Aviso automático 30 días antes de la renovación anual y archivo de pólizas
+                  Aviso automático 30 días antes de la renovación anual, desglose de cuotas y archivo de pólizas
                 </p>
               </div>
               <button
@@ -1370,7 +1659,7 @@ export function EconomyModule({
                   marginBottom: "1.25rem",
                 }}
               >
-                <input type="text" name="title" placeholder="Título (ej. Seguro Hogar)" required className="input-field" />
+                <input type="text" name="title" placeholder="Título (ej. Seguro Hogar / Moto)" required className="input-field" />
                 <select name="category" className="input-field">
                   <option value="hogar">Hogar</option>
                   <option value="coche">Coche / Moto</option>
@@ -1379,9 +1668,16 @@ export function EconomyModule({
                   <option value="decesos">Decesos</option>
                   <option value="otro">Otro</option>
                 </select>
-                <input type="text" name="provider" placeholder="Compañía (ej. Mapfre)" required className="input-field" />
+                <input type="text" name="provider" placeholder="Compañía (ej. Mapfre / Mutua)" required className="input-field" />
                 <input type="text" name="policyNumber" placeholder="Nº de Póliza" className="input-field" />
                 <input type="number" step="0.01" name="annualCost" placeholder="Coste total año (€)" required className="input-field" />
+                <select name="paymentFrequency" className="input-field">
+                  <option value="anual">1 pago único anual</option>
+                  <option value="2_plazos">Fraccionado en 2 mensualidades / semestral (ej. moto/coche)</option>
+                  <option value="3_plazos">Fraccionado en 3 mensualidades (ej. coche/moto)</option>
+                  <option value="trimestral">4 cuotas trimestrales</option>
+                  <option value="mensual">12 mensualidades / mensual</option>
+                </select>
                 <input type="date" name="renewalDate" required className="input-field" />
                 <input type="text" name="notes" placeholder="Notas (franquicia, cobertura...)" className="input-field" style={{ gridColumn: "1 / -1" }} />
 
@@ -1478,7 +1774,18 @@ export function EconomyModule({
                           )}
                         </div>
                         <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.25rem" }}>
-                          Póliza: <code>{pol.policy_number || "S/N"}</code> · Vencimiento: {pol.renewal_date} · Pago {pol.payment_frequency}
+                          Póliza: <code>{pol.policy_number || "S/N"}</code> · Vencimiento: {pol.renewal_date} ·{" "}
+                          <span style={{ color: "var(--apple-text)", fontWeight: 600 }}>
+                            {pol.payment_frequency === "2_plazos" || pol.payment_frequency === "semestral"
+                              ? `Fraccionado en 2 mensualidades (2 x ${(pol.annual_cost / 2).toFixed(2)} €)`
+                              : pol.payment_frequency === "3_plazos"
+                              ? `Fraccionado en 3 mensualidades (3 x ${(pol.annual_cost / 3).toFixed(2)} €)`
+                              : pol.payment_frequency === "trimestral"
+                              ? `Trimestral (4 x ${(pol.annual_cost / 4).toFixed(2)} €)`
+                              : pol.payment_frequency === "mensual"
+                              ? `Mensual (12 x ${(pol.annual_cost / 12).toFixed(2)} €)`
+                              : "Pago único anual"}
+                          </span>
                         </div>
                         {pol.notes && (
                           <div style={{ fontSize: "0.74rem", color: "var(--apple-text-tertiary)", marginTop: "0.2rem" }}>
@@ -1503,7 +1810,9 @@ export function EconomyModule({
                           <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--apple-text)" }}>
                             {pol.annual_cost.toFixed(2)} €
                           </div>
-                          <div style={{ fontSize: "0.7rem", color: "var(--apple-text-secondary)" }}>/ año</div>
+                          <div style={{ fontSize: "0.7rem", color: "var(--apple-text-secondary)" }}>
+                            {(pol.annual_cost / 12).toFixed(2)} €/mes
+                          </div>
                         </div>
                         <button
                           onClick={() => startTransition(() => deleteFamilyInsuranceAction(pol.id))}
@@ -1987,10 +2296,11 @@ export function EconomyModule({
         onClose={() => setIsTicketModalOpen(false)}
       />
 
-      {/* ── Modal de Gasto Manual ── */}
+      {/* ── Modal de Gasto Manual y Recurrente ── */}
       <ManualExpenseModal
         isOpen={isManualExpenseOpen}
         onClose={() => setIsManualExpenseOpen(false)}
+        defaultType={manualExpenseType}
       />
 
       {/* ── Modal de Factura Mensual de Suministros ── */}

@@ -491,13 +491,17 @@ export async function seedDemoReceiptsAction() {
   revalidatePath("/");
 }
 
-// ── Registro de Gasto Manual ─────────────────────────────
+// ── Registro de Gasto Manual y Recurrente ─────────────────────────────
 export async function createManualExpenseAction(data: {
   concept: string;
   amount: number;
   category?: string;
   date?: string;
   storeName?: string;
+  isRecurring?: boolean;
+  frequency?: "mensual" | "2_plazos" | "3_plazos" | "trimestral" | "anual";
+  startMonth?: string;
+  notes?: string;
 }) {
   const schema = z.object({
     concept: z.string().trim().min(1, "El concepto es obligatorio").max(200),
@@ -505,12 +509,82 @@ export async function createManualExpenseAction(data: {
     category: z.string().trim().max(100).optional(),
     date: z.string().trim().max(30).optional(),
     storeName: z.string().trim().max(100).optional(),
+    isRecurring: z.boolean().optional(),
+    frequency: z.enum(["mensual", "2_plazos", "3_plazos", "trimestral", "anual"]).optional(),
+    startMonth: z.string().trim().max(10).optional(),
+    notes: z.string().trim().max(500).optional(),
   });
 
   const parsed = parse(schema, data);
-  const result = await recordManualExpense(parsed);
+
+  if (parsed.isRecurring) {
+    const { addRecurringExpense } = await import("@/lib/repo");
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const id = await addRecurringExpense({
+      title: parsed.concept,
+      category: parsed.category || "Vivienda / Hipoteca",
+      provider: parsed.storeName || null,
+      amount: parsed.amount,
+      frequency: parsed.frequency || "mensual",
+      start_month: parsed.startMonth || parsed.date?.slice(0, 7) || currentMonth,
+      day_of_month: parsed.date ? parseInt(parsed.date.slice(8, 10)) : 1,
+      active: true,
+      notes: parsed.notes || null,
+    });
+    revalidatePath("/");
+    return { success: true, recurringId: id };
+  }
+
+  const result = await recordManualExpense({
+    concept: parsed.concept,
+    amount: parsed.amount,
+    category: parsed.category,
+    date: parsed.date,
+    storeName: parsed.storeName,
+  });
   revalidatePath("/");
   return { success: true, ...result };
+}
+
+// ── Gastos Periódicos y Recurrentes (Hipoteca, Inversiones, Cuotas...) ──────
+export async function addRecurringExpenseAction(data: {
+  title: string;
+  category?: string;
+  provider?: string;
+  amount: number;
+  frequency?: "mensual" | "2_plazos" | "3_plazos" | "trimestral" | "anual";
+  start_month: string;
+  end_month?: string;
+  day_of_month?: number;
+  notes?: string;
+}) {
+  const { addRecurringExpense } = await import("@/lib/repo");
+  const id = await addRecurringExpense({
+    title: data.title,
+    category: data.category || "Vivienda / Hipoteca",
+    provider: data.provider || null,
+    amount: data.amount,
+    frequency: data.frequency || "mensual",
+    start_month: data.start_month,
+    end_month: data.end_month || null,
+    day_of_month: data.day_of_month || 1,
+    active: true,
+    notes: data.notes || null,
+  });
+  revalidatePath("/");
+  return { success: true, id };
+}
+
+export async function toggleRecurringExpenseActiveAction(id: number) {
+  const { toggleRecurringExpenseActive } = await import("@/lib/repo");
+  await toggleRecurringExpenseActive(id);
+  revalidatePath("/");
+}
+
+export async function deleteRecurringExpenseAction(id: number) {
+  const { deleteRecurringExpense } = await import("@/lib/repo");
+  await deleteRecurringExpense(id);
+  revalidatePath("/");
 }
 
 // ── Diagnóstico y Control de Webhook de Telegram ─────────

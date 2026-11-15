@@ -56,6 +56,7 @@ import type {
   Warranty,
   UtilityBill,
   MonthlyExpenses,
+  RecurringExpense,
 } from "@/lib/repo";
 import type { Weather, DayWeather } from "@/lib/weather";
 
@@ -98,6 +99,7 @@ export function DashboardClient({
     receipts_total: 0,
     utilities_total: 0,
     insurances_total: 0,
+    recurring_total: 0,
     by_store: [],
     by_category: [],
     items: [],
@@ -108,6 +110,7 @@ export function DashboardClient({
   insurances = [],
   warranties = [],
   utilityBills = [],
+  recurringExpenses = [],
   news = { espana: [], cyl: [] },
   traffic = null,
   pantryNeedsInventory = false,
@@ -140,6 +143,7 @@ export function DashboardClient({
   insurances: FamilyInsurance[];
   warranties: Warranty[];
   utilityBills?: UtilityBill[];
+  recurringExpenses?: RecurringExpense[];
   news?: { espana: NewsItem[]; cyl: NewsItem[] };
   traffic?: CommuteTraffic | null;
   pantryNeedsInventory?: boolean;
@@ -510,6 +514,7 @@ export function DashboardClient({
               insurances={insurances}
               warranties={warranties}
               utilityBills={utilityBills}
+              recurringExpenses={recurringExpenses}
             />
           </div>
         </div>

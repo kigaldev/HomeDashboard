@@ -211,6 +211,21 @@ create table if not exists utility_bills (
   created_at timestamptz not null default now()
 );
 
+create table if not exists recurring_expenses (
+  id serial primary key,
+  title text not null,
+  category text not null default 'Vivienda / Hipoteca',
+  provider text,
+  amount numeric(8,2) not null,
+  frequency text not null default 'mensual',
+  start_month text not null,
+  end_month text,
+  day_of_month int default 1,
+  active boolean not null default true,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 -- Migraciones seguras para columnas y tiendas actualizadas
 alter table school_menu add column if not exists dinner_recommendation text;
 alter table receipts add column if not exists company_name text;

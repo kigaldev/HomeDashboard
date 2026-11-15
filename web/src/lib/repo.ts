@@ -794,10 +794,36 @@ export type MonthlyExpenses = {
   receipts_total: number;
   utilities_total: number;
   insurances_total: number;
+  recurring_total: number;
   by_store: { store_name: string; color: string; total: number; count: number }[];
   by_category: { category: string; total: number; percentage: number }[];
   items?: ReceiptItemMonthly[];
 };
+
+function computeRecurringMonthlyCost(rec: { amount: number; frequency: string }): number {
+  const amt = rec.amount || 0;
+  switch (rec.frequency) {
+    case "mensual":
+      return amt;
+    case "2_plazos": // 2 mensualidades / semestral
+      return Number(((amt * 2) / 12).toFixed(2));
+    case "3_plazos": // 3 mensualidades / cuatrimestral
+      return Number(((amt * 3) / 12).toFixed(2));
+    case "trimestral": // 4 cuotas al año
+      return Number(((amt * 4) / 12).toFixed(2));
+    case "anual":
+      return Number((amt / 12).toFixed(2));
+    default:
+      return amt;
+  }
+}
+
+function isRecurringActiveInMonth(rec: { start_month: string; end_month?: string | null }, monthStr: string): boolean {
+  if (!rec.start_month) return true;
+  if (monthStr < rec.start_month) return false;
+  if (rec.end_month && monthStr > rec.end_month) return false;
+  return true;
+}
 
 export async function getMonthlyExpenses(): Promise<MonthlyExpenses> {
   // 1. Comercios de tickets del mes actual
@@ -856,7 +882,26 @@ export async function getMonthlyExpenses(): Promise<MonthlyExpenses> {
      order by annual_cost desc`
   );
 
-  // 6. Artículos de tickets del mes actual
+  // 6. Gastos Periódicos y Recurrentes (Hipoteca, Inversiones, Suscripciones...)
+  const recurringRows = await q<{
+    id: number;
+    title: string;
+    category: string;
+    provider: string | null;
+    amount: number;
+    frequency: string;
+    start_month: string;
+    end_month: string | null;
+    day_of_month: number | null;
+    notes: string | null;
+  }>(
+    `select id, title, category, provider, amount::float as amount, frequency, start_month, end_month, day_of_month, notes
+     from recurring_expenses
+     where active = true
+     order by amount desc`
+  );
+
+  // 7. Artículos de tickets del mes actual
   const items = await q<ReceiptItemMonthly>(
     `select ri.id, ri.receipt_id, ri.name, ri.quantity, ri.unit_price::float as unit_price,
             ri.total_price::float as total_price, ri.category,
@@ -868,17 +913,27 @@ export async function getMonthlyExpenses(): Promise<MonthlyExpenses> {
      order by ri.total_price desc, ri.name asc`,
   );
 
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const lastMonthDate = new Date();
+  lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+  const lastMonthStr = lastMonthDate.toISOString().slice(0, 7);
+
+  const activeCurrentRecurring = recurringRows.filter((r) => isRecurringActiveInMonth(r, currentMonthStr));
+  const activeLastRecurring = recurringRows.filter((r) => isRecurringActiveInMonth(r, lastMonthStr));
+
   const receiptsTotal = Number((currentReceiptsRow?.total ?? 0).toFixed(2));
   const utilitiesTotal = Number(currentBills.reduce((acc, b) => acc + (b.amount || 0), 0).toFixed(2));
   const insurancesTotal = Number(activeInsurances.reduce((acc, ins) => acc + ((ins.annual_cost || 0) / 12), 0).toFixed(2));
+  const recurringTotal = Number(activeCurrentRecurring.reduce((acc, r) => acc + computeRecurringMonthlyCost(r), 0).toFixed(2));
 
-  const currentTotal = Number((receiptsTotal + utilitiesTotal + insurancesTotal).toFixed(2));
+  const currentTotal = Number((receiptsTotal + utilitiesTotal + insurancesTotal + recurringTotal).toFixed(2));
 
   const lastReceiptsTotal = Number((lastReceiptsRow?.total ?? 0).toFixed(2));
   const lastUtilitiesTotal = Number((lastBillsRow?.total ?? 0).toFixed(2));
-  const lastTotal = Number((lastReceiptsTotal + lastUtilitiesTotal + insurancesTotal).toFixed(2));
+  const lastRecurringTotal = Number(activeLastRecurring.reduce((acc, r) => acc + computeRecurringMonthlyCost(r), 0).toFixed(2));
+  const lastTotal = Number((lastReceiptsTotal + lastUtilitiesTotal + insurancesTotal + lastRecurringTotal).toFixed(2));
 
-  // Mapa de categorías integrado (Alimentación + Suministros + Pólizas)
+  // Mapa de categorías integrado (Alimentación + Suministros + Pólizas + Recurrentes)
   const categoryMap = new Map<string, number>();
 
   for (const c of categoryRows) {
@@ -926,16 +981,56 @@ export async function getMonthlyExpenses(): Promise<MonthlyExpenses> {
     const monthlyCost = Number(((ins.annual_cost || 0) / 12).toFixed(2));
     categoryMap.set(catName, (categoryMap.get(catName) ?? 0) + monthlyCost);
 
+    let freqLabel = "Cuota mensual";
+    if (ins.payment_frequency === "2_plazos" || ins.payment_frequency === "semestral") {
+      freqLabel = `2 mensualidades (${(ins.annual_cost / 2).toFixed(2)} €/cuota)`;
+    } else if (ins.payment_frequency === "3_plazos") {
+      freqLabel = `3 mensualidades (${(ins.annual_cost / 3).toFixed(2)} €/cuota)`;
+    } else if (ins.payment_frequency === "trimestral") {
+      freqLabel = `4 cuotas (${(ins.annual_cost / 4).toFixed(2)} €/cuota)`;
+    } else if (ins.payment_frequency === "anual") {
+      freqLabel = `1 pago anual (${ins.annual_cost.toFixed(2)} €/año)`;
+    }
+
     items.push({
       id: -(ins.id + 20000),
       receipt_id: 0,
       name: `${ins.title}${ins.provider ? ` (${ins.provider})` : ""}${ins.notes ? ` · ${ins.notes}` : ""}`,
-      quantity: "Cuota mensual",
+      quantity: freqLabel,
       unit_price: monthlyCost,
       total_price: monthlyCost,
       category: catName,
       store_name: ins.provider || "Aseguradora",
       date: ins.renewal_date,
+    });
+  }
+
+  // Integrar gastos recurrentes en categorías e items
+  for (const rec of activeCurrentRecurring) {
+    const mCost = computeRecurringMonthlyCost(rec);
+    categoryMap.set(rec.category, (categoryMap.get(rec.category) ?? 0) + mCost);
+
+    let recFreqLabel = "Gasto mensual";
+    if (rec.frequency === "2_plazos") {
+      recFreqLabel = `2 mensualidades (${rec.amount.toFixed(2)} €/cuota)`;
+    } else if (rec.frequency === "3_plazos") {
+      recFreqLabel = `3 mensualidades (${rec.amount.toFixed(2)} €/cuota)`;
+    } else if (rec.frequency === "trimestral") {
+      recFreqLabel = `Trimestral (${rec.amount.toFixed(2)} €/cuota)`;
+    } else if (rec.frequency === "anual") {
+      recFreqLabel = `Anual (${rec.amount.toFixed(2)} €/año)`;
+    }
+
+    items.push({
+      id: -(rec.id + 30000),
+      receipt_id: 0,
+      name: `${rec.title}${rec.provider ? ` (${rec.provider})` : ""}${rec.notes ? ` · ${rec.notes}` : ""}`,
+      quantity: recFreqLabel,
+      unit_price: mCost,
+      total_price: mCost,
+      category: rec.category,
+      store_name: rec.provider || "Gasto Periódico",
+      date: `${currentMonthStr}-${String(rec.day_of_month || 1).padStart(2, "0")}`,
     });
   }
 
@@ -987,6 +1082,23 @@ export async function getMonthlyExpenses(): Promise<MonthlyExpenses> {
     }
   }
 
+  for (const rec of activeCurrentRecurring) {
+    const provName = rec.provider || (rec.title ? rec.title.slice(0, 30) : "Gasto Periódico");
+    const mCost = computeRecurringMonthlyCost(rec);
+    const existing = storeMap.get(provName);
+    if (existing) {
+      existing.total = Number((existing.total + mCost).toFixed(2));
+      existing.count += 1;
+    } else {
+      storeMap.set(provName, {
+        store_name: provName,
+        color: "#5e5ce6",
+        total: mCost,
+        count: 1,
+      });
+    }
+  }
+
   const byStore = Array.from(storeMap.values()).sort((a, b) => b.total - a.total);
 
   return {
@@ -995,6 +1107,7 @@ export async function getMonthlyExpenses(): Promise<MonthlyExpenses> {
     receipts_total: receiptsTotal,
     utilities_total: utilitiesTotal,
     insurances_total: insurancesTotal,
+    recurring_total: recurringTotal,
     by_store: byStore,
     by_category: categoriesWithPercent,
     items,
@@ -1990,4 +2103,55 @@ export async function addUtilityBill(data: Omit<UtilityBill, "id" | "created_at"
 
 export async function deleteUtilityBill(id: number): Promise<void> {
   await q("delete from utility_bills where id = $1", [id]);
+}
+
+// ── Gastos Periódicos y Recurrentes (Hipoteca, Inversiones, Cuotas...) ──────
+export interface RecurringExpense {
+  id: number;
+  title: string;
+  category: string;
+  provider: string | null;
+  amount: number;
+  frequency: "mensual" | "2_plazos" | "3_plazos" | "trimestral" | "anual";
+  start_month: string; // 'YYYY-MM'
+  end_month?: string | null;
+  day_of_month?: number | null;
+  active: boolean;
+  notes?: string | null;
+  created_at?: string;
+}
+
+export async function getRecurringExpenses(): Promise<RecurringExpense[]> {
+  return await q<RecurringExpense>(
+    `select id, title, category, provider, amount::float, frequency, start_month, end_month, day_of_month, active, notes, created_at::text
+     from recurring_expenses order by active desc, amount desc, id desc`
+  );
+}
+
+export async function addRecurringExpense(data: Omit<RecurringExpense, "id" | "created_at">): Promise<number> {
+  const [row] = await q<{ id: number }>(
+    `insert into recurring_expenses (title, category, provider, amount, frequency, start_month, end_month, day_of_month, active, notes)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
+    [
+      data.title,
+      data.category || "Vivienda / Hipoteca",
+      data.provider || null,
+      data.amount,
+      data.frequency || "mensual",
+      data.start_month,
+      data.end_month || null,
+      data.day_of_month || 1,
+      data.active ?? true,
+      data.notes || null,
+    ]
+  );
+  return row?.id ?? 0;
+}
+
+export async function toggleRecurringExpenseActive(id: number): Promise<void> {
+  await q("update recurring_expenses set active = not active where id = $1", [id]);
+}
+
+export async function deleteRecurringExpense(id: number): Promise<void> {
+  await q("delete from recurring_expenses where id = $1", [id]);
 }
