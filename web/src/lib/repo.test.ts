@@ -273,4 +273,44 @@ describe("repo + db (PGlite en memoria)", () => {
       expect(yogurUpdated?.category).toBe("Desayunos");
     });
   });
+
+  describe("monthly_incomes y evolución financiera", () => {
+    it("computeMonthIncomeFromList suma ingresos específicos y arrastra recurrentes", () => {
+      const incomes = [
+        { id: 1, month: "2026-10", source: "Nómina Kike", amount: 2400, is_recurring: true },
+        { id: 2, month: "2026-10", source: "Nómina Lara", amount: 2100, is_recurring: true },
+        { id: 3, month: "2026-11", source: "Nómina Kike", amount: 2500, is_recurring: true },
+        { id: 4, month: "2026-11", source: "Paga Extra", amount: 1000, is_recurring: false },
+      ];
+
+      // Mes con entradas específicas
+      const novTotal = repo.computeMonthIncomeFromList("2026-11", incomes);
+      expect(novTotal).toBe(3500);
+
+      // Mes sin entradas directas pero con recurrentes previas
+      const dicTotal = repo.computeMonthIncomeFromList("2026-12", incomes);
+      expect(dicTotal).toBe(2500); // Sólo las recurrentes del mes más reciente (2026-11: Nómina Kike)
+    });
+
+    it("addMonthlyIncome y getMonthlyIncomes guardan y recuperan ingresos", async () => {
+      const id = await repo.addMonthlyIncome({
+        month: "2026-11",
+        source: "Nómina Test",
+        amount: 2200,
+        is_recurring: true,
+        notes: "Nómina mensual de prueba",
+      });
+      expect(id).toBeGreaterThan(0);
+
+      const list = await repo.getMonthlyIncomes("2026-11");
+      const found = list.find((i) => i.id === id);
+      expect(found).toBeDefined();
+      expect(found?.amount).toBe(2200);
+      expect(found?.source).toBe("Nómina Test");
+
+      await repo.deleteMonthlyIncome(id);
+      const afterList = await repo.getMonthlyIncomes("2026-11");
+      expect(afterList.some((i) => i.id === id)).toBe(false);
+    });
+  });
 });

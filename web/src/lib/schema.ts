@@ -226,6 +226,17 @@ create table if not exists recurring_expenses (
   created_at timestamptz not null default now()
 );
 
+create table if not exists monthly_incomes (
+  id serial primary key,
+  month text not null, -- 'YYYY-MM'
+  source text not null default 'Nómina / Ingreso Principal',
+  amount numeric(8,2) not null,
+  member_id int references members(id) on delete set null,
+  is_recurring boolean not null default true,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 -- Migraciones seguras para columnas y tiendas actualizadas
 alter table school_menu add column if not exists dinner_recommendation text;
 alter table receipts add column if not exists company_name text;

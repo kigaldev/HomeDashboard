@@ -795,10 +795,50 @@ export type MonthlyExpenses = {
   utilities_total: number;
   insurances_total: number;
   recurring_total: number;
+  current_month_income: number;
+  last_month_income: number;
+  net_savings: number;
+  savings_rate: number;
   by_store: { store_name: string; color: string; total: number; count: number }[];
   by_category: { category: string; total: number; percentage: number }[];
   items?: ReceiptItemMonthly[];
 };
+
+export interface MonthlyIncome {
+  id: number;
+  month: string; // 'YYYY-MM'
+  source: string;
+  amount: number;
+  member_id?: number | null;
+  is_recurring: boolean;
+  notes?: string | null;
+  created_at?: string;
+  member_name?: string | null;
+}
+
+export interface MonthlyEvolutionItem {
+  month: string; // 'YYYY-MM'
+  label: string; // 'Nov 2026'
+  income: number;
+  expenses: number;
+  savings: number;
+  savings_rate: number;
+}
+
+export function computeMonthIncomeFromList(targetMonth: string, allIncomes: MonthlyIncome[]): number {
+  const directIncomes = allIncomes.filter((i) => i.month === targetMonth);
+  if (directIncomes.length > 0) {
+    return Number(directIncomes.reduce((acc, i) => acc + (i.amount || 0), 0).toFixed(2));
+  }
+  // Si no hay ingresos específicos este mes, arrastrar ingresos recurrentes del mes previo más reciente
+  const priorRecurring = allIncomes.filter((i) => i.is_recurring && i.month <= targetMonth);
+  if (priorRecurring.length > 0) {
+    const latestMonth = priorRecurring.reduce((max, i) => (i.month > max ? i.month : max), "");
+    const latestRecurring = priorRecurring.filter((i) => i.month === latestMonth);
+    return Number(latestRecurring.reduce((acc, i) => acc + (i.amount || 0), 0).toFixed(2));
+  }
+  return 0;
+}
 
 function computeRecurringMonthlyCost(rec: { amount: number; frequency: string }): number {
   const amt = rec.amount || 0;
@@ -1101,6 +1141,20 @@ export async function getMonthlyExpenses(): Promise<MonthlyExpenses> {
 
   const byStore = Array.from(storeMap.values()).sort((a, b) => b.total - a.total);
 
+  // 8. Incomes para balance financiero y tasa de ahorro
+  const allIncomes = await q<MonthlyIncome>(
+    `select mi.id, mi.month, mi.source, mi.amount::float as amount, mi.member_id, mi.is_recurring, mi.notes, mi.created_at::text,
+            m.name as member_name
+     from monthly_incomes mi
+     left join members m on m.id = mi.member_id
+     order by mi.month desc, mi.amount desc`
+  );
+
+  const currentIncome = computeMonthIncomeFromList(currentMonthStr, allIncomes);
+  const lastIncome = computeMonthIncomeFromList(lastMonthStr, allIncomes);
+  const netSavings = Number((currentIncome - currentTotal).toFixed(2));
+  const savingsRate = currentIncome > 0 ? Number(((netSavings / currentIncome) * 100).toFixed(1)) : 0;
+
   return {
     current_month_total: currentTotal,
     last_month_total: lastTotal,
@@ -1108,6 +1162,10 @@ export async function getMonthlyExpenses(): Promise<MonthlyExpenses> {
     utilities_total: utilitiesTotal,
     insurances_total: insurancesTotal,
     recurring_total: recurringTotal,
+    current_month_income: currentIncome,
+    last_month_income: lastIncome,
+    net_savings: netSavings,
+    savings_rate: savingsRate,
     by_store: byStore,
     by_category: categoriesWithPercent,
     items,
@@ -2154,4 +2212,135 @@ export async function toggleRecurringExpenseActive(id: number): Promise<void> {
 
 export async function deleteRecurringExpense(id: number): Promise<void> {
   await q("delete from recurring_expenses where id = $1", [id]);
+}
+
+// ── Ingresos Mensuales & Evolución Financiera ───────────────
+export async function getMonthlyIncomes(month?: string): Promise<MonthlyIncome[]> {
+  if (month) {
+    return await q<MonthlyIncome>(
+      `select mi.id, mi.month, mi.source, mi.amount::float as amount, mi.member_id, mi.is_recurring, mi.notes, mi.created_at::text,
+              m.name as member_name
+       from monthly_incomes mi
+       left join members m on m.id = mi.member_id
+       where mi.month = $1
+       order by mi.amount desc, mi.id desc`,
+      [month]
+    );
+  }
+  return await q<MonthlyIncome>(
+    `select mi.id, mi.month, mi.source, mi.amount::float as amount, mi.member_id, mi.is_recurring, mi.notes, mi.created_at::text,
+            m.name as member_name
+     from monthly_incomes mi
+     left join members m on m.id = mi.member_id
+     order by mi.month desc, mi.amount desc, mi.id desc`
+  );
+}
+
+export async function addMonthlyIncome(data: {
+  month: string;
+  source: string;
+  amount: number;
+  member_id?: number | null;
+  is_recurring?: boolean;
+  notes?: string | null;
+}): Promise<number> {
+  const [row] = await q<{ id: number }>(
+    `insert into monthly_incomes (month, source, amount, member_id, is_recurring, notes)
+     values ($1, $2, $3, $4, $5, $6) returning id`,
+    [
+      data.month,
+      data.source || "Nómina / Ingreso Principal",
+      data.amount,
+      data.member_id || null,
+      data.is_recurring ?? true,
+      data.notes || null,
+    ]
+  );
+  return row?.id ?? 0;
+}
+
+export async function deleteMonthlyIncome(id: number): Promise<void> {
+  await q("delete from monthly_incomes where id = $1", [id]);
+}
+
+export async function getFinancialEvolution(monthsCount = 6): Promise<MonthlyEvolutionItem[]> {
+  const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const now = new Date();
+  const months: { str: string; label: string }[] = [];
+
+  for (let i = monthsCount - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = `${MONTH_NAMES_ES[d.getMonth()]} ${d.getFullYear()}`;
+    months.push({ str: mStr, label });
+  }
+
+  const oldestMonthStr = months[0].str;
+
+  // 1. Receipts por mes
+  const receiptRows = await q<{ month: string; total: number }>(
+    `select to_char(date, 'YYYY-MM') as month, coalesce(sum(total_amount), 0)::float as total
+     from receipts
+     where to_char(date, 'YYYY-MM') >= $1
+     group by to_char(date, 'YYYY-MM')`,
+    [oldestMonthStr]
+  );
+  const receiptsByMonth = new Map<string, number>(receiptRows.map((r) => [r.month, r.total]));
+
+  // 2. Facturas de suministros por mes
+  const billRows = await q<{ month: string; total: number }>(
+    `select coalesce(billing_month, to_char(issue_date, 'YYYY-MM')) as month,
+            coalesce(sum(amount), 0)::float as total
+     from utility_bills
+     where coalesce(billing_month, to_char(issue_date, 'YYYY-MM')) >= $1
+     group by coalesce(billing_month, to_char(issue_date, 'YYYY-MM'))`,
+    [oldestMonthStr]
+  );
+  const billsByMonth = new Map<string, number>(billRows.map((b) => [b.month, b.total]));
+
+  // 3. Pólizas activas (cuota mensual ponderada)
+  const [insRow] = await q<{ total: number }>(
+    "select coalesce(sum(annual_cost), 0)::float as total from family_insurances where active = true"
+  );
+  const insurancesMonthly = Number(((insRow?.total ?? 0) / 12).toFixed(2));
+
+  // 4. Gastos recurrentes
+  const recurringRows = await q<{
+    id: number;
+    amount: number;
+    frequency: string;
+    start_month: string;
+    end_month: string | null;
+  }>(
+    "select id, amount::float as amount, frequency, start_month, end_month from recurring_expenses where active = true"
+  );
+
+  // 5. Todos los ingresos
+  const allIncomes = await q<MonthlyIncome>(
+    `select mi.id, mi.month, mi.source, mi.amount::float as amount, mi.member_id, mi.is_recurring, mi.notes
+     from monthly_incomes mi
+     order by mi.month desc`
+  );
+
+  return months.map(({ str, label }) => {
+    const recTotal = receiptsByMonth.get(str) ?? 0;
+    const utilTotal = billsByMonth.get(str) ?? 0;
+    const recurringTotal = recurringRows
+      .filter((r) => isRecurringActiveInMonth(r, str))
+      .reduce((acc, r) => acc + computeRecurringMonthlyCost(r), 0);
+
+    const totalExpenses = Number((recTotal + utilTotal + insurancesMonthly + recurringTotal).toFixed(2));
+    const income = computeMonthIncomeFromList(str, allIncomes);
+    const savings = Number((income - totalExpenses).toFixed(2));
+    const savingsRate = income > 0 ? Number(((savings / income) * 100).toFixed(1)) : 0;
+
+    return {
+      month: str,
+      label,
+      income,
+      expenses: totalExpenses,
+      savings,
+      savings_rate: savingsRate,
+    };
+  });
 }

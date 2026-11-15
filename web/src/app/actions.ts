@@ -587,6 +587,34 @@ export async function deleteRecurringExpenseAction(id: number) {
   revalidatePath("/");
 }
 
+// ── Ingresos Mensuales Familiares (Nóminas, Extras, Variables) ──────────────
+export async function addMonthlyIncomeAction(data: {
+  month: string;
+  source: string;
+  amount: number;
+  member_id?: number | null;
+  is_recurring?: boolean;
+  notes?: string;
+}) {
+  const { addMonthlyIncome } = await import("@/lib/repo");
+  const id = await addMonthlyIncome({
+    month: data.month,
+    source: data.source,
+    amount: data.amount,
+    member_id: data.member_id || null,
+    is_recurring: data.is_recurring ?? true,
+    notes: data.notes || null,
+  });
+  revalidatePath("/");
+  return { success: true, id };
+}
+
+export async function deleteMonthlyIncomeAction(id: number) {
+  const { deleteMonthlyIncome } = await import("@/lib/repo");
+  await deleteMonthlyIncome(id);
+  revalidatePath("/");
+}
+
 // ── Diagnóstico y Control de Webhook de Telegram ─────────
 export async function getTelegramWebhookStatusAction() {
   const token = process.env.TELEGRAM_BOT_TOKEN;

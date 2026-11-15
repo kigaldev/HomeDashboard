@@ -23,6 +23,8 @@ import {
   getWarranties,
   getUtilityBills,
   getRecurringExpenses,
+  getMonthlyIncomes,
+  getFinancialEvolution,
   syncFrequentStaples,
   getPantryLastUpdated,
 } from "@/lib/repo";
@@ -73,6 +75,8 @@ export default async function HomePage() {
     warranties,
     utilityBills,
     recurringExpenses,
+    monthlyIncomes,
+    incomeEvolution,
     news,
     traffic,
     lastPantryUpdate,
@@ -100,6 +104,8 @@ export default async function HomePage() {
     getWarranties(),
     getUtilityBills(50),
     getRecurringExpenses(),
+    getMonthlyIncomes(),
+    getFinancialEvolution(6),
     getLatestNews(),
     getSchoolCommuteTraffic(),
     getPantryLastUpdated(),
@@ -164,6 +170,8 @@ export default async function HomePage() {
       warranties={warranties}
       utilityBills={utilityBills}
       recurringExpenses={recurringExpenses}
+      monthlyIncomes={monthlyIncomes}
+      incomeEvolution={incomeEvolution}
       news={news}
       traffic={traffic}
       pantryNeedsInventory={pantryNeedsInventory}
