@@ -788,18 +788,31 @@ export async function updateReceiptItemCategory(itemId: number, newCategory: str
   return getMonthlyExpenses();
 }
 
-export async function getMonthlyExpenses() {
-  const byStore = await q<{ store_name: string; color: string; total: number; count: number }>(
-    `select coalesce(s.name, 'Otros') as store_name, coalesce(s.color, '#64748b') as color,
+export type MonthlyExpenses = {
+  current_month_total: number;
+  last_month_total: number;
+  receipts_total: number;
+  utilities_total: number;
+  insurances_total: number;
+  by_store: { store_name: string; color: string; total: number; count: number }[];
+  by_category: { category: string; total: number; percentage: number }[];
+  items?: ReceiptItemMonthly[];
+};
+
+export async function getMonthlyExpenses(): Promise<MonthlyExpenses> {
+  // 1. Comercios de tickets del mes actual
+  const storeRows = await q<{ store_name: string; color: string; total: number; count: number }>(
+    `select coalesce(r.company_name, s.name, 'Otros') as store_name, coalesce(s.color, '#64748b') as color,
             sum(r.total_amount)::float as total, count(r.id)::int as count
      from receipts r
      left join stores s on s.id = r.store_id
      where r.date >= date_trunc('month', current_date)
-     group by s.name, s.color
+     group by coalesce(r.company_name, s.name, 'Otros'), s.color
      order by total desc`,
   );
 
-  const byCategory = await q<{ category: string; total: number }>(
+  // 2. Categorías de artículos de tickets del mes actual
+  const categoryRows = await q<{ category: string; total: number }>(
     `select ri.category, sum(ri.total_price)::float as total
      from receipt_items ri
      join receipts r on r.id = ri.receipt_id
@@ -808,20 +821,46 @@ export async function getMonthlyExpenses() {
      order by total desc`,
   );
 
-  const [currentMonth] = await q<{ total: number }>(
+  // 3. Totales de tickets del mes actual y mes anterior
+  const [currentReceiptsRow] = await q<{ total: number }>(
     "select coalesce(sum(total_amount), 0)::float as total from receipts where date >= date_trunc('month', current_date)",
   );
 
-  const [lastMonth] = await q<{ total: number }>(
+  const [lastReceiptsRow] = await q<{ total: number }>(
     `select coalesce(sum(total_amount), 0)::float as total from receipts
      where date >= date_trunc('month', current_date - interval '1 month')
        and date < date_trunc('month', current_date)`,
   );
 
+  // 4. Suministros (utility_bills) del mes actual y mes anterior
+  const currentBills = await q<{ id: number; service: string; provider: string | null; amount: number; billing_month: string; issue_date: string; notes: string | null }>(
+    `select id, service, provider, amount::float as amount, billing_month, issue_date::text, notes
+     from utility_bills
+     where billing_month = to_char(current_date, 'YYYY-MM')
+        or (billing_month is null and issue_date >= date_trunc('month', current_date))
+     order by amount desc`
+  );
+
+  const [lastBillsRow] = await q<{ total: number }>(
+    `select coalesce(sum(amount), 0)::float as total
+     from utility_bills
+     where billing_month = to_char(current_date - interval '1 month', 'YYYY-MM')
+        or (billing_month is null and issue_date >= date_trunc('month', current_date - interval '1 month') and issue_date < date_trunc('month', current_date))`
+  );
+
+  // 5. Pólizas de seguros activas (family_insurances)
+  const activeInsurances = await q<{ id: number; title: string; category: string; provider: string | null; annual_cost: number; payment_frequency: string | null; renewal_date: string; notes: string | null }>(
+    `select id, title, category, provider, annual_cost::float as annual_cost, payment_frequency, renewal_date::text, notes
+     from family_insurances
+     where active = true
+     order by annual_cost desc`
+  );
+
+  // 6. Artículos de tickets del mes actual
   const items = await q<ReceiptItemMonthly>(
     `select ri.id, ri.receipt_id, ri.name, ri.quantity, ri.unit_price::float as unit_price,
             ri.total_price::float as total_price, ri.category,
-            coalesce(s.name, 'Supermercado') as store_name, r.date::text as date
+            coalesce(r.company_name, s.name, 'Supermercado') as store_name, r.date::text as date
      from receipt_items ri
      join receipts r on r.id = ri.receipt_id
      left join stores s on s.id = r.store_id
@@ -829,15 +868,133 @@ export async function getMonthlyExpenses() {
      order by ri.total_price desc, ri.name asc`,
   );
 
-  const currentTotal = currentMonth?.total ?? 0;
-  const categoriesWithPercent = byCategory.map((c) => ({
-    ...c,
-    percentage: currentTotal > 0 ? Math.round((c.total / currentTotal) * 100) : 0,
-  }));
+  const receiptsTotal = Number((currentReceiptsRow?.total ?? 0).toFixed(2));
+  const utilitiesTotal = Number(currentBills.reduce((acc, b) => acc + (b.amount || 0), 0).toFixed(2));
+  const insurancesTotal = Number(activeInsurances.reduce((acc, ins) => acc + ((ins.annual_cost || 0) / 12), 0).toFixed(2));
+
+  const currentTotal = Number((receiptsTotal + utilitiesTotal + insurancesTotal).toFixed(2));
+
+  const lastReceiptsTotal = Number((lastReceiptsRow?.total ?? 0).toFixed(2));
+  const lastUtilitiesTotal = Number((lastBillsRow?.total ?? 0).toFixed(2));
+  const lastTotal = Number((lastReceiptsTotal + lastUtilitiesTotal + insurancesTotal).toFixed(2));
+
+  // Mapa de categorías integrado (Alimentación + Suministros + Pólizas)
+  const categoryMap = new Map<string, number>();
+
+  for (const c of categoryRows) {
+    categoryMap.set(c.category, (categoryMap.get(c.category) ?? 0) + c.total);
+  }
+
+  const serviceLabels: Record<string, string> = {
+    luz: "Suministros: Luz",
+    gas: "Suministros: Gas",
+    agua: "Suministros: Agua",
+    internet: "Suministros: Internet",
+    telefono: "Suministros: Teléfono",
+    otro: "Suministros: Otros",
+  };
+
+  for (const b of currentBills) {
+    const srv = (b.service || "otro").toLowerCase();
+    const catName = serviceLabels[srv] || `Suministros: ${b.service}`;
+    categoryMap.set(catName, (categoryMap.get(catName) ?? 0) + b.amount);
+
+    items.push({
+      id: -(b.id + 10000),
+      receipt_id: 0,
+      name: `Factura ${b.service.toUpperCase()}${b.provider ? ` (${b.provider})` : ""}${b.notes ? ` · ${b.notes}` : ""}`,
+      quantity: "1 mes",
+      unit_price: b.amount,
+      total_price: b.amount,
+      category: catName,
+      store_name: b.provider || "Suministros",
+      date: b.issue_date || `${b.billing_month}-01`,
+    });
+  }
+
+  const insLabels: Record<string, string> = {
+    hogar: "Seguros: Hogar",
+    coche: "Seguros: Coche",
+    salud: "Seguros: Salud",
+    vida: "Seguros: Vida",
+    decesos: "Seguros: Decesos",
+  };
+
+  for (const ins of activeInsurances) {
+    const rawCat = (ins.category || "general").toLowerCase();
+    const catName = insLabels[rawCat] || `Seguros: ${ins.category}`;
+    const monthlyCost = Number(((ins.annual_cost || 0) / 12).toFixed(2));
+    categoryMap.set(catName, (categoryMap.get(catName) ?? 0) + monthlyCost);
+
+    items.push({
+      id: -(ins.id + 20000),
+      receipt_id: 0,
+      name: `${ins.title}${ins.provider ? ` (${ins.provider})` : ""}${ins.notes ? ` · ${ins.notes}` : ""}`,
+      quantity: "Cuota mensual",
+      unit_price: monthlyCost,
+      total_price: monthlyCost,
+      category: catName,
+      store_name: ins.provider || "Aseguradora",
+      date: ins.renewal_date,
+    });
+  }
+
+  const categoriesWithPercent = Array.from(categoryMap.entries())
+    .map(([category, total]) => ({
+      category,
+      total: Number(total.toFixed(2)),
+      percentage: currentTotal > 0 ? Math.round((total / currentTotal) * 100) : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  // Mapa de comercios / proveedores integrado
+  const storeMap = new Map<string, { store_name: string; color: string; total: number; count: number }>();
+
+  for (const st of storeRows) {
+    storeMap.set(st.store_name, { ...st });
+  }
+
+  for (const b of currentBills) {
+    const provName = b.provider || (b.service === "luz" || b.service === "gas" ? "Naturgy" : "Suministros");
+    const existing = storeMap.get(provName);
+    if (existing) {
+      existing.total = Number((existing.total + b.amount).toFixed(2));
+      existing.count += 1;
+    } else {
+      storeMap.set(provName, {
+        store_name: provName,
+        color: b.service === "luz" ? "#ff9f0a" : b.service === "gas" ? "#ff453a" : b.service === "agua" ? "#0a84ff" : "#5e5ce6",
+        total: Number(b.amount.toFixed(2)),
+        count: 1,
+      });
+    }
+  }
+
+  for (const ins of activeInsurances) {
+    const provName = ins.provider || "Aseguradora";
+    const monthlyCost = Number(((ins.annual_cost || 0) / 12).toFixed(2));
+    const existing = storeMap.get(provName);
+    if (existing) {
+      existing.total = Number((existing.total + monthlyCost).toFixed(2));
+      existing.count += 1;
+    } else {
+      storeMap.set(provName, {
+        store_name: provName,
+        color: "#30d158",
+        total: monthlyCost,
+        count: 1,
+      });
+    }
+  }
+
+  const byStore = Array.from(storeMap.values()).sort((a, b) => b.total - a.total);
 
   return {
     current_month_total: currentTotal,
-    last_month_total: lastMonth?.total ?? 0,
+    last_month_total: lastTotal,
+    receipts_total: receiptsTotal,
+    utilities_total: utilitiesTotal,
+    insurances_total: insurancesTotal,
     by_store: byStore,
     by_category: categoriesWithPercent,
     items,

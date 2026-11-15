@@ -55,6 +55,7 @@ import type {
   FamilyInsurance,
   Warranty,
   UtilityBill,
+  MonthlyExpenses,
 } from "@/lib/repo";
 import type { Weather, DayWeather } from "@/lib/weather";
 
@@ -94,8 +95,12 @@ export function DashboardClient({
   monthlyExpenses = {
     current_month_total: 0,
     last_month_total: 0,
+    receipts_total: 0,
+    utilities_total: 0,
+    insurances_total: 0,
     by_store: [],
     by_category: [],
+    items: [],
   },
   priceComparisons = [],
   habits = [],
@@ -128,12 +133,7 @@ export function DashboardClient({
   events: CalEvent[];
   receipts: Receipt[];
   perishables: PerishableAlert[];
-  monthlyExpenses: {
-    current_month_total: number;
-    last_month_total: number;
-    by_store: { store_name: string; color: string; total: number; count: number }[];
-    by_category: { category: string; total: number; percentage: number }[];
-  };
+  monthlyExpenses: MonthlyExpenses;
   priceComparisons: PriceComparison[];
   habits: HabitInsight[];
   energyContracts: EnergyContract[];

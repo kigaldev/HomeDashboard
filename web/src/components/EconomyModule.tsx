@@ -10,6 +10,7 @@ import type {
   FamilyInsurance,
   Warranty,
   UtilityBill,
+  MonthlyExpenses,
 } from "@/lib/repo";
 import type { DayWeather } from "@/lib/weather";
 import type { ReceiptReconciliationResult } from "@/lib/receiptShared";
@@ -65,6 +66,9 @@ export function EconomyModule({
   monthlyExpenses = {
     current_month_total: 0,
     last_month_total: 0,
+    receipts_total: 0,
+    utilities_total: 0,
+    insurances_total: 0,
     by_store: [],
     by_category: [],
     items: [],
@@ -79,13 +83,7 @@ export function EconomyModule({
 }: {
   receipts: Receipt[];
   perishables: PerishableAlert[];
-  monthlyExpenses: {
-    current_month_total: number;
-    last_month_total: number;
-    by_store: { store_name: string; color: string; total: number; count: number }[];
-    by_category: { category: string; total: number; percentage: number }[];
-    items?: ReceiptItemMonthly[];
-  };
+  monthlyExpenses: MonthlyExpenses;
   priceComparisons: PriceComparison[];
   habits: HabitInsight[];
   energyContracts: EnergyContract[];
@@ -114,7 +112,11 @@ export function EconomyModule({
   // Manejo de Drag & Drop y reclasificación inmediata
   const handleDrop = (targetCategory: string, itemIdInput?: number) => {
     const itemId = itemIdInput ?? draggedItemId;
-    if (!itemId) return;
+    if (!itemId || itemId < 0) {
+      setDragOverCategory(null);
+      setDraggedItemId(null);
+      return;
+    }
 
     const item = monthItems.find((i) => i.id === itemId);
     if (!item || item.category === targetCategory) {
@@ -405,6 +407,19 @@ export function EconomyModule({
             <div style={{ fontSize: "0.76rem", color: diffMonth <= 0 ? "var(--apple-green)" : "var(--apple-orange)", marginTop: "0.2rem", fontWeight: 600 }}>
               {diffMonth <= 0 ? `▼ ${diffPercent}% vs mes anterior` : `▲ +${diffPercent}% vs mes anterior`}
             </div>
+            {(monthlyExpenses.receipts_total !== undefined || monthlyExpenses.utilities_total !== undefined) && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginTop: "0.45rem", fontSize: "0.71rem", color: "var(--apple-text-secondary)" }}>
+                <span>🛒 Compras: {(monthlyExpenses.receipts_total ?? 0).toFixed(0)} €</span>
+                <span>·</span>
+                <span>💡 Suministros: {(monthlyExpenses.utilities_total ?? 0).toFixed(0)} €</span>
+                {Boolean(monthlyExpenses.insurances_total && monthlyExpenses.insurances_total > 0) && (
+                  <>
+                    <span>·</span>
+                    <span>🛡️ Seguros: {(monthlyExpenses.insurances_total ?? 0).toFixed(0)} €</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Suministros Naturgy */}
@@ -417,16 +432,18 @@ export function EconomyModule({
             }}
           >
             <div style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
-              Suministros Naturgy
+              Suministros & Energía
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", marginTop: "0.3rem" }}>
               <span style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--apple-text)" }}>
-                {elecPrice} €
+                {(monthlyExpenses.utilities_total ?? 0) > 0 ? `${(monthlyExpenses.utilities_total ?? 0).toFixed(2)} €` : `${elecPrice} €`}
               </span>
-              <span style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)" }}>/kWh luz</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)" }}>
+                {(monthlyExpenses.utilities_total ?? 0) > 0 ? "facturado" : "/kWh luz"}
+              </span>
             </div>
             <div style={{ fontSize: "0.76rem", color: "var(--apple-green)", marginTop: "0.2rem", fontWeight: 600 }}>
-              Tarifa Plana Fija 24h activa
+              {(monthlyExpenses.utilities_total ?? 0) > 0 ? `${utilityBills?.length ?? 1} facturas este mes` : "Tarifa Plana Fija 24h activa"}
             </div>
           </div>
 
