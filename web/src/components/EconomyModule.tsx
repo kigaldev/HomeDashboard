@@ -9,6 +9,7 @@ import type {
   EnergyContract,
   FamilyInsurance,
   Warranty,
+  UtilityBill,
 } from "@/lib/repo";
 import type { DayWeather } from "@/lib/weather";
 import type { ReceiptReconciliationResult } from "@/lib/receiptShared";
@@ -25,6 +26,8 @@ import {
   deleteFamilyInsuranceAction,
   addWarrantyAction,
   deleteWarrantyAction,
+  deleteReceiptAction,
+  deleteUtilityBillAction,
   updateReceiptItemCategoryAction,
 } from "@/app/actions";
 import {
@@ -40,6 +43,8 @@ import {
 } from "./Icons";
 import { TicketManagerModal } from "./TicketManagerModal";
 import { ManualExpenseModal } from "./ManualExpenseModal";
+import { ManualUtilityBillModal } from "./ManualUtilityBillModal";
+import { DocumentViewerModal } from "./DocumentViewerModal";
 import { CategoryDonutChart, MonthCompareChart } from "./ChartsLazy";
 
 export type ReceiptItemMonthly = {
@@ -70,6 +75,7 @@ export function EconomyModule({
   todayWeather = null,
   insurances = [],
   warranties = [],
+  utilityBills = [],
 }: {
   receipts: Receipt[];
   perishables: PerishableAlert[];
@@ -86,6 +92,7 @@ export function EconomyModule({
   todayWeather: DayWeather | null;
   insurances: FamilyInsurance[];
   warranties: Warranty[];
+  utilityBills?: UtilityBill[];
 }) {
   const [activeTab, setActiveTab] = useState<"balance" | "energy" | "insurances" | "warranties" | "scan" | "perishables">("balance");
   const [isPending, startTransition] = useTransition();
@@ -187,19 +194,26 @@ export function EconomyModule({
   // Estados para Escáner de Tickets y Gastos Manuales
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [isManualExpenseOpen, setIsManualExpenseOpen] = useState(false);
+  const [ticketFilter, setTicketFilter] = useState<"all" | "with_ticket" | "manual" | "supermarket">("all");
   const [showScanner, setShowScanner] = useState(false);
   const [rawInput, setRawInput] = useState("");
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
   const [reconciliation, setReconciliation] = useState<ReceiptReconciliationResult | null>(null);
 
-  // Estados para Energía
+  // Estados para Energía y Facturación de Suministros
+  const [isUtilityModalOpen, setIsUtilityModalOpen] = useState(false);
   const [billTextInput, setBillTextInput] = useState("");
   const [showBillUploader, setShowBillUploader] = useState(false);
   const [energyUploadStatus, setEnergyUploadStatus] = useState<string | null>(null);
 
-  // Estados para formularios de Pólizas y Garantías
+  // Estados para formularios y visualizador de Pólizas y Garantías
   const [showAddInsurance, setShowAddInsurance] = useState(false);
   const [showAddWarranty, setShowAddWarranty] = useState(false);
+  const [insuranceDocUrl, setInsuranceDocUrl] = useState<string | null>(null);
+  const [isUploadingInsuranceDoc, setIsUploadingInsuranceDoc] = useState(false);
+  const [warrantyDocUrl, setWarrantyDocUrl] = useState<string | null>(null);
+  const [isUploadingWarrantyDoc, setIsUploadingWarrantyDoc] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState<{ title: string; url: string } | null>(null);
 
   const energyRecs = getEnergyRecommendations(energyContracts, todayWeather);
   const elecContract = energyRecs.electricityContract;
@@ -1066,6 +1080,200 @@ export function EconomyModule({
             </div>
           </div>
 
+          {/* ── Facturación Mensual de Suministros (Luz, Agua, Gas, Internet, Teléfono...) ── */}
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                  <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
+                    Facturación Mensual de Suministros
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      padding: "0.1rem 0.45rem",
+                      borderRadius: "var(--radius-full)",
+                      background: "rgba(0, 113, 227, 0.12)",
+                      color: "var(--apple-blue)",
+                    }}
+                  >
+                    Control Manual Sin Factura
+                  </span>
+                </div>
+                <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.15rem" }}>
+                  Introduce directamente el importe del mes de tus recibos (luz, agua, gas, fibra, móvil...)
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsUtilityModalOpen(true)}
+                className="btn-primary"
+                style={{ fontSize: "0.78rem", padding: "0.4rem 0.85rem", gap: "0.35rem" }}
+              >
+                <IconPlus size={13} />
+                <span>Registrar Factura del Mes</span>
+              </button>
+            </div>
+
+            {/* KPI Resumen del Mes Actual */}
+            {(() => {
+              const currentMonthStr = new Date().toISOString().slice(0, 7);
+              const thisMonthBills = utilityBills.filter((b) => b.billing_month === currentMonthStr);
+              const thisMonthTotal = thisMonthBills.reduce((sum, b) => sum + b.amount, 0);
+
+              const serviceBadges: Record<string, { icon: string; name: string; color: string }> = {
+                luz: { icon: "💡", name: "Luz", color: "#f59e0b" },
+                gas: { icon: "🔥", name: "Gas", color: "#ef4444" },
+                agua: { icon: "💧", name: "Agua", color: "#06b6d4" },
+                internet: { icon: "🌐", name: "Fibra / Internet", color: "#3b82f6" },
+                telefono: { icon: "📱", name: "Teléfono Móvil", color: "#8b5cf6" },
+                otro: { icon: "📦", name: "Otros", color: "#64748b" },
+              };
+
+              return (
+                <div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: "0.75rem",
+                      padding: "0.85rem 1rem",
+                      borderRadius: "var(--radius-md)",
+                      background: "var(--apple-surface-secondary)",
+                      border: "1px solid var(--apple-border)",
+                      marginBottom: "1rem",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>
+                        Total Suministros Mes en Curso ({new Date().toLocaleDateString("es-ES", { month: "long", year: "numeric" })})
+                      </div>
+                      <div style={{ fontSize: "1.45rem", fontWeight: 800, color: "var(--apple-text)", marginTop: "0.2rem" }}>
+                        {thisMonthTotal > 0 ? `${thisMonthTotal.toFixed(2)} €` : "0.00 €"}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                      {Object.entries(serviceBadges).map(([svcKey, svcMeta]) => {
+                        const billsForSvc = thisMonthBills.filter((b) => b.service === svcKey);
+                        const sumForSvc = billsForSvc.reduce((acc, b) => acc + b.amount, 0);
+                        if (sumForSvc <= 0) return null;
+                        return (
+                          <div
+                            key={svcKey}
+                            style={{
+                              padding: "0.3rem 0.6rem",
+                              borderRadius: "var(--radius-full)",
+                              background: "rgba(255, 255, 255, 0.05)",
+                              border: "1px solid var(--apple-border)",
+                              fontSize: "0.75rem",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.3rem",
+                            }}
+                          >
+                            <span>{svcMeta.icon}</span>
+                            <span style={{ fontWeight: 600, color: "var(--apple-text)" }}>{svcMeta.name}:</span>
+                            <span style={{ fontWeight: 700, color: svcMeta.color }}>{sumForSvc.toFixed(2)} €</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Listado de Facturas Registradas */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+                    {utilityBills.length === 0 ? (
+                      <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--apple-text-secondary)", background: "rgba(255, 255, 255, 0.02)", borderRadius: "var(--radius-md)" }}>
+                        <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 500 }}>No hay facturas registradas todavía.</p>
+                        <p style={{ margin: 0, marginTop: "0.2rem", fontSize: "0.76rem" }}>
+                          Pulsa en <b>"Registrar Factura del Mes"</b> para añadir el recibo de este mes de luz, agua, gas o internet.
+                        </p>
+                      </div>
+                    ) : (
+                      utilityBills.map((ub) => {
+                        const meta = serviceBadges[ub.service] || serviceBadges.otro;
+                        // Formatear mes de facturación ej. 2026-11 -> Noviembre 2026
+                        let formattedMonth = ub.billing_month;
+                        try {
+                          const [y, m] = ub.billing_month.split("-");
+                          const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+                          formattedMonth = d.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+                        } catch {}
+
+                        return (
+                          <div
+                            key={ub.id}
+                            style={{
+                              padding: "0.75rem 1rem",
+                              borderRadius: "var(--radius-md)",
+                              background: "var(--apple-surface-secondary)",
+                              border: "1px solid var(--apple-border)",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                              gap: "0.6rem",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+                              <span style={{ fontSize: "1.2rem" }}>{meta.icon}</span>
+                              <div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                                  <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--apple-text)" }}>
+                                    {meta.name}
+                                  </span>
+                                  {ub.provider && (
+                                    <span
+                                      style={{
+                                        fontSize: "0.72rem",
+                                        padding: "0.1rem 0.45rem",
+                                        borderRadius: "var(--radius-full)",
+                                        background: "rgba(255, 255, 255, 0.08)",
+                                        color: "var(--apple-text-secondary)",
+                                      }}
+                                    >
+                                      {ub.provider}
+                                    </span>
+                                  )}
+                                  <span style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)" }}>
+                                    · Mes: <b style={{ textTransform: "capitalize", color: "var(--apple-text-secondary)" }}>{formattedMonth}</b>
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: "0.74rem", color: "var(--apple-text-secondary)", marginTop: "0.15rem" }}>
+                                  Fecha cargo: {ub.issue_date} {ub.notes ? `· ${ub.notes}` : ""}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                              <span style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--apple-text)" }}>
+                                {ub.amount.toFixed(2)} €
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => startTransition(() => deleteUtilityBillAction(ub.id))}
+                                className="btn-ghost"
+                                style={{ width: "26px", height: "26px", borderRadius: "50%", padding: 0, justifyContent: "center", color: "var(--apple-text-tertiary)" }}
+                                title="Eliminar factura"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
           {/* Optimización de Horarios y Equipamiento */}
           <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
             <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
@@ -1113,7 +1321,7 @@ export function EconomyModule({
                   Pólizas de Seguros Familiares
                 </h3>
                 <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
-                  Aviso automático 30 días antes de la renovación anual
+                  Aviso automático 30 días antes de la renovación anual y archivo de pólizas
                 </p>
               </div>
               <button
@@ -1131,6 +1339,7 @@ export function EconomyModule({
               <form
                 action={async (fd) => {
                   await addFamilyInsuranceAction(fd);
+                  setInsuranceDocUrl(null);
                   setShowAddInsurance(false);
                 }}
                 style={{
@@ -1158,6 +1367,46 @@ export function EconomyModule({
                 <input type="number" step="0.01" name="annualCost" placeholder="Coste total año (€)" required className="input-field" />
                 <input type="date" name="renewalDate" required className="input-field" />
                 <input type="text" name="notes" placeholder="Notas (franquicia, cobertura...)" className="input-field" style={{ gridColumn: "1 / -1" }} />
+
+                {/* Subir archivo de póliza */}
+                <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", padding: "0.3rem 0" }}>
+                  <label
+                    className="btn-secondary"
+                    style={{ fontSize: "0.78rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                  >
+                    <span>📄</span>
+                    <span>{isUploadingInsuranceDoc ? "Subiendo póliza..." : insuranceDocUrl ? "✓ Póliza adjuntada" : "Adjuntar Póliza (PDF o Foto)"}</span>
+                    <input
+                      type="file"
+                      accept="application/pdf,image/*"
+                      disabled={isUploadingInsuranceDoc}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setIsUploadingInsuranceDoc(true);
+                        const fd = new FormData();
+                        fd.append("file", file);
+                        try {
+                          const res = await fetch("/api/documents", { method: "POST", body: fd });
+                          const data = await res.json();
+                          if (data.url) setInsuranceDocUrl(data.url);
+                        } catch (err) {
+                          console.error("Error al subir póliza:", err);
+                        } finally {
+                          setIsUploadingInsuranceDoc(false);
+                        }
+                      }}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                  {insuranceDocUrl && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--apple-green)", fontWeight: 600 }}>
+                      ✓ Póliza lista para guardar
+                    </span>
+                  )}
+                  <input type="hidden" name="documentUrl" value={insuranceDocUrl || ""} />
+                </div>
+
                 <button type="submit" className="btn-primary" style={{ gridColumn: "1 / -1", padding: "0.45rem", fontSize: "0.8rem" }}>
                   Guardar Póliza
                 </button>
@@ -1166,69 +1415,92 @@ export function EconomyModule({
 
             {/* Lista de Pólizas */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {insurances.map((pol) => {
-                const renewal = new Date(pol.renewal_date);
-                const daysUntilRenewal = Math.round((renewal.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                const isRenewingSoon = daysUntilRenewal <= 45 && daysUntilRenewal >= 0;
+              {insurances.length === 0 ? (
+                <div style={{ padding: "2rem", textAlign: "center", color: "var(--apple-text-secondary)", background: "rgba(255, 255, 255, 0.02)", borderRadius: "var(--radius-lg)" }}>
+                  <div style={{ fontSize: "1.6rem", marginBottom: "0.4rem" }}>🛡️</div>
+                  <p style={{ fontWeight: 600, fontSize: "0.92rem", margin: 0, color: "var(--apple-text)" }}>
+                    Sin pólizas registradas
+                  </p>
+                  <p style={{ fontSize: "0.78rem", margin: 0, marginTop: "0.25rem" }}>
+                    Los datos de prueba han sido eliminados. Pulsa en <b>"Añadir Póliza"</b> para incorporar tus seguros reales (Hogar, Coche, Salud, Vida...) y adjuntar el documento o foto de la póliza.
+                  </p>
+                </div>
+              ) : (
+                insurances.map((pol) => {
+                  const renewal = new Date(pol.renewal_date);
+                  const daysUntilRenewal = Math.round((renewal.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                  const isRenewingSoon = daysUntilRenewal <= 45 && daysUntilRenewal >= 0;
 
-                return (
-                  <div
-                    key={pol.id}
-                    style={{
-                      padding: "0.95rem 1.1rem",
-                      borderRadius: "var(--radius-md)",
-                      background: "var(--apple-surface-secondary)",
-                      border: "1px solid var(--apple-border)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                      gap: "0.75rem",
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <span style={{ fontSize: "0.92rem", fontWeight: 700, color: "var(--apple-text)" }}>
-                          {pol.title}
-                        </span>
-                        <span style={{ fontSize: "0.72rem", padding: "0.1rem 0.45rem", borderRadius: "var(--radius-full)", background: "rgba(255, 255, 255, 0.08)", color: "var(--apple-text-secondary)", textTransform: "capitalize" }}>
-                          {pol.provider}
-                        </span>
-                        {isRenewingSoon && (
-                          <span style={{ fontSize: "0.7rem", padding: "0.1rem 0.45rem", borderRadius: "var(--radius-full)", background: "rgba(255, 159, 10, 0.15)", color: "var(--apple-orange)", fontWeight: 700 }}>
-                            Renovación en {daysUntilRenewal} días
+                  return (
+                    <div
+                      key={pol.id}
+                      style={{
+                        padding: "0.95rem 1.1rem",
+                        borderRadius: "var(--radius-md)",
+                        background: "var(--apple-surface-secondary)",
+                        border: "1px solid var(--apple-border)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "0.75rem",
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <span style={{ fontSize: "0.92rem", fontWeight: 700, color: "var(--apple-text)" }}>
+                            {pol.title}
                           </span>
+                          <span style={{ fontSize: "0.72rem", padding: "0.1rem 0.45rem", borderRadius: "var(--radius-full)", background: "rgba(255, 255, 255, 0.08)", color: "var(--apple-text-secondary)", textTransform: "capitalize" }}>
+                            {pol.provider}
+                          </span>
+                          {isRenewingSoon && (
+                            <span style={{ fontSize: "0.7rem", padding: "0.1rem 0.45rem", borderRadius: "var(--radius-full)", background: "rgba(255, 159, 10, 0.15)", color: "var(--apple-orange)", fontWeight: 700 }}>
+                              Renovación en {daysUntilRenewal} días
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.25rem" }}>
+                          Póliza: <code>{pol.policy_number || "S/N"}</code> · Vencimiento: {pol.renewal_date} · Pago {pol.payment_frequency}
+                        </div>
+                        {pol.notes && (
+                          <div style={{ fontSize: "0.74rem", color: "var(--apple-text-tertiary)", marginTop: "0.2rem" }}>
+                            {pol.notes}
+                          </div>
                         )}
                       </div>
-                      <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.25rem" }}>
-                        Póliza: <code>{pol.policy_number || "S/N"}</code> · Vencimiento: {pol.renewal_date} · Pago {pol.payment_frequency}
-                      </div>
-                      {pol.notes && (
-                        <div style={{ fontSize: "0.74rem", color: "var(--apple-text-tertiary)", marginTop: "0.2rem" }}>
-                          {pol.notes}
-                        </div>
-                      )}
-                    </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--apple-text)" }}>
-                          {pol.annual_cost.toFixed(2)} €
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        {pol.document_url && (
+                          <button
+                            type="button"
+                            onClick={() => setViewingDoc({ title: `Póliza: ${pol.title} (${pol.provider})`, url: pol.document_url! })}
+                            className="btn-secondary"
+                            style={{ fontSize: "0.74rem", padding: "0.28rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+                          >
+                            <span>📄</span>
+                            <span>Ver Póliza</span>
+                          </button>
+                        )}
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--apple-text)" }}>
+                            {pol.annual_cost.toFixed(2)} €
+                          </div>
+                          <div style={{ fontSize: "0.7rem", color: "var(--apple-text-secondary)" }}>/ año</div>
                         </div>
-                        <div style={{ fontSize: "0.7rem", color: "var(--apple-text-secondary)" }}>/ año</div>
+                        <button
+                          onClick={() => startTransition(() => deleteFamilyInsuranceAction(pol.id))}
+                          className="btn-ghost"
+                          style={{ width: "26px", height: "26px", borderRadius: "50%", padding: 0, justifyContent: "center", color: "var(--apple-text-tertiary)" }}
+                          title="Eliminar póliza"
+                        >
+                          ✕
+                        </button>
                       </div>
-                      <button
-                        onClick={() => startTransition(() => deleteFamilyInsuranceAction(pol.id))}
-                        className="btn-ghost"
-                        style={{ width: "26px", height: "26px", borderRadius: "50%", padding: 0, justifyContent: "center", color: "var(--apple-text-tertiary)" }}
-                        title="Eliminar póliza"
-                      >
-                        ✕
-                      </button>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
@@ -1244,7 +1516,7 @@ export function EconomyModule({
                   Garantías & Bienes de Consumo (3 Años)
                 </h3>
                 <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
-                  Control de vigencia legal y tickets asociados de electrodomésticos y tecnología
+                  Control de vigencia legal y tickets o facturas asociadas de electrodomésticos y tecnología
                 </p>
               </div>
               <button
@@ -1262,6 +1534,7 @@ export function EconomyModule({
               <form
                 action={async (fd) => {
                   await addWarrantyAction(fd);
+                  setWarrantyDocUrl(null);
                   setShowAddWarranty(false);
                 }}
                 style={{
@@ -1281,6 +1554,46 @@ export function EconomyModule({
                 <input type="number" name="warrantyYears" defaultValue={3} placeholder="Años garantía" className="input-field" />
                 <input type="number" step="0.01" name="price" placeholder="Importe de compra (€)" className="input-field" />
                 <input type="text" name="notes" placeholder="Notas adicionales..." className="input-field" style={{ gridColumn: "1 / -1" }} />
+
+                {/* Subir foto de ticket o factura */}
+                <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", padding: "0.3rem 0" }}>
+                  <label
+                    className="btn-secondary"
+                    style={{ fontSize: "0.78rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                  >
+                    <span>🧾</span>
+                    <span>{isUploadingWarrantyDoc ? "Subiendo ticket..." : warrantyDocUrl ? "✓ Ticket adjuntado" : "Adjuntar Foto del Ticket o Factura"}</span>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      disabled={isUploadingWarrantyDoc}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setIsUploadingWarrantyDoc(true);
+                        const fd = new FormData();
+                        fd.append("file", file);
+                        try {
+                          const res = await fetch("/api/documents", { method: "POST", body: fd });
+                          const data = await res.json();
+                          if (data.url) setWarrantyDocUrl(data.url);
+                        } catch (err) {
+                          console.error("Error al subir ticket de garantía:", err);
+                        } finally {
+                          setIsUploadingWarrantyDoc(false);
+                        }
+                      }}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                  {warrantyDocUrl && (
+                    <span style={{ fontSize: "0.75rem", color: "var(--apple-green)", fontWeight: 600 }}>
+                      ✓ Ticket listo para guardar
+                    </span>
+                  )}
+                  <input type="hidden" name="documentUrl" value={warrantyDocUrl || ""} />
+                </div>
+
                 <button type="submit" className="btn-primary" style={{ gridColumn: "1 / -1", padding: "0.45rem", fontSize: "0.8rem" }}>
                   Guardar Garantía
                 </button>
@@ -1289,276 +1602,361 @@ export function EconomyModule({
 
             {/* Listado de Garantías */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "0.85rem" }}>
-              {warranties.map((w) => {
-                const pDate = new Date(w.purchase_date);
-                const expiry = new Date(pDate);
-                expiry.setFullYear(expiry.getFullYear() + w.warranty_years);
-                const daysRemaining = Math.round((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                const isValid = daysRemaining > 0;
-
-                return (
-                  <div
-                    key={w.id}
-                    style={{
-                      padding: "1rem",
-                      borderRadius: "var(--radius-lg)",
-                      background: "var(--apple-surface-secondary)",
-                      border: "1px solid var(--apple-border)",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      gap: "0.65rem",
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                        <span
-                          style={{
-                            fontSize: "0.7rem",
-                            fontWeight: 700,
-                            padding: "0.15rem 0.5rem",
-                            borderRadius: "var(--radius-full)",
-                            background: isValid ? "rgba(52, 199, 89, 0.12)" : "rgba(255, 69, 58, 0.12)",
-                            color: isValid ? "var(--apple-green)" : "var(--apple-red)",
-                          }}
-                        >
-                          {isValid ? `${Math.round(daysRemaining / 30)} meses restantes` : "Garantía expirada"}
-                        </span>
-                        {w.store_name && (
-                          <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)" }}>
-                            {w.store_name}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--apple-text)", letterSpacing: "-0.01em" }}>
-                        {w.item_name}
-                      </div>
-                      <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
-                        Comprado: {w.purchase_date} {w.price ? `· ${w.price.toFixed(2)} €` : ""}
-                      </div>
-                      {w.notes && (
-                        <div style={{ fontSize: "0.74rem", color: "var(--apple-text-tertiary)", marginTop: "0.25rem" }}>
-                          {w.notes}
-                        </div>
-                      )}
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                      <button
-                        onClick={() => startTransition(() => deleteWarrantyAction(w.id))}
-                        className="btn-ghost"
-                        style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)", padding: "0.2rem 0.4rem" }}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── VISTA 5: ESCANEAR & ARCHIVO DE TICKETS ── */}
-      {activeTab === "scan" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-              <div>
-                <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
-                  Digitalización y Conciliación de Tickets
-                </h3>
-                <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
-                  Actualiza despensa y tacha la compra automáticamente tras subir tu ticket
-                </p>
-              </div>
-              <button
-                onClick={() => setIsTicketModalOpen(true)}
-                className="btn-primary"
-                style={{ fontSize: "0.8rem", padding: "0.4rem 0.85rem", gap: "0.35rem" }}
-              >
-                <IconCamera size={14} />
-                <span>📷 Nuevo Ticket con Cámara</span>
-              </button>
-            </div>
-
-            {/* Banner de Reconciliación */}
-            {reconciliation && (
-              <div
-                style={{
-                  padding: "1rem",
-                  background: "rgba(52, 199, 89, 0.12)",
-                  border: "1px solid rgba(52, 199, 89, 0.35)",
-                  borderRadius: "var(--radius-lg)",
-                  marginBottom: "1rem",
-                }}
-              >
-                <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--apple-green)", marginBottom: "0.3rem" }}>
-                  Conciliación de Compra Completada
-                </div>
-                <div style={{ fontSize: "0.82rem", color: "var(--apple-text)", lineHeight: 1.4 }}>
-                  {reconciliation.summaryMessage}
-                </div>
-              </div>
-            )}
-
-            {scanFeedback && !reconciliation && (
-              <div style={{ padding: "0.75rem 1rem", borderRadius: "var(--radius-md)", background: "rgba(0, 113, 227, 0.1)", color: "var(--apple-text)", fontSize: "0.82rem", marginBottom: "1rem" }}>
-                {scanFeedback}
-              </div>
-            )}
-
-            {showScanner && (
-              <div
-                style={{
-                  padding: "1.1rem",
-                  background: "var(--apple-surface-secondary)",
-                  borderRadius: "var(--radius-lg)",
-                  border: "1px solid var(--apple-border)",
-                  marginBottom: "1.25rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.85rem",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setIsTicketModalOpen(true)}
-                  className="btn-primary"
-                  style={{ alignSelf: "flex-start", cursor: "pointer", fontSize: "0.85rem", gap: "0.45rem", padding: "0.5rem 1rem" }}
-                >
-                  <IconCamera size={16} />
-                  <span>📸 Abrir Gestor de Ticket con Cámara en Vivo</span>
-                </button>
-
-                <textarea
-                  rows={3}
-                  placeholder="O pega el texto del ticket aquí..."
-                  value={rawInput}
-                  onChange={(e) => setRawInput(e.target.value)}
-                  className="input-field"
-                  style={{ fontSize: "0.8rem" }}
-                />
-
-                <button
-                  type="button"
-                  onClick={() => handleProcessTicketText(rawInput)}
-                  disabled={isPending || !rawInput.trim()}
-                  className="btn-primary"
-                  style={{ alignSelf: "flex-start", fontSize: "0.8rem", padding: "0.45rem 1rem" }}
-                >
-                  Procesar Ticket
-                </button>
-              </div>
-            )}
-
-            {/* Listado de Tickets Recientes */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-              {receipts.length === 0 ? (
-                <div style={{ padding: "1.5rem", textAlign: "center", color: "var(--apple-text-secondary)" }}>
-                  No hay tickets digitalizados aún.
+              {warranties.length === 0 ? (
+                <div style={{ gridColumn: "1 / -1", padding: "2rem", textAlign: "center", color: "var(--apple-text-secondary)", background: "rgba(255, 255, 255, 0.02)", borderRadius: "var(--radius-lg)" }}>
+                  <div style={{ fontSize: "1.6rem", marginBottom: "0.4rem" }}>🧾</div>
+                  <p style={{ fontWeight: 600, fontSize: "0.92rem", margin: 0, color: "var(--apple-text)" }}>
+                    Sin garantías registradas
+                  </p>
+                  <p style={{ fontSize: "0.78rem", margin: 0, marginTop: "0.25rem" }}>
+                    Los datos de prueba han sido eliminados. Pulsa en <b>"Registrar Garantía"</b> para añadir tus electrodomésticos, dispositivos o compras de valor con su foto de ticket.
+                  </p>
                 </div>
               ) : (
-                receipts.map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      padding: "0.85rem 1rem",
-                      borderRadius: "var(--radius-md)",
-                      background: "var(--apple-surface-secondary)",
-                      border: "1px solid var(--apple-border)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "var(--apple-text)" }}>
-                        {r.store_name}
+                warranties.map((w) => {
+                  const pDate = new Date(w.purchase_date);
+                  const expiry = new Date(pDate);
+                  expiry.setFullYear(expiry.getFullYear() + w.warranty_years);
+                  const daysRemaining = Math.round((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                  const isValid = daysRemaining > 0;
+
+                  return (
+                    <div
+                      key={w.id}
+                      style={{
+                        padding: "1rem",
+                        borderRadius: "var(--radius-lg)",
+                        background: "var(--apple-surface-secondary)",
+                        border: "1px solid var(--apple-border)",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        gap: "0.65rem",
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                          <span
+                            style={{
+                              fontSize: "0.7rem",
+                              fontWeight: 700,
+                              padding: "0.15rem 0.5rem",
+                              borderRadius: "var(--radius-full)",
+                              background: isValid ? "rgba(52, 199, 89, 0.12)" : "rgba(255, 69, 58, 0.12)",
+                              color: isValid ? "var(--apple-green)" : "var(--apple-red)",
+                            }}
+                          >
+                            {isValid ? `${Math.round(daysRemaining / 30)} meses restantes` : "Garantía expirada"}
+                          </span>
+                          {w.store_name && (
+                            <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)" }}>
+                              {w.store_name}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--apple-text)", letterSpacing: "-0.01em" }}>
+                          {w.item_name}
+                        </div>
+                        <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
+                          Comprado: {w.purchase_date} {w.price ? `· ${w.price.toFixed(2)} €` : ""}
+                        </div>
+                        {w.notes && (
+                          <div style={{ fontSize: "0.74rem", color: "var(--apple-text-tertiary)", marginTop: "0.25rem" }}>
+                            {w.notes}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--apple-text-secondary)", marginTop: "0.15rem" }}>
-                        Fecha: {r.date} · {r.items_count || 0} artículos registrados
+
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.25rem" }}>
+                        {w.document_url ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewingDoc({ title: `Ticket/Garantía: ${w.item_name}`, url: w.document_url! })}
+                            className="btn-secondary"
+                            style={{ fontSize: "0.72rem", padding: "0.25rem 0.6rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+                          >
+                            <span>🧾</span>
+                            <span>Ver Ticket</span>
+                          </button>
+                        ) : <div />}
+
+                        <button
+                          onClick={() => startTransition(() => deleteWarrantyAction(w.id))}
+                          className="btn-ghost"
+                          style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)", padding: "0.2rem 0.4rem" }}
+                        >
+                          Eliminar
+                        </button>
                       </div>
                     </div>
-                    <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--apple-text)" }}>
-                      {r.total_amount.toFixed(2)} €
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* ── VISTA 6: CADUCIDADES & FRESCOS (Oculto a petición del usuario) ── */}
-      {false && activeTab === ("perishables" as any) && (
+      {/* ── VISTA 5: ESCANEAR & ARCHIVO DE TICKETS / GASTOS MANUALES ── */}
+      {activeTab === "scan" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
-            <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, marginBottom: "0.85rem", letterSpacing: "-0.01em" }}>
-              Control de Caducidades & Alimentos Frescos
-            </h3>
-            {perishables.length === 0 ? (
-              <div style={{ padding: "2rem", textAlign: "center", color: "var(--apple-text-secondary)", background: "var(--apple-surface-secondary)", borderRadius: "var(--radius-lg)" }}>
-                <p style={{ fontWeight: 600, fontSize: "0.92rem", margin: 0, color: "var(--apple-text)" }}>
-                  Despensa al día
-                </p>
-                <p style={{ fontSize: "0.8rem", margin: 0, marginTop: "0.2rem" }}>
-                  No hay alimentos próximos a caducar en los próximos 7 días.
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+              <div>
+                <h3 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
+                  Tickets Digitalizados & Gastos Manuales
+                </h3>
+                <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
+                  Historial de tickets escaneados con cámara y compras de supermercado registradas sin ticket
                 </p>
               </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.75rem" }}>
-                {perishables.map((item) => (
+
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsManualExpenseOpen(true)}
+                  className="btn-secondary"
+                  style={{ fontSize: "0.8rem", padding: "0.4rem 0.85rem", gap: "0.35rem" }}
+                >
+                  <IconPlus size={14} />
+                  <span>+ Gasto Manual / Súper</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTicketModalOpen(true)}
+                  className="btn-primary"
+                  style={{ fontSize: "0.8rem", padding: "0.4rem 0.85rem", gap: "0.35rem" }}
+                >
+                  <IconCamera size={14} />
+                  <span>📷 Escanear con Cámara</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filtros rápidos: Todos, Con Ticket, Gastos Manuales, Supermercados */}
+            {(() => {
+              const supermarketKeywords = ["mercadona", "carrefour", "lidl", "aldi", "día", "dia", "alcampo", "hipercor", "e.leclerc", "eroski", "ahorramas"];
+              const isSupermarket = (name?: string | null) =>
+                supermarketKeywords.some((sm) => (name || "").toLowerCase().includes(sm));
+
+              const withTicketCount = receipts.filter((r) => Boolean(r.photo_url)).length;
+              const manualCount = receipts.filter((r) => !r.photo_url || r.raw_text?.startsWith("Gasto manual")).length;
+              const supermarketCount = receipts.filter((r) => isSupermarket(r.store_name || r.company_name)).length;
+
+              const filteredReceipts = receipts.filter((r) => {
+                if (ticketFilter === "with_ticket") return Boolean(r.photo_url);
+                if (ticketFilter === "manual") return !r.photo_url || r.raw_text?.startsWith("Gasto manual");
+                if (ticketFilter === "supermarket") return isSupermarket(r.store_name || r.company_name);
+                return true;
+              });
+
+              return (
+                <div>
                   <div
-                    key={item.id}
                     style={{
-                      padding: "0.9rem",
-                      borderRadius: "var(--radius-md)",
-                      background: "var(--apple-surface-secondary)",
-                      border: "1px solid var(--apple-border)",
                       display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      gap: "0.6rem",
+                      gap: "0.4rem",
+                      marginBottom: "1rem",
+                      overflowX: "auto",
+                      scrollbarWidth: "none",
                     }}
                   >
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span
-                          style={{
-                            fontSize: "0.7rem",
-                            fontWeight: 700,
-                            padding: "0.15rem 0.5rem",
-                            borderRadius: "var(--radius-full)",
-                            background: item.days_left <= 1 ? "rgba(255, 69, 58, 0.15)" : "rgba(255, 159, 10, 0.15)",
-                            color: item.days_left <= 1 ? "var(--apple-red)" : "var(--apple-orange)",
-                          }}
-                        >
-                          {item.days_left === 0 ? "Caduca HOY" : item.days_left === 1 ? "Caduca MAÑANA" : `${item.days_left} días`}
-                        </span>
-                        <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)" }}>
-                          {item.store_name}
-                        </span>
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--apple-text)", marginTop: "0.4rem" }}>
-                        {item.name}
-                      </div>
-                    </div>
-
                     <button
-                      onClick={() => startTransition(() => markPerishableConsumedAction(item.id))}
-                      disabled={isPending}
-                      className="btn-secondary"
-                      style={{ fontSize: "0.74rem", padding: "0.3rem 0.6rem", justifyContent: "center" }}
+                      type="button"
+                      onClick={() => setTicketFilter("all")}
+                      style={{
+                        padding: "0.3rem 0.75rem",
+                        borderRadius: "var(--radius-full)",
+                        fontSize: "0.76rem",
+                        fontWeight: ticketFilter === "all" ? 700 : 500,
+                        background: ticketFilter === "all" ? "var(--apple-blue)" : "rgba(255, 255, 255, 0.05)",
+                        color: ticketFilter === "all" ? "#fff" : "var(--apple-text-secondary)",
+                        border: "1px solid var(--apple-border)",
+                        cursor: "pointer",
+                      }}
                     >
-                      ✓ Marcar consumido
+                      Todos ({receipts.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTicketFilter("with_ticket")}
+                      style={{
+                        padding: "0.3rem 0.75rem",
+                        borderRadius: "var(--radius-full)",
+                        fontSize: "0.76rem",
+                        fontWeight: ticketFilter === "with_ticket" ? 700 : 500,
+                        background: ticketFilter === "with_ticket" ? "var(--apple-blue)" : "rgba(255, 255, 255, 0.05)",
+                        color: ticketFilter === "with_ticket" ? "#fff" : "var(--apple-text-secondary)",
+                        border: "1px solid var(--apple-border)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      📸 Con Ticket ({withTicketCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTicketFilter("manual")}
+                      style={{
+                        padding: "0.3rem 0.75rem",
+                        borderRadius: "var(--radius-full)",
+                        fontSize: "0.76rem",
+                        fontWeight: ticketFilter === "manual" ? 700 : 500,
+                        background: ticketFilter === "manual" ? "var(--apple-blue)" : "rgba(255, 255, 255, 0.05)",
+                        color: ticketFilter === "manual" ? "#fff" : "var(--apple-text-secondary)",
+                        border: "1px solid var(--apple-border)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✍️ Gastos Manuales ({manualCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTicketFilter("supermarket")}
+                      style={{
+                        padding: "0.3rem 0.75rem",
+                        borderRadius: "var(--radius-full)",
+                        fontSize: "0.76rem",
+                        fontWeight: ticketFilter === "supermarket" ? 700 : 500,
+                        background: ticketFilter === "supermarket" ? "var(--apple-blue)" : "rgba(255, 255, 255, 0.05)",
+                        color: ticketFilter === "supermarket" ? "#fff" : "var(--apple-text-secondary)",
+                        border: "1px solid var(--apple-border)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      🛒 Supermercados ({supermarketCount})
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
+
+                  {/* Banner de Reconciliación */}
+                  {reconciliation && (
+                    <div
+                      style={{
+                        padding: "1rem",
+                        background: "rgba(52, 199, 89, 0.12)",
+                        border: "1px solid rgba(52, 199, 89, 0.35)",
+                        borderRadius: "var(--radius-lg)",
+                        marginBottom: "1rem",
+                      }}
+                    >
+                      <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--apple-green)", marginBottom: "0.3rem" }}>
+                        Conciliación de Compra Completada
+                      </div>
+                      <div style={{ fontSize: "0.82rem", color: "var(--apple-text)", lineHeight: 1.4 }}>
+                        {reconciliation.summaryMessage}
+                      </div>
+                    </div>
+                  )}
+
+                  {scanFeedback && !reconciliation && (
+                    <div style={{ padding: "0.75rem 1rem", borderRadius: "var(--radius-md)", background: "rgba(0, 113, 227, 0.1)", color: "var(--apple-text)", fontSize: "0.82rem", marginBottom: "1rem" }}>
+                      {scanFeedback}
+                    </div>
+                  )}
+
+                  {/* Listado de Tickets y Gastos Manuales */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+                    {filteredReceipts.length === 0 ? (
+                      <div style={{ padding: "2rem", textAlign: "center", color: "var(--apple-text-secondary)", background: "rgba(255, 255, 255, 0.02)", borderRadius: "var(--radius-md)" }}>
+                        <p style={{ margin: 0, fontSize: "0.88rem", fontWeight: 600, color: "var(--apple-text)" }}>
+                          No hay gastos en esta categoría
+                        </p>
+                        <p style={{ margin: 0, marginTop: "0.2rem", fontSize: "0.78rem" }}>
+                          Puedes escanear un ticket con la cámara o añadir un gasto manual seleccionando el supermercado.
+                        </p>
+                      </div>
+                    ) : (
+                      filteredReceipts.map((r) => {
+                        const isManual = !r.photo_url || r.raw_text?.startsWith("Gasto manual");
+                        const displayName = r.store_name || r.company_name || "Comercio";
+
+                        return (
+                          <div
+                            key={r.id}
+                            style={{
+                              padding: "0.9rem 1.1rem",
+                              borderRadius: "var(--radius-md)",
+                              background: "var(--apple-surface-secondary)",
+                              border: "1px solid var(--apple-border)",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                              gap: "0.75rem",
+                            }}
+                          >
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: r.store_color || "var(--apple-blue)" }} />
+                                <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--apple-text)" }}>
+                                  {displayName}
+                                </span>
+                                {isManual ? (
+                                  <span
+                                    style={{
+                                      fontSize: "0.68rem",
+                                      fontWeight: 600,
+                                      padding: "0.1rem 0.45rem",
+                                      borderRadius: "var(--radius-full)",
+                                      background: "rgba(255, 159, 10, 0.12)",
+                                      color: "var(--apple-orange)",
+                                    }}
+                                  >
+                                    ✍️ Gasto Manual (sin ticket)
+                                  </span>
+                                ) : (
+                                  <span
+                                    style={{
+                                      fontSize: "0.68rem",
+                                      fontWeight: 600,
+                                      padding: "0.1rem 0.45rem",
+                                      borderRadius: "var(--radius-full)",
+                                      background: "rgba(52, 199, 89, 0.12)",
+                                      color: "var(--apple-green)",
+                                    }}
+                                  >
+                                    📸 Ticket digitalizado
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
+                                Fecha: {r.date} · {r.items_count || 1} artículos registrados {r.items_summary ? `(${r.items_summary})` : ""}
+                              </div>
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                              {r.photo_url && (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingDoc({ title: `Ticket: ${displayName} (${r.date})`, url: r.photo_url! })}
+                                  className="btn-secondary"
+                                  style={{ fontSize: "0.74rem", padding: "0.25rem 0.6rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+                                >
+                                  <span>📷</span>
+                                  <span>Ver Ticket</span>
+                                </button>
+                              )}
+                              <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--apple-text)" }}>
+                                {r.total_amount.toFixed(2)} €
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => startTransition(() => deleteReceiptAction(r.id))}
+                                className="btn-ghost"
+                                style={{ width: "26px", height: "26px", borderRadius: "50%", padding: 0, justifyContent: "center", color: "var(--apple-text-tertiary)" }}
+                                title="Eliminar este gasto"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -1573,6 +1971,20 @@ export function EconomyModule({
       <ManualExpenseModal
         isOpen={isManualExpenseOpen}
         onClose={() => setIsManualExpenseOpen(false)}
+      />
+
+      {/* ── Modal de Factura Mensual de Suministros ── */}
+      <ManualUtilityBillModal
+        isOpen={isUtilityModalOpen}
+        onClose={() => setIsUtilityModalOpen(false)}
+      />
+
+      {/* ── Visor de Documentos (Pólizas, Tickets y Garantías) ── */}
+      <DocumentViewerModal
+        isOpen={Boolean(viewingDoc)}
+        onClose={() => setViewingDoc(null)}
+        title={viewingDoc?.title || "Documento"}
+        url={viewingDoc?.url || null}
       />
     </div>
   );

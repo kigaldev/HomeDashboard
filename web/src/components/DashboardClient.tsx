@@ -54,6 +54,7 @@ import type {
   EnergyContract,
   FamilyInsurance,
   Warranty,
+  UtilityBill,
 } from "@/lib/repo";
 import type { Weather, DayWeather } from "@/lib/weather";
 
@@ -101,6 +102,7 @@ export function DashboardClient({
   energyContracts = [],
   insurances = [],
   warranties = [],
+  utilityBills = [],
   news = { espana: [], cyl: [] },
   traffic = null,
   pantryNeedsInventory = false,
@@ -137,6 +139,7 @@ export function DashboardClient({
   energyContracts: EnergyContract[];
   insurances: FamilyInsurance[];
   warranties: Warranty[];
+  utilityBills?: UtilityBill[];
   news?: { espana: NewsItem[]; cyl: NewsItem[] };
   traffic?: CommuteTraffic | null;
   pantryNeedsInventory?: boolean;
@@ -506,6 +509,7 @@ export function DashboardClient({
               todayWeather={todayWeather}
               insurances={insurances}
               warranties={warranties}
+              utilityBills={utilityBills}
             />
           </div>
         </div>

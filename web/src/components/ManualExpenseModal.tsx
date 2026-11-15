@@ -4,9 +4,22 @@ import { useState, useRef, useEffect, useTransition } from "react";
 import { createManualExpenseAction } from "@/app/actions";
 import { IconEconomy, IconPlus } from "./Icons";
 
+const SUPERMARKETS = [
+  { name: "Mercadona", color: "#00a650", emoji: "🟢" },
+  { name: "Carrefour", color: "#0055b8", emoji: "🔵" },
+  { name: "Lidl", color: "#e6a100", emoji: "🟡" },
+  { name: "Aldi", color: "#00205b", emoji: "🔵" },
+  { name: "Día", color: "#d91d24", emoji: "🔴" },
+  { name: "Alcampo", color: "#c60c30", emoji: "🔴" },
+  { name: "Hipercor", color: "#007a33", emoji: "🟢" },
+  { name: "E.Leclerc", color: "#0066b3", emoji: "🔵" },
+  { name: "Eroski", color: "#e30613", emoji: "🔴" },
+  { name: "Ahorramas", color: "#f39200", emoji: "🟠" },
+];
+
 const PRESET_CATEGORIES = [
-  { name: "Restaurante", icon: "🍽️", label: "Restaurante / Bar" },
   { name: "Despensa", icon: "🥫", label: "Supermercado / Despensa" },
+  { name: "Restaurante", icon: "🍽️", label: "Restaurante / Bar" },
   { name: "Fruta y Verdura", icon: "🍎", label: "Frutería / Verdura" },
   { name: "Carnicería", icon: "🥩", label: "Carnicería" },
   { name: "Pescadería", icon: "🐟", label: "Pescadería" },
@@ -24,19 +37,30 @@ export function ManualExpenseModal({
   isOpen,
   onClose,
   onSuccess,
+  defaultStore,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  defaultStore?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [expenseType, setExpenseType] = useState<"supermarket" | "general">("supermarket");
   const [amount, setAmount] = useState("");
   const [concept, setConcept] = useState("");
-  const [category, setCategory] = useState("Restaurante");
-  const [storeName, setStoreName] = useState("");
+  const [category, setCategory] = useState("Despensa");
+  const [storeName, setStoreName] = useState(defaultStore || "Mercadona");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (defaultStore) {
+      setStoreName(defaultStore);
+      setExpenseType("supermarket");
+      setCategory("Despensa");
+    }
+  }, [defaultStore]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -44,7 +68,6 @@ export function ManualExpenseModal({
 
     if (isOpen && !dialog.open) {
       dialog.showModal();
-      // Reset form
       setError(null);
     } else if (!isOpen && dialog.open) {
       dialog.close();
@@ -72,6 +95,14 @@ export function ManualExpenseModal({
     return () => dialog.removeEventListener("click", handleBackdropClick);
   }, [onClose]);
 
+  const handleSelectSupermarket = (superName: string) => {
+    setStoreName(superName);
+    setCategory("Despensa");
+    if (!concept || concept.startsWith("Compra ")) {
+      setConcept(`Compra ${superName}`);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanAmt = parseFloat(amount.replace(",", "."));
@@ -79,17 +110,14 @@ export function ManualExpenseModal({
       setError("Por favor introduce un importe válido superior a 0 €");
       return;
     }
-    if (!concept.trim()) {
-      setError("Por favor escribe el concepto o descripción del gasto");
-      return;
-    }
+    const finalConcept = concept.trim() || (expenseType === "supermarket" ? `Compra ${storeName || "Supermercado"}` : "Gasto manual");
 
     setError(null);
     startTransition(async () => {
       try {
         await createManualExpenseAction({
           amount: cleanAmt,
-          concept: concept.trim(),
+          concept: finalConcept,
           category,
           storeName: storeName.trim() || undefined,
           date,
@@ -98,7 +126,7 @@ export function ManualExpenseModal({
         // Limpiar formulario y cerrar
         setAmount("");
         setConcept("");
-        setStoreName("");
+        setStoreName(expenseType === "supermarket" ? "Mercadona" : "");
         onSuccess?.();
         onClose();
       } catch (err: any) {
@@ -144,7 +172,7 @@ export function ManualExpenseModal({
                 Nuevo Gasto Manual
               </h3>
               <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.15rem" }}>
-                Añade consumiciones, farmacia, gasolina o compras directas sin ticket
+                Registra compras de supermercado sin ticket o consumiciones directas
               </p>
             </div>
           </div>
@@ -156,6 +184,71 @@ export function ManualExpenseModal({
             aria-label="Cerrar modal"
           >
             ✕
+          </button>
+        </div>
+
+        {/* Selector de Tipo: Supermercado vs Otro Gasto */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "0.4rem",
+            background: "rgba(0, 0, 0, 0.25)",
+            padding: "0.3rem",
+            borderRadius: "0.75rem",
+            marginBottom: "1.15rem",
+            border: "1px solid var(--apple-border)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setExpenseType("supermarket");
+              setCategory("Despensa");
+              if (!storeName) setStoreName("Mercadona");
+            }}
+            style={{
+              padding: "0.55rem 0.8rem",
+              borderRadius: "0.55rem",
+              fontSize: "0.82rem",
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.4rem",
+              background: expenseType === "supermarket" ? "var(--apple-blue)" : "transparent",
+              color: expenseType === "supermarket" ? "#fff" : "var(--apple-text-secondary)",
+              border: "none",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <span>🛒 Compra Supermercado</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setExpenseType("general");
+              setCategory("Restaurante");
+            }}
+            style={{
+              padding: "0.55rem 0.8rem",
+              borderRadius: "0.55rem",
+              fontSize: "0.82rem",
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.4rem",
+              background: expenseType === "general" ? "var(--apple-blue)" : "transparent",
+              color: expenseType === "general" ? "#fff" : "var(--apple-text-secondary)",
+              border: "none",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <span>🍽️ Restaurante / Otro Gasto</span>
           </button>
         </div>
 
@@ -213,36 +306,163 @@ export function ManualExpenseModal({
             </div>
           </div>
 
-          {/* Concepto y Establecimiento */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+          {/* Opciones de Supermercado si está activo */}
+          {expenseType === "supermarket" ? (
             <div>
-              <label style={{ display: "block", fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.35rem", fontWeight: 500 }}>
-                Concepto / Descripción *
+              <label style={{ display: "block", fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.45rem", fontWeight: 600 }}>
+                Elige el Supermercado donde compraste:
               </label>
-              <input
-                type="text"
-                placeholder="Ej. Comida restaurante"
-                value={concept}
-                onChange={(e) => setConcept(e.target.value)}
-                required
-                className="input-field"
-                style={{ width: "100%", fontSize: "0.88rem" }}
-              />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(105px, 1fr))",
+                  gap: "0.45rem",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                {SUPERMARKETS.map((sm) => {
+                  const isSelected = storeName.toLowerCase() === sm.name.toLowerCase();
+                  return (
+                    <button
+                      key={sm.name}
+                      type="button"
+                      onClick={() => handleSelectSupermarket(sm.name)}
+                      style={{
+                        padding: "0.5rem 0.6rem",
+                        borderRadius: "0.6rem",
+                        fontSize: "0.8rem",
+                        fontWeight: isSelected ? 700 : 500,
+                        border: isSelected ? `2px solid ${sm.color}` : "1px solid var(--apple-border)",
+                        background: isSelected ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.03)",
+                        color: isSelected ? "#fff" : "var(--apple-text)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.4rem",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: sm.color }} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sm.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.35rem", fontWeight: 500 }}>
+                    Supermercado (editable si es otro)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Supermercado local"
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    required
+                    className="input-field"
+                    style={{ width: "100%", fontSize: "0.88rem" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.35rem", fontWeight: 500 }}>
+                    Concepto / Detalle
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={`Ej. Compra semanal ${storeName}`}
+                    value={concept}
+                    onChange={(e) => setConcept(e.target.value)}
+                    className="input-field"
+                    style={{ width: "100%", fontSize: "0.88rem" }}
+                  />
+                </div>
+              </div>
             </div>
+          ) : (
             <div>
-              <label style={{ display: "block", fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.35rem", fontWeight: 500 }}>
-                Establecimiento / Local
-              </label>
-              <input
-                type="text"
-                placeholder="Ej. Restaurante Casa Pepe"
-                value={storeName}
-                onChange={(e) => setStoreName(e.target.value)}
-                className="input-field"
-                style={{ width: "100%", fontSize: "0.88rem" }}
-              />
+              {/* Concepto y Establecimiento General */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.85rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.35rem", fontWeight: 500 }}>
+                    Concepto / Descripción *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Comida restaurante"
+                    value={concept}
+                    onChange={(e) => setConcept(e.target.value)}
+                    required
+                    className="input-field"
+                    style={{ width: "100%", fontSize: "0.88rem" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.35rem", fontWeight: 500 }}>
+                    Establecimiento / Local
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Restaurante Casa Pepe"
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    className="input-field"
+                    style={{ width: "100%", fontSize: "0.88rem" }}
+                  />
+                </div>
+              </div>
+
+              {/* Selector de Categoría General */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.45rem", fontWeight: 500 }}>
+                  Categoría de Consumo
+                </label>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                    gap: "0.4rem",
+                    maxHeight: "135px",
+                    overflowY: "auto",
+                    padding: "0.3rem",
+                    border: "1px solid var(--apple-border)",
+                    borderRadius: "0.75rem",
+                    background: "rgba(0, 0, 0, 0.2)",
+                  }}
+                >
+                  {PRESET_CATEGORIES.map((cat) => {
+                    const isSelected = category === cat.name;
+                    return (
+                      <button
+                        key={cat.name}
+                        type="button"
+                        onClick={() => setCategory(cat.name)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                          padding: "0.45rem 0.6rem",
+                          borderRadius: "0.5rem",
+                          fontSize: "0.76rem",
+                          textAlign: "left",
+                          border: isSelected ? "1px solid var(--apple-blue)" : "1px solid transparent",
+                          background: isSelected ? "rgba(0, 113, 227, 0.2)" : "rgba(255, 255, 255, 0.03)",
+                          color: isSelected ? "#60a5fa" : "var(--apple-text)",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <span>{cat.icon}</span>
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {cat.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Fecha */}
           <div>
@@ -258,58 +478,22 @@ export function ManualExpenseModal({
             />
           </div>
 
-          {/* Selector de Categoría */}
-          <div>
-            <label style={{ display: "block", fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginBottom: "0.45rem", fontWeight: 500 }}>
-              Categoría de Consumo
-            </label>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
-                gap: "0.4rem",
-                maxHeight: "150px",
-                overflowY: "auto",
-                padding: "0.3rem",
-                border: "1px solid var(--apple-border)",
-                borderRadius: "0.75rem",
-                background: "rgba(0, 0, 0, 0.2)",
-              }}
-            >
-              {PRESET_CATEGORIES.map((cat) => {
-                const isSelected = category === cat.name;
-                return (
-                  <button
-                    key={cat.name}
-                    type="button"
-                    onClick={() => setCategory(cat.name)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.35rem",
-                      padding: "0.45rem 0.6rem",
-                      borderRadius: "0.5rem",
-                      fontSize: "0.76rem",
-                      textAlign: "left",
-                      border: isSelected ? "1px solid var(--apple-blue)" : "1px solid transparent",
-                      background: isSelected ? "rgba(0, 113, 227, 0.2)" : "rgba(255, 255, 255, 0.03)",
-                      color: isSelected ? "#60a5fa" : "var(--apple-text)",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    <span>{cat.icon}</span>
-                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {cat.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+          <div
+            style={{
+              padding: "0.6rem 0.85rem",
+              borderRadius: "0.65rem",
+              background: "rgba(0, 113, 227, 0.08)",
+              border: "1px solid rgba(0, 113, 227, 0.2)",
+              fontSize: "0.75rem",
+              color: "var(--apple-text-secondary)",
+              lineHeight: 1.4,
+            }}
+          >
+            ℹ️ Este gasto se guardará y se listará de inmediato en <b>Tickets Digitalizados</b> y computará en el desglose comercial mensual.
           </div>
 
           {/* Acciones */}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem", marginTop: "0.75rem" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem", marginTop: "0.5rem" }}>
             <button type="button" onClick={onClose} className="btn-secondary" disabled={isPending}>
               Cancelar
             </button>
@@ -328,4 +512,3 @@ export function ManualExpenseModal({
     </dialog>
   );
 }
-

@@ -646,6 +646,7 @@ export type Receipt = {
   photo_url: string | null;
   raw_text: string | null;
   items_count?: number;
+  items_summary?: string | null;
 };
 
 export type ReceiptItem = {
@@ -692,17 +693,23 @@ export type HabitInsight = {
   status: "ok" | "soon" | "overdue";
 };
 
-export async function getReceipts(limit = 20): Promise<Receipt[]> {
+export async function getReceipts(limit = 50): Promise<Receipt[]> {
   return q<Receipt>(
-    `select r.id, r.store_id, r.company_name, s.name as store_name, s.color as store_color,
+    `select r.id, r.store_id, r.company_name, coalesce(r.company_name, s.name, 'Comercio') as store_name, s.color as store_color,
             r.date::text, r.total_amount::float as total_amount, r.photo_url, r.raw_text,
-            (select count(*) from receipt_items ri where ri.receipt_id = r.id)::int as items_count
+            (select count(*) from receipt_items ri where ri.receipt_id = r.id)::int as items_count,
+            (select string_agg(ri.name, ', ') from (select name from receipt_items where receipt_id = r.id limit 3) ri) as items_summary
      from receipts r
      left join stores s on s.id = r.store_id
      order by r.date desc, r.created_at desc
      limit $1`,
     [limit],
   );
+}
+
+export async function deleteReceipt(id: number): Promise<void> {
+  await q("delete from receipt_items where receipt_id = $1", [id]);
+  await q("delete from receipts where id = $1", [id]);
 }
 
 export async function getReceiptItems(receiptId: number): Promise<ReceiptItem[]> {
@@ -1710,20 +1717,21 @@ export interface FamilyInsurance {
   renewal_date: string;
   active: boolean;
   notes: string | null;
+  document_url?: string | null;
   created_at?: string;
 }
 
 export async function getFamilyInsurances(): Promise<FamilyInsurance[]> {
   return await q<FamilyInsurance>(
-    `select id, title, category, provider, policy_number, annual_cost::float, payment_frequency, renewal_date::text, active, notes
+    `select id, title, category, provider, policy_number, annual_cost::float, payment_frequency, renewal_date::text, active, notes, document_url
      from family_insurances order by renewal_date asc`
   );
 }
 
 export async function addFamilyInsurance(data: Omit<FamilyInsurance, "id" | "created_at">): Promise<number> {
   const [row] = await q<{ id: number }>(
-    `insert into family_insurances (title, category, provider, policy_number, annual_cost, payment_frequency, renewal_date, active, notes)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
+    `insert into family_insurances (title, category, provider, policy_number, annual_cost, payment_frequency, renewal_date, active, notes, document_url)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
     [
       data.title,
       data.category,
@@ -1734,6 +1742,7 @@ export async function addFamilyInsurance(data: Omit<FamilyInsurance, "id" | "cre
       data.renewal_date,
       data.active ?? true,
       data.notes || null,
+      data.document_url || null,
     ]
   );
   return row?.id ?? 0;
@@ -1753,20 +1762,21 @@ export interface Warranty {
   price: number | null;
   status: string;
   notes: string | null;
+  document_url?: string | null;
   created_at?: string;
 }
 
 export async function getWarranties(): Promise<Warranty[]> {
   return await q<Warranty>(
-    `select id, item_name, store_name, purchase_date::text, warranty_years, price::float, status, notes
+    `select id, item_name, store_name, purchase_date::text, warranty_years, price::float, status, notes, document_url
      from warranties order by purchase_date desc`
   );
 }
 
 export async function addWarranty(data: Omit<Warranty, "id" | "created_at">): Promise<number> {
   const [row] = await q<{ id: number }>(
-    `insert into warranties (item_name, store_name, purchase_date, warranty_years, price, status, notes)
-     values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+    `insert into warranties (item_name, store_name, purchase_date, warranty_years, price, status, notes, document_url)
+     values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`,
     [
       data.item_name,
       data.store_name || null,
@@ -1775,6 +1785,7 @@ export async function addWarranty(data: Omit<Warranty, "id" | "created_at">): Pr
       data.price ?? null,
       data.status || "vigente",
       data.notes || null,
+      data.document_url || null,
     ]
   );
   return row?.id ?? 0;
@@ -1782,4 +1793,44 @@ export async function addWarranty(data: Omit<Warranty, "id" | "created_at">): Pr
 
 export async function deleteWarranty(id: number): Promise<void> {
   await q("delete from warranties where id = $1", [id]);
+}
+
+// ── Suministros y Facturación Mensual ──────────────────────────
+export interface UtilityBill {
+  id: number;
+  service: "luz" | "gas" | "agua" | "internet" | "telefono" | "otro";
+  provider: string | null;
+  amount: number;
+  billing_month: string; // Formato 'YYYY-MM'
+  issue_date: string;
+  notes: string | null;
+  created_at?: string;
+}
+
+export async function getUtilityBills(limit = 60): Promise<UtilityBill[]> {
+  return await q<UtilityBill>(
+    `select id, service, provider, amount::float, billing_month, issue_date::text, notes
+     from utility_bills order by billing_month desc, id desc limit $1`,
+    [limit]
+  );
+}
+
+export async function addUtilityBill(data: Omit<UtilityBill, "id" | "created_at">): Promise<number> {
+  const [row] = await q<{ id: number }>(
+    `insert into utility_bills (service, provider, amount, billing_month, issue_date, notes)
+     values ($1, $2, $3, $4, $5, $6) returning id`,
+    [
+      data.service,
+      data.provider || null,
+      data.amount,
+      data.billing_month,
+      data.issue_date || isoDate(),
+      data.notes || null,
+    ]
+  );
+  return row?.id ?? 0;
+}
+
+export async function deleteUtilityBill(id: number): Promise<void> {
+  await q("delete from utility_bills where id = $1", [id]);
 }

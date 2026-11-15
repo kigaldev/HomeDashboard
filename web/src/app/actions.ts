@@ -637,6 +637,13 @@ export async function ingestEnergyBillImageAction(base64Image: string, mimeType:
   return result;
 }
 
+// ── Eliminación de Ticket / Gasto Manual ─────────────────────
+export async function deleteReceiptAction(id: number) {
+  const { deleteReceipt } = await import("@/lib/repo");
+  await deleteReceipt(id);
+  revalidatePath("/");
+}
+
 // ── Pólizas & Seguros Familiares ─────────────────────────────
 export async function addFamilyInsuranceAction(formData: FormData) {
   const title = formData.get("title") as string;
@@ -647,6 +654,7 @@ export async function addFamilyInsuranceAction(formData: FormData) {
   const paymentFrequency = formData.get("paymentFrequency") as string;
   const renewalDate = formData.get("renewalDate") as string;
   const notes = formData.get("notes") as string;
+  const documentUrl = formData.get("documentUrl") as string;
 
   const { addFamilyInsurance } = await import("@/lib/repo");
   await addFamilyInsurance({
@@ -659,6 +667,7 @@ export async function addFamilyInsuranceAction(formData: FormData) {
     renewal_date: renewalDate,
     active: true,
     notes: notes || null,
+    document_url: documentUrl || null,
   });
   revalidatePath("/");
 }
@@ -677,6 +686,7 @@ export async function addWarrantyAction(formData: FormData) {
   const warrantyYearsStr = formData.get("warrantyYears") as string;
   const priceStr = formData.get("price") as string;
   const notes = formData.get("notes") as string;
+  const documentUrl = formData.get("documentUrl") as string;
 
   const { addWarranty } = await import("@/lib/repo");
   await addWarranty({
@@ -687,6 +697,7 @@ export async function addWarrantyAction(formData: FormData) {
     price: priceStr ? parseFloat(priceStr) : null,
     status: "vigente",
     notes: notes || null,
+    document_url: documentUrl || null,
   });
   revalidatePath("/");
 }
@@ -694,6 +705,34 @@ export async function addWarrantyAction(formData: FormData) {
 export async function deleteWarrantyAction(id: number) {
   const { deleteWarranty } = await import("@/lib/repo");
   await deleteWarranty(id);
+  revalidatePath("/");
+}
+
+// ── Facturación Mensual de Suministros del Hogar ────────────
+export async function addUtilityBillAction(data: {
+  service: "luz" | "gas" | "agua" | "internet" | "telefono" | "otro";
+  provider?: string;
+  amount: number;
+  billing_month: string;
+  issue_date?: string;
+  notes?: string;
+}) {
+  const { addUtilityBill } = await import("@/lib/repo");
+  const id = await addUtilityBill({
+    service: data.service,
+    provider: data.provider || null,
+    amount: data.amount,
+    billing_month: data.billing_month,
+    issue_date: data.issue_date || new Date().toISOString().slice(0, 10),
+    notes: data.notes || null,
+  });
+  revalidatePath("/");
+  return { success: true, id };
+}
+
+export async function deleteUtilityBillAction(id: number) {
+  const { deleteUtilityBill } = await import("@/lib/repo");
+  await deleteUtilityBill(id);
   revalidatePath("/");
 }
 

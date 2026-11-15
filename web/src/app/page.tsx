@@ -21,6 +21,7 @@ import {
   getEnergyContracts,
   getFamilyInsurances,
   getWarranties,
+  getUtilityBills,
   syncFrequentStaples,
   getPantryLastUpdated,
 } from "@/lib/repo";
@@ -69,6 +70,7 @@ export default async function HomePage() {
     energyContracts,
     insurances,
     warranties,
+    utilityBills,
     news,
     traffic,
     lastPantryUpdate,
@@ -86,7 +88,7 @@ export default async function HomePage() {
     getSchoolRun(today),
     getHealthUpcoming(30),
     getEventsBetween(today, addDays(today, 60)),
-    getReceipts(15),
+    getReceipts(50),
     getExpiringPerishables(7),
     getMonthlyExpenses(),
     getPriceComparisons(),
@@ -94,6 +96,7 @@ export default async function HomePage() {
     getEnergyContracts(),
     getFamilyInsurances(),
     getWarranties(),
+    getUtilityBills(50),
     getLatestNews(),
     getSchoolCommuteTraffic(),
     getPantryLastUpdated(),
@@ -156,6 +159,7 @@ export default async function HomePage() {
       energyContracts={energyContracts}
       insurances={insurances}
       warranties={warranties}
+      utilityBills={utilityBills}
       news={news}
       traffic={traffic}
       pantryNeedsInventory={pantryNeedsInventory}
