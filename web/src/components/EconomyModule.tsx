@@ -123,8 +123,8 @@ export function EconomyModule({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
-  const [isStoresBreakdownOpen, setIsStoresBreakdownOpen] = useState(false);
-  const [isCategoriesListOpen, setIsCategoriesListOpen] = useState(false);
+  const [isStoresBreakdownOpen, setIsStoresBreakdownOpen] = useState(true);
+  const [isCategoriesListOpen, setIsCategoriesListOpen] = useState(true);
 
   useEffect(() => {
     setCategories(monthlyExpenses.by_category);
@@ -599,6 +599,28 @@ export function EconomyModule({
             </div>
             <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
               {insurances.filter((i) => i.active).length} pólizas vigentes ({totalAnnualInsurance.toFixed(0)} €/año)
+            </div>
+          </div>
+
+          {/* Garantías Legales */}
+          <div
+            onClick={() => setActiveTab("warranties")}
+            style={{
+              padding: "1rem",
+              borderRadius: "var(--radius-lg)",
+              background: "var(--apple-surface-secondary)",
+              border: "1px solid var(--apple-border)",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
+              Garantías Legales
+            </div>
+            <div style={{ fontSize: "1.3rem", fontWeight: 800, letterSpacing: "-0.02em", marginTop: "0.3rem", color: "var(--apple-text)" }}>
+              {warranties.filter((w) => w.status === "vigente").length} vigentes
+            </div>
+            <div style={{ fontSize: "0.76rem", color: "var(--apple-green)", marginTop: "0.2rem", fontWeight: 600 }}>
+              {warranties.length} productos protegidos
             </div>
           </div>
         </div>
