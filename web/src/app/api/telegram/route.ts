@@ -40,11 +40,12 @@ async function tgSendAction(chatId: string | number, action: string = "typing") 
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const setupUrl = url.searchParams.get("set_webhook");
+  const setupWebhook = url.searchParams.get("set_webhook");
 
-  if (setupUrl && TOKEN) {
+  if (setupWebhook && TOKEN) {
     try {
-      const webhookTarget = setupUrl.startsWith("http") ? setupUrl : `${url.origin}/api/telegram`;
+      // Por seguridad estricta: Solo permitir registrar el webhook hacia el mismo dominio de la aplicación
+      const webhookTarget = `${url.origin}/api/telegram`;
       const res = await fetch(`https://api.telegram.org/bot${TOKEN}/setWebhook?url=${encodeURIComponent(webhookTarget)}`);
       const data = await res.json();
       return NextResponse.json({ success: true, webhookTarget, result: data });

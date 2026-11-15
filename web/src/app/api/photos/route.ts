@@ -47,14 +47,27 @@ export async function POST(req: Request) {
     }
 
     const blob = file as Blob;
+    // Validar tamaño máximo (10 MB) para prevenir ataques DoS por agotamiento de memoria
+    if (blob.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "El archivo supera el tamaño máximo permitido de 10 MB" }, { status: 413 });
+    }
+
+    // Sanitizar y validar extensión de archivo estrictamente
+    const rawName = (file as { name?: string }).name || "foto.jpg";
+    const ext = path.extname(rawName).toLowerCase();
+    const validExts = [".jpg", ".jpeg", ".png", ".webp", ".heic"];
+    if (!validExts.includes(ext)) {
+      return NextResponse.json(
+        { error: "Formato no permitido. Solo se aceptan imágenes JPG, PNG, WEBP o HEIC" },
+        { status: 400 }
+      );
+    }
+
     const arrayBuffer = await blob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Sanitizar nombre de archivo
-    const rawName = (file as { name?: string }).name || "foto.jpg";
-    const ext = path.extname(rawName).toLowerCase() || ".jpg";
     const timestamp = Date.now();
-    const cleanBase = path.basename(rawName, ext).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const cleanBase = path.basename(rawName, ext).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50);
     const filename = `${timestamp}_${cleanBase}${ext}`;
     const targetPath = path.join(PHOTOS_DIR, filename);
 

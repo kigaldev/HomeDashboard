@@ -38,9 +38,9 @@ export const instant = false;
 
 export default async function HomePage() {
   await connection();
-  await syncFrequentStaples().catch((err) => {
-    console.warn("[page] Error al sincronizar básicos frecuentes:", err);
-  });
+  // Sincronizaciones no bloqueantes en segundo plano
+  syncFrequentStaples().catch(() => {});
+
   const today = isoDate();
   const formattedDate = longDate(today);
   const currentGreeting = greeting();
@@ -104,31 +104,27 @@ export default async function HomePage() {
     Date.now() - new Date(lastPantryUpdate).getTime() > 7 * 24 * 60 * 60 * 1000;
 
   const todayWeather = weather?.days.find((d) => d.date === today) ?? null;
-  let schoolLunch = schoolMenuRow?.lunch ?? null;
-  let schoolDinnerRec = schoolMenuRow?.dinner_recommendation ?? null;
+  const schoolLunch = schoolMenuRow?.lunch ?? null;
+  const schoolDinnerRec = schoolMenuRow?.dinner_recommendation ?? null;
 
-  if (!schoolLunch) {
-    try {
-      await syncMontessoriMenu();
-      const updatedMenu = await getSchoolMenu(today);
-      if (updatedMenu) {
-        schoolLunch = updatedMenu.lunch;
-        schoolDinnerRec = updatedMenu.dinner_recommendation;
-      }
-    } catch (e) {
-      console.warn("[page] Error auto-sincronizando menú escolar:", e);
-    }
+  // Solo si es día lectivo (Lunes a Viernes) y no hay menú, programar sync en segundo plano
+  const dayOfWeek = new Date().getDay();
+  const isSchoolDay = dayOfWeek >= 1 && dayOfWeek <= 5;
+  if (!schoolLunch && isSchoolDay) {
+    syncMontessoriMenu().catch((e) => {
+      console.warn("[page] Auto-sync menú escolar en segundo plano:", e);
+    });
   }
 
+  // Briefing: Usar el último generado sin bloquear la respuesta HTTP con llamadas lentas a Gemini
   let latestBriefing = latestBriefingRow?.content ?? null;
-  if (!latestBriefing || latestBriefingRow?.for_date !== today) {
-    try {
-      const isEvening = new Date().getHours() >= 20;
-      const kind = isEvening ? "evening" : "morning";
-      latestBriefing = await generateBriefing(kind);
-    } catch (e) {
-      console.warn("[page] Error auto-generando briefing diario:", e);
-    }
+  if (!latestBriefing) {
+    const isEvening = new Date().getHours() >= 20;
+    const kind = isEvening ? "evening" : "morning";
+    generateBriefing(kind).catch((e) => {
+      console.warn("[page] Auto-briefing en segundo plano:", e);
+    });
+    latestBriefing = `☀️ **${currentGreeting}**. Bienvenido al centro de mandos de tu hogar. Todo en orden para hoy ${formattedDate}.`;
   }
 
   return (

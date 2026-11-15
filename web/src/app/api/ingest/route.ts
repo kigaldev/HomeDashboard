@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { upsertExternalEvents, setSchoolMenu } from "@/lib/repo";
 
 export async function POST(req: Request) {
-  const token = req.headers.get("authorization")?.replace("Bearer ", "");
-  const expected = process.env.INGEST_TOKEN;
-  if (expected && token !== expected) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const token = req.headers.get("authorization")?.replace("Bearer ", "")?.trim();
+  const expected = process.env.INGEST_TOKEN?.trim();
+
+  // Validación de seguridad estricta: Rechazar si no está configurado INGEST_TOKEN o si no coincide
+  if (!expected || token !== expected) {
+    return NextResponse.json({ error: "Unauthorized: Token inválido o no configurado" }, { status: 401 });
   }
 
   try {
