@@ -86,88 +86,8 @@ export function PantryModule({
   const [newItemName, setNewItemName] = useState("");
   const [newItemLevel, setNewItemLevel] = useState(100);
 
-  // Catálogo completo de despensa doméstica familiar (79 productos supervisados)
-  const defaultPantry = [
-    "Aceite de oliva",
-    "Leche",
-    "Huevos",
-    "Café",
-    "Arroz",
-    "Arroz Basmati",
-    "Pasta",
-    "FIDEOS GALLO 400G",
-    "AZUCAR",
-    "GALLETAS MINI 400G",
-    "GOTAS DE CHOCOLATE",
-    "TORTITAS DE MAIZ",
-    "MASA HOJALDRE X 2",
-    "Infusión de jengibre y cúrcuma",
-    "LINDOR LECHE 100G",
-    "FILETE 1ª TERNERA",
-    "Chuleta de vacuno",
-    "Picaña de pato",
-    "JAMON CEBO",
-    "FUET ESPETEC EXTRA",
-    "Espetec",
-    "Mejillones vivos",
-    "Mejillón Fresco",
-    "FUMES PESCADO 1L",
-    "CLARA LÍQUIDA PASTEU",
-    "BANANA GRANEL",
-    "Manzana Roja 2 kg",
-    "MANZANA GOLDEN",
-    "ARÁNDANO 500 GR",
-    "KIWI ZESPRI",
-    "Kiwi rojo",
-    "MANGO BANDEJA",
-    "PIÑA EN SU JUGO",
-    "PIÑA S/AZ AÑADIDO",
-    "Caqui",
-    "KAKI CRF GRANEL",
-    "Ciruela Roja",
-    "Patata Granel",
-    "Boniato",
-    "Zanahorias",
-    "CALABACIN DADOS 450",
-    "Pimiento Tricolor",
-    "CEBOLLA CARAMELIZADA",
-    "TOAMATE CUBOS CRF",
-    "TOMATE MUTTI 130G",
-    "PEPINILLO AG GRANDE",
-    "GAZPACHO CRF 1L",
-    "LECHE ENTERA SIN 1L",
-    "Yogur",
-    "GRIEGO NATURAL LIGHT",
-    "Bífi Fruta con Trozos",
-    "Bífidus 0% 0% Fruta",
-    "Bífidus 0% 0% Cereales / Muesli",
-    "Kéfir Bebible",
-    "PETIT POCKET FRESA",
-    "Queso Cottage",
-    "Lonchas Edam",
-    "MEZCLA 4 QUESOS",
-    "QUESO CARREFOUR 250G",
-    "QUESO CARREFOUR 300G",
-    "QUESO ROQUEFORT 100G",
-    "SNACK QUESO CRF 200G",
-    "Pizza blanca de trufa",
-    "PAN MOLDE INTEGRAL",
-    "Panecillo Integral Pack 6",
-    "AGUADOY 6L",
-    "ICE TEA MELOCOTÓN 0",
-    "Pañales",
-    "Toallitas",
-    "Detergente",
-    "Papel higiénico",
-    "POUCH MY BABY BIO 4U",
-    "CREMA BEBE 150ML",
-    "QUITAMANCHAS TEXTIL",
-    "SUAVIZANTE COLONIA",
-    "Juguetes-0521537",
-    "Juguetes-0521545",
-    "Trenes Madera-0521227",
-    "DESCUENTO EN 2ª UNIDAD",
-  ];
+  // Catálogo inicial vacío: la despensa muestra exclusivamente los alimentos reales registrados
+  const defaultPantry: string[] = [];
 
   const dbNames = useMemo(() => new Set(items.map((i) => i.name.toLowerCase())), [items]);
   const allPantry: (PantryItem & { quantity_level: number })[] = useMemo(() => {
@@ -520,7 +440,7 @@ export function PantryModule({
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "0.6rem" }}>
                 <input
                   type="text"
-                  placeholder="Ej. Café en grano, Aceite de oliva, Yogures..."
+                  placeholder="Ej. Leche entera (6L), Arroz (1 kg), Huevos (12 uds)..."
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   autoFocus
@@ -535,6 +455,50 @@ export function PantryModule({
                 >
                   Guardar
                 </button>
+              </div>
+
+              {/* Botones rápidos de cantidad / unidad */}
+              <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)" }}>
+                  Formato rápido:
+                </span>
+                {[
+                  "1 kg",
+                  "500 g",
+                  "1 L",
+                  "6 bricks",
+                  "12 uds",
+                  "6 uds",
+                  "Pack 2",
+                  "1 bote",
+                  "1 paquete",
+                ].map((unit) => (
+                  <button
+                    key={unit}
+                    type="button"
+                    onClick={() => {
+                      const trimmed = newItemName.trim();
+                      if (!trimmed) {
+                        setNewItemName(`(${unit})`);
+                      } else if (trimmed.includes("(") && trimmed.endsWith(")")) {
+                        setNewItemName(trimmed.replace(/\([^)]+\)$/, `(${unit})`));
+                      } else {
+                        setNewItemName(`${trimmed} (${unit})`);
+                      }
+                    }}
+                    style={{
+                      fontSize: "0.72rem",
+                      padding: "0.2rem 0.55rem",
+                      borderRadius: "var(--radius-full)",
+                      background: "rgba(255, 255, 255, 0.08)",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
+                      color: "var(--apple-text)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    +{unit}
+                  </button>
+                ))}
               </div>
 
               {/* Slider de nivel inicial */}
@@ -558,15 +522,22 @@ export function PantryModule({
           {filteredItems.length === 0 ? (
             <div
               style={{
-                padding: "2rem",
+                padding: "2.5rem 1.5rem",
                 textAlign: "center",
                 color: "var(--apple-text-secondary)",
                 borderRadius: "var(--radius-lg)",
                 background: "var(--liquid-glass-bg-subtle, rgba(255, 255, 255, 0.03))",
+                border: "1px dashed var(--liquid-glass-border, rgba(255, 255, 255, 0.12))",
               }}
             >
-              <p style={{ margin: 0, fontSize: "0.88rem" }}>
-                {searchQuery ? `No hay productos que coincidan con «${searchQuery}».` : "No hay productos en esta vista."}
+              <div style={{ fontSize: "2.2rem", marginBottom: "0.5rem" }}>🥫</div>
+              <p style={{ margin: "0 0 0.35rem 0", fontWeight: 700, color: "var(--apple-text)", fontSize: "0.98rem" }}>
+                {searchQuery ? `No hay productos que coincidan con «${searchQuery}».` : "Tu despensa está vacía y lista"}
+              </p>
+              <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--apple-text-secondary)", maxWidth: "460px", marginInline: "auto", lineHeight: 1.45 }}>
+                {searchQuery
+                  ? "Prueba con otra palabra o añade el producto con el botón superior."
+                  : "Comienza a incorporar los alimentos de tu casa con sus cantidades (ej: «Leche entera (6L)», «Huevos (12 uds)», «Arroz (1 kg)»). También puedes dictárselos a Pepe por voz con el micrófono o fotografiar un ticket de compra."}
               </p>
             </div>
           ) : (
