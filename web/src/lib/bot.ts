@@ -204,14 +204,14 @@ export async function handleBotMessage(text: string, telegramUserId?: string): P
     ].join("\n");
   }
 
-  if (/^tareas\??$/.test(low)) {
+  if (/^\/?tareas\??$/.test(low)) {
     const tasks = (await getOpenTasks()).filter((x) => !x.done);
     const name = (id: number | null) => members.find((x) => x.id === id)?.name ?? "ambos";
     return tasks.length ? "✅ <b>Pendientes</b>\n" + tasks.map((x) => `• ${escapeHtml(x.title)} — ${escapeHtml(name(x.assignee_id))}`).join("\n") : "Nada pendiente 🙌";
   }
 
-  if (/^(briefing|resumen|buenos días|buenos dias)$/.test(low)) return generateBriefing("morning");
-  if (/^(mañana|resumen de mañana)\??$/.test(low)) return generateBriefing("evening");
+  if (/^\/?(briefing|resumen|buenos días|buenos dias)$/.test(low)) return generateBriefing("morning");
+  if (/^\/?(mañana|resumen de mañana)\??$/.test(low)) return generateBriefing("evening");
 
   if (/^(\/start|\/help|ayuda)$/.test(low))
     return [
