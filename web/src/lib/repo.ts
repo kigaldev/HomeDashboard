@@ -2322,25 +2322,28 @@ export async function getFinancialEvolution(monthsCount = 6): Promise<MonthlyEvo
      order by mi.month desc`
   );
 
-  return months.map(({ str, label }) => {
-    const recTotal = receiptsByMonth.get(str) ?? 0;
-    const utilTotal = billsByMonth.get(str) ?? 0;
-    const recurringTotal = recurringRows
-      .filter((r) => isRecurringActiveInMonth(r, str))
-      .reduce((acc, r) => acc + computeRecurringMonthlyCost(r), 0);
+  return months
+    .map(({ str, label }) => {
+      const recTotal = receiptsByMonth.get(str) ?? 0;
+      const utilTotal = billsByMonth.get(str) ?? 0;
+      const recurringTotal = recurringRows
+        .filter((r) => isRecurringActiveInMonth(r, str))
+        .reduce((acc, r) => acc + computeRecurringMonthlyCost(r), 0);
+      const insForMonth = str >= "2026-11" ? insurancesMonthly : 0;
 
-    const totalExpenses = Number((recTotal + utilTotal + insurancesMonthly + recurringTotal).toFixed(2));
-    const income = computeMonthIncomeFromList(str, allIncomes);
-    const savings = Number((income - totalExpenses).toFixed(2));
-    const savingsRate = income > 0 ? Number(((savings / income) * 100).toFixed(1)) : 0;
+      const totalExpenses = Number((recTotal + utilTotal + insForMonth + recurringTotal).toFixed(2));
+      const income = computeMonthIncomeFromList(str, allIncomes);
+      const savings = (income > 0 || totalExpenses > 0) ? Number((income - totalExpenses).toFixed(2)) : 0;
+      const savingsRate = income > 0 ? Number(((savings / income) * 100).toFixed(1)) : 0;
 
-    return {
-      month: str,
-      label,
-      income,
-      expenses: totalExpenses,
-      savings,
-      savings_rate: savingsRate,
-    };
-  });
+      return {
+        month: str,
+        label,
+        income,
+        expenses: totalExpenses,
+        savings,
+        savings_rate: savingsRate,
+      };
+    })
+    .filter((m) => m.income > 0 || m.expenses > 0);
 }
