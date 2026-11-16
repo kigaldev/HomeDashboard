@@ -46,28 +46,62 @@ export function getDbStatus(): DbStatus {
 }
 
 async function connect(): Promise<Db> {
-  const url = process.env.DATABASE_URL;
+  const rawUrl = process.env.DATABASE_URL;
 
   // 1. Conexión a Postgres gestionado (Supabase, Neon, Servidor doméstico)
-  if (url) {
+  if (rawUrl) {
     const { Pool } = await import("pg");
-    const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
+    const isLocal = rawUrl.includes("localhost") || rawUrl.includes("127.0.0.1");
+
+    // Si es Supabase pooler o soporta pgbouncer, optimizar parámetros de conexión
+    let connString = rawUrl;
+    try {
+      if (rawUrl.includes("pooler.supabase.com")) {
+        const u = new URL(rawUrl);
+        // Desactivar prepared statements conflictivos con el pooler
+        if (!u.searchParams.has("pgbouncer")) {
+          u.searchParams.set("pgbouncer", "true");
+        }
+        connString = u.toString();
+      }
+    } catch {
+      connString = rawUrl;
+    }
+
     const pool = new Pool({
-      connectionString: url,
-      max: 8,
-      idleTimeoutMillis: 10000,
+      connectionString: connString,
+      // Limitar pool a 2 conexiones para jamás sobrepasar el límite de pool_size (15) de Supabase
+      // incluso con múltiples pestañas o peticiones simultáneas
+      max: 2,
+      idleTimeoutMillis: 5000,
       ssl: isLocal ? false : { rejectUnauthorized: false },
-      connectionTimeoutMillis: 15000,
+      connectionTimeoutMillis: 10000,
     });
+
+    pool.on("error", (err) => {
+      console.warn("[db] Error en cliente inactivo del pool:", err.message);
+      setDbStatus({ lastError: err.message });
+    });
+
     setDbStatus({ mode: "postgres", hasDatabaseUrl: true, lastError: null });
 
     return {
       async query<T extends Row>(sql: string, params: unknown[] = []) {
-        const r = await pool.query(sql, params);
-        return r.rows as T[];
+        const client = await pool.connect();
+        try {
+          const r = await client.query(sql, params);
+          return r.rows as T[];
+        } finally {
+          client.release();
+        }
       },
       async exec(sql: string) {
-        await pool.query(sql);
+        const client = await pool.connect();
+        try {
+          await client.query(sql);
+        } finally {
+          client.release();
+        }
       },
     };
   }
