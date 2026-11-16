@@ -791,14 +791,14 @@ export async function updateReceiptItemCategory(itemId: number, newCategory: str
 export type MonthlyExpenses = {
   current_month_total: number;
   last_month_total: number;
-  receipts_total: number;
-  utilities_total: number;
-  insurances_total: number;
-  recurring_total: number;
-  current_month_income: number;
-  last_month_income: number;
-  net_savings: number;
-  savings_rate: number;
+  receipts_total?: number;
+  utilities_total?: number;
+  insurances_total?: number;
+  recurring_total?: number;
+  current_month_income?: number;
+  last_month_income?: number;
+  net_savings?: number;
+  savings_rate?: number;
   by_store: { store_name: string; color: string; total: number; count: number }[];
   by_category: { category: string; total: number; percentage: number }[];
   items?: ReceiptItemMonthly[];

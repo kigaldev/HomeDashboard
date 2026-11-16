@@ -548,10 +548,6 @@ export function DashboardClient({
               insurances={insurances}
               warranties={warranties}
               utilityBills={utilityBills}
-              recurringExpenses={recurringExpenses}
-              monthlyIncomes={monthlyIncomes}
-              incomeEvolution={incomeEvolution}
-              members={members}
             />
           </div>
         </div>
