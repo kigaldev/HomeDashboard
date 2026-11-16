@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { handleBotMessage, handleBotPhoto, handleBotDocument } from "@/lib/bot";
+import { q } from "@/lib/db";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ALLOWED = (process.env.TELEGRAM_ALLOWED_USERS || "")
@@ -158,8 +159,22 @@ export async function POST(req: Request) {
     // 3. Texto o Comandos de JARVIS
     if (msg.text) {
       await tgSendAction(chatId, "typing");
-      const reply = await handleBotMessage(msg.text, fromId);
+      let reply = "";
+      try {
+        reply = await handleBotMessage(msg.text, fromId);
+      } catch (err: any) {
+        reply = `❌ Error procesando mensaje: ${err?.message || "Error desconocido"}`;
+      }
       await tgSend(chatId, reply);
+      
+      // Registrar en log para diagnóstico
+      try {
+        await q(
+          `insert into telegram_logs (update_id, chat_id, from_user, message_text, reply_text) values ($1, $2, $3, $4, $5)`,
+          [update?.update_id || null, String(chatId), fromId, msg.text, reply.slice(0, 500)]
+        );
+      } catch {}
+
       try {
         revalidatePath("/");
       } catch {}
