@@ -37,6 +37,7 @@ import { getSchoolCommuteTraffic } from "@/lib/traffic";
 import { syncMontessoriMenu } from "@/lib/schoolMenu";
 import { generateBriefing } from "@/lib/briefing";
 import { getActiveMemberId } from "@/lib/session";
+import { getDbStatus } from "@/lib/db";
 import { DashboardClient } from "@/components/DashboardClient";
 
 export default async function HomePage() {
@@ -173,6 +174,7 @@ export default async function HomePage() {
       news={news}
       traffic={traffic}
       pantryNeedsInventory={pantryNeedsInventory}
+      dbStatus={getDbStatus()}
     />
   );
 }

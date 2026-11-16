@@ -15,7 +15,35 @@ interface Db {
   exec(sql: string): Promise<void>;
 }
 
-const g = globalThis as unknown as { __hdDb?: Promise<Db> };
+export interface DbStatus {
+  mode: "postgres" | "pglite-local" | "pglite-memory" | "stub" | "unknown";
+  hasDatabaseUrl: boolean;
+  lastError: string | null;
+}
+
+const g = globalThis as unknown as {
+  __hdDb?: Promise<Db>;
+  __hdDbStatus?: DbStatus;
+};
+
+function setDbStatus(partial: Partial<DbStatus>) {
+  g.__hdDbStatus = {
+    mode: g.__hdDbStatus?.mode ?? "unknown",
+    hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+    lastError: g.__hdDbStatus?.lastError ?? null,
+    ...partial,
+  };
+}
+
+export function getDbStatus(): DbStatus {
+  return (
+    g.__hdDbStatus ?? {
+      mode: "unknown",
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+      lastError: null,
+    }
+  );
+}
 
 async function connect(): Promise<Db> {
   const url = process.env.DATABASE_URL;
@@ -26,11 +54,12 @@ async function connect(): Promise<Db> {
     const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
     const pool = new Pool({
       connectionString: url,
-      max: 20,
+      max: 8,
       idleTimeoutMillis: 10000,
       ssl: isLocal ? false : { rejectUnauthorized: false },
       connectionTimeoutMillis: 15000,
     });
+    setDbStatus({ mode: "postgres", hasDatabaseUrl: true, lastError: null });
 
     return {
       async query<T extends Row>(sql: string, params: unknown[] = []) {
@@ -52,10 +81,12 @@ async function connect(): Promise<Db> {
     if (isVercel) {
       // En serverless de Vercel, iniciar en memoria
       pg = await PGlite.create();
+      setDbStatus({ mode: "pglite-memory", hasDatabaseUrl: false });
     } else {
       const dir = path.join(process.cwd(), ".data", "pglite");
       fs.mkdirSync(dir, { recursive: true });
       pg = await PGlite.create(dir);
+      setDbStatus({ mode: "pglite-local", hasDatabaseUrl: false });
     }
 
     return {
@@ -69,6 +100,11 @@ async function connect(): Promise<Db> {
     };
   } catch (err) {
     console.warn("[db] PGlite no disponible o falló en serverless:", err);
+    setDbStatus({
+      mode: "stub",
+      hasDatabaseUrl: false,
+      lastError: err instanceof Error ? err.message : String(err),
+    });
     // Retornar un stub básico para evitar que la aplicación caiga en 500
     return {
       async query<T extends Row>(_sql: string, _params: unknown[] = []) {
@@ -82,14 +118,36 @@ async function connect(): Promise<Db> {
 async function init(): Promise<Db> {
   const db = await connect();
   try {
-    await db.exec(SCHEMA_SQL);
-    const res = await db.query<{ n: number }>("select count(*)::int as n from stores");
-    const n = res[0]?.n ?? 0;
-    if (n === 0) {
-      await db.exec(SEED_SQL);
+    // Fast-path: en arranques fríos (especialmente serverless/pooler) evitar ejecutar ALTER TABLE si el esquema ya existe
+    let needsSchema = true;
+    try {
+      const [check] = await db.query<{
+        has_incomes: string | null;
+        has_recurring: string | null;
+        stores_count: number;
+      }>(
+        `select to_regclass('public.monthly_incomes')::text as has_incomes,
+                to_regclass('public.recurring_expenses')::text as has_recurring,
+                (select count(*)::int from stores) as stores_count`
+      );
+      if (check?.has_incomes && check?.has_recurring && (check?.stores_count ?? 0) > 0) {
+        needsSchema = false;
+      }
+    } catch {
+      needsSchema = true;
+    }
+
+    if (needsSchema) {
+      await db.exec(SCHEMA_SQL);
+      const res = await db.query<{ n: number }>("select count(*)::int as n from stores");
+      const n = res[0]?.n ?? 0;
+      if (n === 0) {
+        await db.exec(SEED_SQL);
+      }
     }
   } catch (err) {
     console.warn("[db] Error aplicando esquema o semillas:", err);
+    setDbStatus({ lastError: err instanceof Error ? err.message : String(err) });
   }
   return db;
 }
@@ -115,6 +173,7 @@ export async function q<T extends Row = Row>(sql: string, params: unknown[] = []
       return q<T>(sql, params, retries - 1);
     }
     console.error(`[db] Error ejecutando consulta SQL: ${sql.slice(0, 80)}`, err);
+    setDbStatus({ lastError: err instanceof Error ? err.message : String(err) });
     return [];
   }
 }

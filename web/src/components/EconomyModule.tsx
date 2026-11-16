@@ -11,6 +11,10 @@ import type {
   Warranty,
   UtilityBill,
   MonthlyExpenses,
+  RecurringExpense,
+  MonthlyIncome,
+  MonthlyEvolutionItem,
+  Member,
 } from "@/lib/repo";
 import type { DayWeather } from "@/lib/weather";
 import type { ReceiptReconciliationResult } from "@/lib/receiptShared";
@@ -29,7 +33,10 @@ import {
   deleteWarrantyAction,
   deleteReceiptAction,
   deleteUtilityBillAction,
+  toggleRecurringExpenseActiveAction,
+  deleteRecurringExpenseAction,
   updateReceiptItemCategoryAction,
+  deleteMonthlyIncomeAction,
 } from "@/app/actions";
 import {
   IconEconomy,
@@ -45,6 +52,7 @@ import {
 import { TicketManagerModal } from "./TicketManagerModal";
 import { ManualExpenseModal } from "./ManualExpenseModal";
 import { ManualUtilityBillModal } from "./ManualUtilityBillModal";
+import { IncomeModal } from "./IncomeModal";
 import { DocumentViewerModal } from "./DocumentViewerModal";
 import { CategoryDonutChart, MonthCompareChart } from "./ChartsLazy";
 
@@ -69,6 +77,11 @@ export function EconomyModule({
     receipts_total: 0,
     utilities_total: 0,
     insurances_total: 0,
+    recurring_total: 0,
+    current_month_income: 0,
+    last_month_income: 0,
+    net_savings: 0,
+    savings_rate: 0,
     by_store: [],
     by_category: [],
     items: [],
@@ -80,6 +93,11 @@ export function EconomyModule({
   insurances = [],
   warranties = [],
   utilityBills = [],
+  recurringExpenses = [],
+  monthlyIncomes = [],
+  incomeEvolution = [],
+  members = [],
+  dbStatus,
 }: {
   receipts: Receipt[];
   perishables: PerishableAlert[];
@@ -91,8 +109,14 @@ export function EconomyModule({
   insurances: FamilyInsurance[];
   warranties: Warranty[];
   utilityBills?: UtilityBill[];
+  recurringExpenses?: RecurringExpense[];
+  monthlyIncomes?: MonthlyIncome[];
+  incomeEvolution?: MonthlyEvolutionItem[];
+  members?: Member[];
+  dbStatus?: { mode: string; hasDatabaseUrl: boolean; lastError: string | null };
 }) {
-  const [activeTab, setActiveTab] = useState<"balance" | "energy" | "insurances" | "warranties" | "scan" | "perishables">("balance");
+  const [activeTab, setActiveTab] = useState<"balance" | "incomes" | "energy" | "recurring" | "insurances" | "warranties" | "scan" | "perishables">("balance");
+  const [manualExpenseType, setManualExpenseType] = useState<"supermarket" | "general" | "recurring">("supermarket");
   const [isPending, startTransition] = useTransition();
 
   // Estados interactivos para Categorías y Drag & Drop
@@ -196,6 +220,8 @@ export function EconomyModule({
   // Estados para Escáner de Tickets y Gastos Manuales
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [isManualExpenseOpen, setIsManualExpenseOpen] = useState(false);
+  const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState(() => new Date().toISOString().slice(0, 7));
   const [ticketFilter, setTicketFilter] = useState<"all" | "with_ticket" | "manual" | "supermarket">("all");
   const [showScanner, setShowScanner] = useState(false);
   const [rawInput, setRawInput] = useState("");
@@ -228,6 +254,14 @@ export function EconomyModule({
   const diffPercent = monthlyExpenses.last_month_total > 0
     ? ((diffMonth / monthlyExpenses.last_month_total) * 100).toFixed(1)
     : "0.0";
+
+  // Cálculos de ingresos familiares y ahorro neto
+  const currentIncome = monthlyExpenses.current_month_income ?? 0;
+  const lastIncome = monthlyExpenses.last_month_income ?? 0;
+  const diffIncome = currentIncome - lastIncome;
+  const diffIncomePercent = lastIncome > 0 ? ((diffIncome / lastIncome) * 100).toFixed(1) : null;
+  const netSavings = monthlyExpenses.net_savings ?? (currentIncome - monthlyExpenses.current_month_total);
+  const savingsRate = monthlyExpenses.savings_rate ?? (currentIncome > 0 ? (netSavings / currentIncome) * 100 : 0);
 
   // Total anual de seguros
   const totalAnnualInsurance = insurances.reduce((acc, curr) => acc + (curr.active ? curr.annual_cost : 0), 0);
@@ -362,6 +396,21 @@ export function EconomyModule({
 
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
             <button
+              onClick={() => setIsIncomeModalOpen(true)}
+              className="btn-secondary"
+              style={{
+                fontSize: "0.82rem",
+                padding: "0.45rem 0.95rem",
+                gap: "0.4rem",
+                border: "1px solid rgba(48, 209, 88, 0.4)",
+                color: "#30d158",
+                background: "rgba(48, 209, 88, 0.08)",
+              }}
+            >
+              <IconPlus size={14} />
+              <span>Registrar Ingreso</span>
+            </button>
+            <button
               onClick={() => setIsManualExpenseOpen(true)}
               className="btn-secondary"
               style={{ fontSize: "0.82rem", padding: "0.45rem 0.95rem", gap: "0.4rem" }}
@@ -380,22 +429,79 @@ export function EconomyModule({
           </div>
         </div>
 
+        {/* ── Aviso de Diagnóstico de Base de Datos (si no está en Postgres o hubo error) ── */}
+        {dbStatus && (dbStatus.mode !== "postgres" || dbStatus.lastError) && (
+          <div
+            style={{
+              marginTop: "1rem",
+              padding: "0.75rem 1rem",
+              borderRadius: "var(--radius-md)",
+              background: "rgba(255, 69, 58, 0.12)",
+              border: "1px solid rgba(255, 69, 58, 0.35)",
+              fontSize: "0.8rem",
+              color: "#ff9f99",
+              lineHeight: 1.45,
+            }}
+          >
+            <strong>⚠️ Alerta de conexión a base de datos ({dbStatus.mode}):</strong>{" "}
+            {!dbStatus.hasDatabaseUrl
+              ? "Falta la variable de entorno DATABASE_URL en este servidor (por ejemplo en Vercel). Se está usando una base temporal vacía en lugar de Supabase."
+              : dbStatus.lastError
+              ? `Error consultando Supabase: ${dbStatus.lastError}`
+              : "No se pudo conectar con Supabase."}
+          </div>
+        )}
+
         {/* ── Métricas Clave de Alto Nivel ── */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
             gap: "0.85rem",
             marginTop: "1.25rem",
           }}
         >
-          {/* Gasto Mes Actual */}
+          {/* Ingreso Mensual Familiar */}
           <div
+            onClick={() => setActiveTab("incomes")}
             style={{
               padding: "1rem",
               borderRadius: "var(--radius-lg)",
               background: "var(--apple-surface-secondary)",
               border: "1px solid var(--apple-border)",
+              cursor: "pointer",
+              transition: "transform 0.15s ease",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
+                Ingresos del Mes
+              </span>
+              <span style={{ fontSize: "0.7rem", padding: "0.1rem 0.45rem", borderRadius: "var(--radius-full)", background: "rgba(48, 209, 88, 0.15)", color: "#30d158", fontWeight: 700 }}>
+                Nóminas
+              </span>
+            </div>
+            <div style={{ fontSize: "1.6rem", fontWeight: 800, letterSpacing: "-0.03em", marginTop: "0.3rem", color: currentIncome > 0 ? "#30d158" : "var(--apple-text)" }}>
+              {currentIncome.toFixed(2)} €
+            </div>
+            <div style={{ fontSize: "0.76rem", color: diffIncome >= 0 ? "var(--apple-green)" : "var(--apple-orange)", marginTop: "0.2rem", fontWeight: 600 }}>
+              {diffIncomePercent ? (
+                diffIncome >= 0 ? `▲ +${diffIncome.toFixed(0)} € (+${diffIncomePercent}%) vs mes ant.` : `▼ ${diffIncome.toFixed(0)} € (${diffIncomePercent}%) vs mes ant.`
+              ) : (
+                monthlyIncomes.length > 0 ? `${monthlyIncomes.length} fuentes activas` : "Pulsa para registrar nómina"
+              )}
+            </div>
+          </div>
+
+          {/* Gasto Mes Actual */}
+          <div
+            onClick={() => setActiveTab("balance")}
+            style={{
+              padding: "1rem",
+              borderRadius: "var(--radius-lg)",
+              background: "var(--apple-surface-secondary)",
+              border: "1px solid var(--apple-border)",
+              cursor: "pointer",
             }}
           >
             <div style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
@@ -409,26 +515,78 @@ export function EconomyModule({
             </div>
             {(monthlyExpenses.receipts_total !== undefined || monthlyExpenses.utilities_total !== undefined) && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginTop: "0.45rem", fontSize: "0.71rem", color: "var(--apple-text-secondary)" }}>
-                <span>🛒 Compras: {(monthlyExpenses.receipts_total ?? 0).toFixed(0)} €</span>
+                <span>🛒 {(monthlyExpenses.receipts_total ?? 0).toFixed(0)} €</span>
                 <span>·</span>
-                <span>💡 Suministros: {(monthlyExpenses.utilities_total ?? 0).toFixed(0)} €</span>
+                <span>💡 {(monthlyExpenses.utilities_total ?? 0).toFixed(0)} €</span>
+                {Boolean(monthlyExpenses.recurring_total && monthlyExpenses.recurring_total > 0) && (
+                  <>
+                    <span>·</span>
+                    <span>🔄 {(monthlyExpenses.recurring_total ?? 0).toFixed(0)} €</span>
+                  </>
+                )}
                 {Boolean(monthlyExpenses.insurances_total && monthlyExpenses.insurances_total > 0) && (
                   <>
                     <span>·</span>
-                    <span>🛡️ Seguros: {(monthlyExpenses.insurances_total ?? 0).toFixed(0)} €</span>
+                    <span>🛡️ {(monthlyExpenses.insurances_total ?? 0).toFixed(0)} €</span>
                   </>
                 )}
               </div>
             )}
           </div>
 
-          {/* Suministros Naturgy */}
+          {/* Balance Neto / Ahorro */}
           <div
+            onClick={() => setActiveTab("balance")}
             style={{
               padding: "1rem",
               borderRadius: "var(--radius-lg)",
               background: "var(--apple-surface-secondary)",
               border: "1px solid var(--apple-border)",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
+                Ahorro Neto / Balance
+              </span>
+              <span
+                style={{
+                  fontSize: "0.7rem",
+                  padding: "0.1rem 0.45rem",
+                  borderRadius: "var(--radius-full)",
+                  background: netSavings >= 0 ? "rgba(48, 209, 88, 0.15)" : "rgba(255, 69, 58, 0.15)",
+                  color: netSavings >= 0 ? "#30d158" : "var(--apple-red)",
+                  fontWeight: 700,
+                }}
+              >
+                {netSavings >= 0 ? "Superávit" : "Déficit"}
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: "1.6rem",
+                fontWeight: 800,
+                letterSpacing: "-0.03em",
+                marginTop: "0.3rem",
+                color: netSavings >= 0 ? "#30d158" : "var(--apple-red)",
+              }}
+            >
+              {netSavings >= 0 ? "+" : ""}{netSavings.toFixed(2)} €
+            </div>
+            <div style={{ fontSize: "0.76rem", color: netSavings >= 0 ? "var(--apple-green)" : "var(--apple-red)", marginTop: "0.2rem", fontWeight: 600 }}>
+              {currentIncome > 0 ? `Tasa de ahorro: ${savingsRate.toFixed(1)}%` : "Requiere ingresos del mes"}
+            </div>
+          </div>
+
+          {/* Suministros Naturgy */}
+          <div
+            onClick={() => setActiveTab("energy")}
+            style={{
+              padding: "1rem",
+              borderRadius: "var(--radius-lg)",
+              background: "var(--apple-surface-secondary)",
+              border: "1px solid var(--apple-border)",
+              cursor: "pointer",
             }}
           >
             <div style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
@@ -449,11 +607,13 @@ export function EconomyModule({
 
           {/* Cobertura de Seguros */}
           <div
+            onClick={() => setActiveTab("insurances")}
             style={{
               padding: "1rem",
               borderRadius: "var(--radius-lg)",
               background: "var(--apple-surface-secondary)",
               border: "1px solid var(--apple-border)",
+              cursor: "pointer",
             }}
           >
             <div style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
@@ -467,23 +627,25 @@ export function EconomyModule({
             </div>
           </div>
 
-          {/* Bienes en Garantía */}
+          {/* Garantías Legales */}
           <div
+            onClick={() => setActiveTab("warranties")}
             style={{
               padding: "1rem",
               borderRadius: "var(--radius-lg)",
               background: "var(--apple-surface-secondary)",
               border: "1px solid var(--apple-border)",
+              cursor: "pointer",
             }}
           >
             <div style={{ fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
               Garantías Legales
             </div>
             <div style={{ fontSize: "1.3rem", fontWeight: 800, letterSpacing: "-0.02em", marginTop: "0.3rem", color: "var(--apple-text)" }}>
-              {warranties.length} artículos
+              {warranties.filter((w) => w.status === "vigente").length} vigentes
             </div>
             <div style={{ fontSize: "0.76rem", color: "var(--apple-green)", marginTop: "0.2rem", fontWeight: 600 }}>
-              100% de tickets y compras cubiertas
+              {warranties.length} productos protegidos
             </div>
           </div>
         </div>
@@ -510,11 +672,27 @@ export function EconomyModule({
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab("incomes")}
+            className={`tab-btn ${activeTab === "incomes" ? "active" : ""}`}
+            style={{ fontSize: "0.82rem", padding: "0.4rem 0.95rem" }}
+          >
+            Ingresos & Nóminas ({monthlyIncomes.length})
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab("energy")}
             className={`tab-btn ${activeTab === "energy" ? "active" : ""}`}
             style={{ fontSize: "0.82rem", padding: "0.4rem 0.95rem" }}
           >
             Suministros & Energía
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("recurring")}
+            className={`tab-btn ${activeTab === "recurring" ? "active" : ""}`}
+            style={{ fontSize: "0.82rem", padding: "0.4rem 0.95rem" }}
+          >
+            Gastos Fijos & Hipoteca ({recurringExpenses.length})
           </button>
           <button
             type="button"
@@ -555,6 +733,202 @@ export function EconomyModule({
       {/* ── VISTA 1: BALANCE & GASTOS ── */}
       {activeTab === "balance" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {/* ── Evolución y Balance Financiero Mensual ── */}
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem", marginBottom: "1rem" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
+                    📊 Evolución Financiera & Tasa de Ahorro
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: "0.72rem",
+                      padding: "0.15rem 0.55rem",
+                      borderRadius: "var(--radius-full)",
+                      background: "rgba(48, 209, 88, 0.12)",
+                      color: "#30d158",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Balance Familiar
+                  </span>
+                </div>
+                <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.2rem" }}>
+                  Comparativa de ingresos netos vs gastos totales y evolución histórica mes a mes
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsIncomeModalOpen(true)}
+                  className="btn-secondary"
+                  style={{
+                    fontSize: "0.78rem",
+                    padding: "0.35rem 0.75rem",
+                    gap: "0.35rem",
+                    border: "1px solid rgba(48, 209, 88, 0.4)",
+                    color: "#30d158",
+                  }}
+                >
+                  <IconPlus size={13} />
+                  <span>Añadir Ingreso</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Barra de progreso / balance del mes actual */}
+            <div
+              style={{
+                padding: "1rem",
+                borderRadius: "var(--radius-lg)",
+                background: "var(--apple-surface-secondary)",
+                border: "1px solid var(--apple-border)",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                <div>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--apple-text-secondary)" }}>
+                    Mes en curso · Balance Neto
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "0.15rem" }}>
+                    <span style={{ fontSize: "1.35rem", fontWeight: 800, color: netSavings >= 0 ? "#30d158" : "var(--apple-red)" }}>
+                      {netSavings >= 0 ? "+" : ""}{netSavings.toFixed(2)} €
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.74rem",
+                        padding: "0.15rem 0.5rem",
+                        borderRadius: "var(--radius-full)",
+                        background: netSavings >= 0 ? "rgba(48, 209, 88, 0.15)" : "rgba(255, 69, 58, 0.15)",
+                        color: netSavings >= 0 ? "#30d158" : "var(--apple-red)",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {currentIncome > 0 ? `${savingsRate.toFixed(1)}% tasa ahorro` : "Sin ingresos registrados"}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "1rem", fontSize: "0.78rem" }}>
+                  <div>
+                    <span style={{ color: "var(--apple-text-secondary)" }}>Ingresos: </span>
+                    <strong style={{ color: "#30d158" }}>{currentIncome.toFixed(2)} €</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "var(--apple-text-secondary)" }}>Gastos: </span>
+                    <strong style={{ color: "var(--apple-text)" }}>{monthlyExpenses.current_month_total.toFixed(2)} €</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barra de progreso de gastos vs ahorro */}
+              {currentIncome > 0 ? (
+                <div style={{ width: "100%", height: "10px", background: "rgba(255,255,255,0.06)", borderRadius: "var(--radius-full)", overflow: "hidden", display: "flex" }}>
+                  <div
+                    style={{
+                      width: `${Math.min(100, Math.round((monthlyExpenses.current_month_total / currentIncome) * 100))}%`,
+                      height: "100%",
+                      background: monthlyExpenses.current_month_total > currentIncome ? "var(--apple-red)" : "var(--apple-blue)",
+                      transition: "width 0.4s ease",
+                    }}
+                    title={`Gastos: ${monthlyExpenses.current_month_total.toFixed(2)} €`}
+                  />
+                  {netSavings > 0 && (
+                    <div
+                      style={{
+                        width: `${Math.round((netSavings / currentIncome) * 100)}%`,
+                        height: "100%",
+                        background: "#30d158",
+                        transition: "width 0.4s ease",
+                      }}
+                      title={`Ahorro: ${netSavings.toFixed(2)} €`}
+                    />
+                  )}
+                </div>
+              ) : (
+                <div style={{ fontSize: "0.74rem", color: "var(--apple-orange)", marginTop: "0.3rem" }}>
+                  ⚠️ Registra los ingresos familiares del mes para calcular y visualizar la tasa de ahorro familiar.
+                </div>
+              )}
+            </div>
+
+            {/* Evolución Histórica de los últimos meses */}
+            {incomeEvolution.length > 0 && (
+              <div>
+                <div style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--apple-text-secondary)", marginBottom: "0.6rem" }}>
+                  Histórico Mensual Comparado (Últimos 6 Meses)
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+                  {incomeEvolution.map((item) => {
+                    const maxVal = Math.max(item.income, item.expenses, 1);
+                    const incWidth = Math.min(100, Math.round((item.income / maxVal) * 100));
+                    const expWidth = Math.min(100, Math.round((item.expenses / maxVal) * 100));
+
+                    return (
+                      <div
+                        key={item.month}
+                        style={{
+                          padding: "0.75rem 0.95rem",
+                          borderRadius: "var(--radius-md)",
+                          background: "var(--apple-surface-secondary)",
+                          border: "1px solid var(--apple-border)",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem", fontSize: "0.82rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <strong style={{ color: "var(--apple-text)" }}>{item.label}</strong>
+                            <span style={{ fontSize: "0.7rem", color: "var(--apple-text-tertiary)" }}>({item.month})</span>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", fontSize: "0.78rem" }}>
+                            <span>
+                              Ingresos: <strong style={{ color: "#30d158" }}>{item.income.toFixed(0)} €</strong>
+                            </span>
+                            <span>
+                              Gastos: <strong style={{ color: "var(--apple-text)" }}>{item.expenses.toFixed(0)} €</strong>
+                            </span>
+                            <span
+                              style={{
+                                fontWeight: 700,
+                                color: item.savings >= 0 ? "#30d158" : "var(--apple-red)",
+                              }}
+                            >
+                              {item.savings >= 0 ? "+" : ""}{item.savings.toFixed(0)} €
+                              {item.income > 0 && (
+                                <span style={{ fontSize: "0.7rem", fontWeight: 500, color: "var(--apple-text-secondary)", marginLeft: "0.25rem" }}>
+                                  ({item.savings_rate.toFixed(0)}%)
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Barras visuales comparativas */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <span style={{ fontSize: "0.68rem", width: "45px", color: "#30d158" }}>Ingreso</span>
+                            <div style={{ flex: 1, height: "5px", background: "rgba(255,255,255,0.05)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
+                              <div style={{ width: `${incWidth}%`, height: "100%", background: "#30d158", borderRadius: "var(--radius-full)" }} />
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <span style={{ fontSize: "0.68rem", width: "45px", color: "var(--apple-blue)" }}>Gasto</span>
+                            <div style={{ flex: 1, height: "5px", background: "rgba(255,255,255,0.05)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
+                              <div style={{ width: `${expWidth}%`, height: "100%", background: "var(--apple-blue)", borderRadius: "var(--radius-full)" }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Desglose por Comercios (Plegable) */}
           <div className="liquid-glass liquid-specular" style={{ padding: "1.15rem 1.35rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
@@ -964,6 +1338,257 @@ export function EconomyModule({
         </div>
       )}
 
+      {/* ── VISTA: INGRESOS & NÓMINAS FAMILIARES ── */}
+      {activeTab === "incomes" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {/* Cabecera de la sección */}
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>
+                    💼 Nóminas & Fuentes de Ingreso Familiar
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: "0.72rem",
+                      padding: "0.15rem 0.55rem",
+                      borderRadius: "var(--radius-full)",
+                      background: "rgba(48, 209, 88, 0.15)",
+                      color: "#30d158",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {monthlyIncomes.length} fuentes
+                  </span>
+                </div>
+                <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.2rem" }}>
+                  Configuración de nóminas periódicas de Kike y Lara, pagas extraordinarias y rendimientos de ahorro.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsIncomeModalOpen(true)}
+                style={{
+                  background: "#30d158",
+                  color: "#000",
+                  fontWeight: 700,
+                  fontSize: "0.82rem",
+                  padding: "0.45rem 1rem",
+                  borderRadius: "var(--radius-md)",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+              >
+                <IconPlus size={14} />
+                <span>Registrar Nuevo Ingreso</span>
+              </button>
+            </div>
+
+            {/* Tarjetas resumen de ingresos */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "0.85rem",
+                marginTop: "1.25rem",
+              }}
+            >
+              <div style={{ padding: "0.9rem", borderRadius: "var(--radius-md)", background: "var(--apple-surface-secondary)", border: "1px solid var(--apple-border)" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", fontWeight: 700, textTransform: "uppercase" }}>
+                  Ingreso Total Este Mes
+                </span>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#30d158", marginTop: "0.2rem" }}>
+                  {currentIncome.toFixed(2)} €
+                </div>
+                <span style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)" }}>
+                  Base para cálculo de ahorro
+                </span>
+              </div>
+
+              <div style={{ padding: "0.9rem", borderRadius: "var(--radius-md)", background: "var(--apple-surface-secondary)", border: "1px solid var(--apple-border)" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", fontWeight: 700, textTransform: "uppercase" }}>
+                  Ingresos Mes Anterior
+                </span>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--apple-text)", marginTop: "0.2rem" }}>
+                  {lastIncome.toFixed(2)} €
+                </div>
+                <span style={{ fontSize: "0.72rem", color: diffIncome >= 0 ? "var(--apple-green)" : "var(--apple-orange)" }}>
+                  {diffIncomePercent ? `${diffIncome >= 0 ? "+" : ""}${diffIncomePercent}% vs mes anterior` : "Mes previo"}
+                </span>
+              </div>
+
+              <div style={{ padding: "0.9rem", borderRadius: "var(--radius-md)", background: "var(--apple-surface-secondary)", border: "1px solid var(--apple-border)" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)", fontWeight: 700, textTransform: "uppercase" }}>
+                  Ahorro Neto Previsto
+                </span>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: netSavings >= 0 ? "#30d158" : "var(--apple-red)", marginTop: "0.2rem" }}>
+                  {netSavings >= 0 ? "+" : ""}{netSavings.toFixed(2)} €
+                </div>
+                <span style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)" }}>
+                  Tras cubrir {monthlyExpenses.current_month_total.toFixed(0)} € de gastos
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Listado de Ingresos */}
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
+            <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--apple-text)", marginBottom: "0.85rem" }}>
+              Registros de Ingresos Familiares ({monthlyIncomes.length})
+            </div>
+
+            {monthlyIncomes.length === 0 ? (
+              <div style={{ padding: "2.5rem 1.5rem", textAlign: "center" }}>
+                <span style={{ fontSize: "2.5rem" }}>💼</span>
+                <h4 style={{ fontSize: "1.05rem", fontWeight: 700, marginTop: "0.75rem", marginBottom: "0.35rem" }}>
+                  Aún no hay ingresos registrados
+                </h4>
+                <p style={{ fontSize: "0.8rem", color: "var(--apple-text-secondary)", maxWidth: "420px", margin: "0 auto 1.25rem" }}>
+                  Registra la nómina de Kike, la de Lara o cualquier otro ingreso familiar para activar la comparativa y el cálculo de ahorro en tiempo real.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsIncomeModalOpen(true)}
+                  style={{
+                    background: "#30d158",
+                    color: "#000",
+                    fontWeight: 700,
+                    fontSize: "0.85rem",
+                    padding: "0.55rem 1.25rem",
+                    borderRadius: "var(--radius-md)",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                  }}
+                >
+                  <IconPlus size={15} />
+                  <span>Registrar Primera Nómina</span>
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {monthlyIncomes.map((inc) => (
+                  <div
+                    key={inc.id}
+                    style={{
+                      padding: "1rem",
+                      borderRadius: "var(--radius-md)",
+                      background: "var(--apple-surface-secondary)",
+                      border: "1px solid var(--apple-border)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: "0.75rem",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <div
+                        style={{
+                          width: "2.5rem",
+                          height: "2.5rem",
+                          borderRadius: "0.6rem",
+                          background: "rgba(48, 209, 88, 0.15)",
+                          color: "#30d158",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "1.2rem",
+                        }}
+                      >
+                        💼
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <strong style={{ fontSize: "0.95rem", color: "var(--apple-text)" }}>
+                            {inc.source}
+                          </strong>
+                          {inc.member_name && (
+                            <span
+                              style={{
+                                fontSize: "0.7rem",
+                                padding: "0.1rem 0.5rem",
+                                borderRadius: "var(--radius-full)",
+                                background: "rgba(0, 113, 227, 0.12)",
+                                color: "var(--apple-blue)",
+                                fontWeight: 600,
+                              }}
+                            >
+                              👤 {inc.member_name}
+                            </span>
+                          )}
+                          {inc.is_recurring && (
+                            <span
+                              style={{
+                                fontSize: "0.7rem",
+                                padding: "0.1rem 0.5rem",
+                                borderRadius: "var(--radius-full)",
+                                background: "rgba(48, 209, 88, 0.12)",
+                                color: "#30d158",
+                                fontWeight: 600,
+                              }}
+                            >
+                              🔄 Mensual
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem", display: "flex", gap: "0.5rem" }}>
+                          <span>Mes: <strong>{inc.month}</strong></span>
+                          {inc.notes && <span>· {inc.notes}</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#30d158" }}>
+                          +{inc.amount.toFixed(2)} €
+                        </div>
+                        <span style={{ fontSize: "0.7rem", color: "var(--apple-text-tertiary)" }}>
+                          Neto percibido
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`¿Eliminar el registro de ingreso "${inc.source}"?`)) {
+                            startTransition(async () => {
+                              await deleteMonthlyIncomeAction(inc.id);
+                            });
+                          }
+                        }}
+                        className="btn-ghost"
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "50%",
+                          padding: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "var(--apple-text-tertiary)",
+                        }}
+                        title="Eliminar ingreso"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── VISTA 2: SUMINISTROS & ENERGÍA (NATURGY) ── */}
       {activeTab === "energy" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
@@ -1328,7 +1953,275 @@ export function EconomyModule({
         </div>
       )}
 
-      {/* ── VISTA 3: PÓLIZAS & SEGUROS ── */}
+      {/* ── VISTA 3: GASTOS FIJOS, HIPOTECA & INVERSIONES ── */}
+      {activeTab === "recurring" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.15rem", flexWrap: "wrap", gap: "0.75rem" }}>
+              <div>
+                <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
+                  Gastos Fijos, Hipoteca & Inversiones Periódicas
+                </h3>
+                <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.15rem" }}>
+                  Compromisos recurrentes (hipoteca, inversiones, cuota de comunidad...) que se contabilizan automáticamente cada mes.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setManualExpenseType("recurring");
+                  setIsManualExpenseOpen(true);
+                }}
+                className="btn-primary"
+                style={{ fontSize: "0.8rem", padding: "0.45rem 1rem", gap: "0.35rem" }}
+              >
+                <IconPlus size={14} />
+                <span>Añadir Gasto Fijo</span>
+              </button>
+            </div>
+
+            {/* Tarjeta de Resumen de Compromiso Fijo */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "0.85rem",
+                marginBottom: "1.25rem",
+              }}
+            >
+              <div
+                style={{
+                  padding: "1rem",
+                  borderRadius: "var(--radius-lg)",
+                  background: "var(--apple-surface-secondary)",
+                  border: "1px solid var(--apple-border)",
+                }}
+              >
+                <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
+                  Total Compromiso Mensual Fijo
+                </div>
+                <div style={{ fontSize: "1.45rem", fontWeight: 800, color: "var(--apple-text)", marginTop: "0.25rem" }}>
+                  {(recurringExpenses ?? [])
+                    .filter((r) => r.active)
+                    .reduce((acc, r) => {
+                      const amt = r.amount || 0;
+                      if (r.frequency === "2_plazos") return acc + (amt * 2) / 12;
+                      if (r.frequency === "3_plazos") return acc + (amt * 3) / 12;
+                      if (r.frequency === "trimestral") return acc + (amt * 4) / 12;
+                      if (r.frequency === "anual") return acc + amt / 12;
+                      return acc + amt;
+                    }, 0)
+                    .toFixed(2)}{" "}
+                  € <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--apple-text-secondary)" }}>/ mes</span>
+                </div>
+                <div style={{ fontSize: "0.74rem", color: "var(--apple-green)", marginTop: "0.2rem", fontWeight: 600 }}>
+                  ✓ Se suma de forma automática a los totales y gráficos mensuales
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "1rem",
+                  borderRadius: "var(--radius-lg)",
+                  background: "var(--apple-surface-secondary)",
+                  border: "1px solid var(--apple-border)",
+                }}
+              >
+                <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--apple-text-secondary)" }}>
+                  Gastos Fijos Activos
+                </div>
+                <div style={{ fontSize: "1.45rem", fontWeight: 800, color: "var(--apple-text)", marginTop: "0.25rem" }}>
+                  {(recurringExpenses ?? []).filter((r) => r.active).length}{" "}
+                  <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--apple-text-secondary)" }}>de {(recurringExpenses ?? []).length} registrados</span>
+                </div>
+                <div style={{ fontSize: "0.74rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
+                  Puedes pausar o reactivar cualquier cuota en cualquier momento
+                </div>
+              </div>
+            </div>
+
+            {/* Listado de Gastos Fijos */}
+            {(!recurringExpenses || recurringExpenses.length === 0) ? (
+              <div
+                style={{
+                  padding: "2.5rem 1.5rem",
+                  textAlign: "center",
+                  borderRadius: "var(--radius-lg)",
+                  background: "rgba(255, 255, 255, 0.02)",
+                  border: "1px dashed var(--apple-border)",
+                }}
+              >
+                <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🏠 📈 🏢</div>
+                <h4 style={{ fontSize: "0.95rem", fontWeight: 700, margin: 0, color: "var(--apple-text)" }}>
+                  No tienes gastos fijos periódicos registrados todavía
+                </h4>
+                <p style={{ fontSize: "0.82rem", color: "var(--apple-text-secondary)", margin: "0.4rem 0 1rem 0" }}>
+                  Añade aquí la hipoteca, aportaciones a fondos de inversión, cuota de la comunidad, seguro de moto o coche fraccionado, etc., y se contabilizarán automáticamente a partir del mes que indiques.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManualExpenseType("recurring");
+                    setIsManualExpenseOpen(true);
+                  }}
+                  className="btn-primary"
+                  style={{ fontSize: "0.82rem", padding: "0.5rem 1.15rem", gap: "0.35rem" }}
+                >
+                  <IconPlus size={14} />
+                  <span>Añadir Primer Gasto Fijo</span>
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {recurringExpenses.map((rec) => {
+                  let freqDesc = "Cobro mensual";
+                  let monthlyEquivalent = rec.amount;
+                  if (rec.frequency === "2_plazos") {
+                    freqDesc = `Fraccionado en 2 mensualidades (${rec.amount.toFixed(2)} €/cuota)`;
+                    monthlyEquivalent = (rec.amount * 2) / 12;
+                  } else if (rec.frequency === "3_plazos") {
+                    freqDesc = `Fraccionado en 3 mensualidades (${rec.amount.toFixed(2)} €/cuota)`;
+                    monthlyEquivalent = (rec.amount * 3) / 12;
+                  } else if (rec.frequency === "trimestral") {
+                    freqDesc = `Trimestral (${rec.amount.toFixed(2)} €/cuota)`;
+                    monthlyEquivalent = (rec.amount * 4) / 12;
+                  } else if (rec.frequency === "anual") {
+                    freqDesc = `Pago único anual (${rec.amount.toFixed(2)} €/año)`;
+                    monthlyEquivalent = rec.amount / 12;
+                  }
+
+                  const categoryEmoji =
+                    rec.category.includes("Hipoteca") || rec.category.includes("Vivienda")
+                      ? "🏠"
+                      : rec.category.includes("Inversión") || rec.category.includes("Ahorro")
+                      ? "📈"
+                      : rec.category.includes("Comunidad")
+                      ? "🏢"
+                      : rec.category.includes("Colegio") || rec.category.includes("Educación")
+                      ? "🎓"
+                      : rec.category.includes("Seguro")
+                      ? "🏍️"
+                      : rec.category.includes("Suscripción")
+                      ? "💳"
+                      : "🔄";
+
+                  return (
+                    <div
+                      key={rec.id}
+                      style={{
+                        padding: "1rem 1.2rem",
+                        borderRadius: "var(--radius-lg)",
+                        background: rec.active ? "var(--apple-surface-secondary)" : "rgba(255, 255, 255, 0.02)",
+                        border: "1px solid var(--apple-border)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "0.85rem",
+                        opacity: rec.active ? 1 : 0.6,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                        <div
+                          style={{
+                            width: "2.4rem",
+                            height: "2.4rem",
+                            borderRadius: "0.65rem",
+                            background: "rgba(94, 92, 230, 0.15)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "1.25rem",
+                          }}
+                        >
+                          {categoryEmoji}
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                            <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--apple-text)" }}>
+                              {rec.title}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "0.68rem",
+                                fontWeight: 600,
+                                padding: "0.15rem 0.5rem",
+                                borderRadius: "var(--radius-full)",
+                                background: "rgba(94, 92, 230, 0.15)",
+                                color: "#af52de",
+                              }}
+                            >
+                              {rec.category}
+                            </span>
+                            {!rec.active && (
+                              <span
+                                style={{
+                                  fontSize: "0.68rem",
+                                  fontWeight: 600,
+                                  padding: "0.15rem 0.5rem",
+                                  borderRadius: "var(--radius-full)",
+                                  background: "rgba(255, 255, 255, 0.1)",
+                                  color: "var(--apple-text-tertiary)",
+                                }}
+                              >
+                                Pausado
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.25rem" }}>
+                            {rec.provider && <strong>{rec.provider} · </strong>}
+                            {freqDesc} · Desde: {rec.start_month}
+                            {rec.day_of_month ? ` (día ${rec.day_of_month})` : ""}
+                          </div>
+                          {rec.notes && (
+                            <div style={{ fontSize: "0.72rem", color: "var(--apple-text-tertiary)", marginTop: "0.2rem" }}>
+                              {rec.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--apple-text)" }}>
+                            {rec.amount.toFixed(2)} €
+                          </div>
+                          <div style={{ fontSize: "0.72rem", color: "var(--apple-text-secondary)" }}>
+                            {rec.frequency === "mensual" ? "/ mes" : `~${monthlyEquivalent.toFixed(2)} €/mes`}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "0.35rem" }}>
+                          <button
+                            type="button"
+                            onClick={() => startTransition(() => toggleRecurringExpenseActiveAction(rec.id))}
+                            className="btn-secondary"
+                            style={{ fontSize: "0.74rem", padding: "0.3rem 0.65rem" }}
+                            title={rec.active ? "Pausar gasto" : "Reactivar gasto"}
+                          >
+                            {rec.active ? "Pausar" : "Activar"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => startTransition(() => deleteRecurringExpenseAction(rec.id))}
+                            className="btn-ghost"
+                            style={{ width: "28px", height: "28px", borderRadius: "50%", padding: 0, justifyContent: "center", color: "var(--apple-text-tertiary)" }}
+                            title="Eliminar gasto periódico"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── VISTA 4: PÓLIZAS & SEGUROS ── */}
       {activeTab === "insurances" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <div className="liquid-glass liquid-specular" style={{ padding: "1.35rem" }}>
@@ -1338,7 +2231,7 @@ export function EconomyModule({
                   Pólizas de Seguros Familiares
                 </h3>
                 <p style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.1rem" }}>
-                  Aviso automático 30 días antes de la renovación anual y archivo de pólizas
+                  Aviso automático 30 días antes de la renovación anual, desglose de cuotas y archivo de pólizas
                 </p>
               </div>
               <button
@@ -1370,7 +2263,7 @@ export function EconomyModule({
                   marginBottom: "1.25rem",
                 }}
               >
-                <input type="text" name="title" placeholder="Título (ej. Seguro Hogar)" required className="input-field" />
+                <input type="text" name="title" placeholder="Título (ej. Seguro Hogar / Moto)" required className="input-field" />
                 <select name="category" className="input-field">
                   <option value="hogar">Hogar</option>
                   <option value="coche">Coche / Moto</option>
@@ -1379,9 +2272,16 @@ export function EconomyModule({
                   <option value="decesos">Decesos</option>
                   <option value="otro">Otro</option>
                 </select>
-                <input type="text" name="provider" placeholder="Compañía (ej. Mapfre)" required className="input-field" />
+                <input type="text" name="provider" placeholder="Compañía (ej. Mapfre / Mutua)" required className="input-field" />
                 <input type="text" name="policyNumber" placeholder="Nº de Póliza" className="input-field" />
                 <input type="number" step="0.01" name="annualCost" placeholder="Coste total año (€)" required className="input-field" />
+                <select name="paymentFrequency" className="input-field">
+                  <option value="anual">1 pago único anual</option>
+                  <option value="2_plazos">Fraccionado en 2 mensualidades / semestral (ej. moto/coche)</option>
+                  <option value="3_plazos">Fraccionado en 3 mensualidades (ej. coche/moto)</option>
+                  <option value="trimestral">4 cuotas trimestrales</option>
+                  <option value="mensual">12 mensualidades / mensual</option>
+                </select>
                 <input type="date" name="renewalDate" required className="input-field" />
                 <input type="text" name="notes" placeholder="Notas (franquicia, cobertura...)" className="input-field" style={{ gridColumn: "1 / -1" }} />
 
@@ -1478,7 +2378,18 @@ export function EconomyModule({
                           )}
                         </div>
                         <div style={{ fontSize: "0.76rem", color: "var(--apple-text-secondary)", marginTop: "0.25rem" }}>
-                          Póliza: <code>{pol.policy_number || "S/N"}</code> · Vencimiento: {pol.renewal_date} · Pago {pol.payment_frequency}
+                          Póliza: <code>{pol.policy_number || "S/N"}</code> · Vencimiento: {pol.renewal_date} ·{" "}
+                          <span style={{ color: "var(--apple-text)", fontWeight: 600 }}>
+                            {pol.payment_frequency === "2_plazos" || pol.payment_frequency === "semestral"
+                              ? `Fraccionado en 2 mensualidades (2 x ${(pol.annual_cost / 2).toFixed(2)} €)`
+                              : pol.payment_frequency === "3_plazos"
+                              ? `Fraccionado en 3 mensualidades (3 x ${(pol.annual_cost / 3).toFixed(2)} €)`
+                              : pol.payment_frequency === "trimestral"
+                              ? `Trimestral (4 x ${(pol.annual_cost / 4).toFixed(2)} €)`
+                              : pol.payment_frequency === "mensual"
+                              ? `Mensual (12 x ${(pol.annual_cost / 12).toFixed(2)} €)`
+                              : "Pago único anual"}
+                          </span>
                         </div>
                         {pol.notes && (
                           <div style={{ fontSize: "0.74rem", color: "var(--apple-text-tertiary)", marginTop: "0.2rem" }}>
@@ -1503,7 +2414,9 @@ export function EconomyModule({
                           <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--apple-text)" }}>
                             {pol.annual_cost.toFixed(2)} €
                           </div>
-                          <div style={{ fontSize: "0.7rem", color: "var(--apple-text-secondary)" }}>/ año</div>
+                          <div style={{ fontSize: "0.7rem", color: "var(--apple-text-secondary)" }}>
+                            {(pol.annual_cost / 12).toFixed(2)} €/mes
+                          </div>
                         </div>
                         <button
                           onClick={() => startTransition(() => deleteFamilyInsuranceAction(pol.id))}
@@ -1987,16 +2900,24 @@ export function EconomyModule({
         onClose={() => setIsTicketModalOpen(false)}
       />
 
-      {/* ── Modal de Gasto Manual ── */}
+      {/* ── Modal de Gasto Manual y Recurrente ── */}
       <ManualExpenseModal
         isOpen={isManualExpenseOpen}
         onClose={() => setIsManualExpenseOpen(false)}
+        defaultType={manualExpenseType}
       />
 
       {/* ── Modal de Factura Mensual de Suministros ── */}
       <ManualUtilityBillModal
         isOpen={isUtilityModalOpen}
         onClose={() => setIsUtilityModalOpen(false)}
+      />
+
+      {/* ── Modal de Ingreso Mensual y Nóminas Familiares ── */}
+      <IncomeModal
+        isOpen={isIncomeModalOpen}
+        onClose={() => setIsIncomeModalOpen(false)}
+        members={members}
       />
 
       {/* ── Visor de Documentos (Pólizas, Tickets y Garantías) ── */}

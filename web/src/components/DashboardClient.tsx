@@ -123,6 +123,7 @@ export function DashboardClient({
   news = { espana: [], cyl: [] },
   traffic = null,
   pantryNeedsInventory = false,
+  dbStatus,
 }: {
   members: Member[];
   currentMemberId?: number | null;
@@ -158,6 +159,7 @@ export function DashboardClient({
   news?: { espana: NewsItem[]; cyl: NewsItem[] };
   traffic?: CommuteTraffic | null;
   pantryNeedsInventory?: boolean;
+  dbStatus?: { mode: string; hasDatabaseUrl: boolean; lastError: string | null };
 }) {
   const router = useRouter();
   const activeMember = members.find((m) => m.id === currentMemberId);
@@ -548,6 +550,11 @@ export function DashboardClient({
               insurances={insurances}
               warranties={warranties}
               utilityBills={utilityBills}
+              recurringExpenses={recurringExpenses}
+              monthlyIncomes={monthlyIncomes}
+              incomeEvolution={incomeEvolution}
+              members={members}
+              dbStatus={dbStatus}
             />
           </div>
         </div>
