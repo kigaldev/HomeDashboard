@@ -11,11 +11,24 @@ const ALLOWED = (process.env.TELEGRAM_ALLOWED_USERS || "")
 async function tgSend(chatId: string | number, text: string) {
   if (!TOKEN) return;
   try {
-    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    // 1. Intento primario con formato HTML
+    const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
     });
+    
+    // 2. Si Telegram rechaza el parseo HTML (error 400), reintentar en texto plano limpio
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      console.warn("[api/telegram] Falló envío HTML:", errJson?.description);
+      const cleanText = text.replace(/<[^>]*>/g, "");
+      await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: cleanText }),
+      });
+    }
   } catch (err) {
     console.error("[api/telegram] Error enviando mensaje a Telegram:", err);
   }
