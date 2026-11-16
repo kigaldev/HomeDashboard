@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "./Header";
 import { BriefingCard } from "./BriefingCard";
 import { DinnerCard } from "./DinnerCard";
@@ -158,7 +159,30 @@ export function DashboardClient({
   traffic?: CommuteTraffic | null;
   pantryNeedsInventory?: boolean;
 }) {
+  const router = useRouter();
   const activeMember = members.find((m) => m.id === currentMemberId);
+
+  // Auto-refresco en visibilidad o vuelta a la app PWA en la tablet
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        router.refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onVisibilityChange);
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        router.refresh();
+      }
+    }, 5 * 60 * 1000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [router]);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const deckRef = useRef<HTMLDivElement>(null);
   const tabBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);

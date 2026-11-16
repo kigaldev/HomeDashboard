@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import type { Member } from "@/lib/repo";
 import type { Weather } from "@/lib/weather";
 import { weatherLabel, kidsOutfit } from "@/lib/weather";
-import { IconSparkles, IconSettings, IconMaximize2, IconMinimize2 } from "./Icons";
+import { IconSparkles, IconSettings, IconMaximize2, IconMinimize2, IconRefresh } from "./Icons";
 import { HamburgerMenu, type NavItem } from "./HamburgerMenu";
 
 export function Header({
@@ -45,6 +45,7 @@ export function Header({
   const activeMember = members.find((m) => m.id === currentMemberId);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const handleFsChange = () => {
@@ -60,6 +61,13 @@ export function Header({
       document.documentElement.requestFullscreen().catch(() => {});
     } else {
       document.exitFullscreen().catch(() => {});
+    }
+  };
+
+  const handleReload = () => {
+    setIsRefreshing(true);
+    if (typeof window !== "undefined") {
+      window.location.reload();
     }
   };
 
@@ -180,6 +188,19 @@ export function Header({
               <IconSparkles size={14} />
             </div>
           </div>
+
+          {/* Botón Recargar / Sincronizar Datos */}
+          <button
+            onClick={handleReload}
+            className="btn-settings-header liquid-glass-elevated"
+            title="Sincronizar y recargar datos"
+            aria-label="Sincronizar y recargar datos"
+            disabled={isRefreshing}
+          >
+            <span style={{ display: "inline-flex", animation: isRefreshing ? "spin 1s linear infinite" : "none" }}>
+              <IconRefresh size={16} />
+            </span>
+          </button>
 
           {/* Botón Pantalla Completa (Ocultar barras del navegador en Tablet) */}
           <button

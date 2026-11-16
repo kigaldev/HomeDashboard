@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const maxDuration = 60;
 
 import { isoDate, longDate, greeting, addDays } from "@/lib/dates";
@@ -34,14 +36,10 @@ import { getLatestNews } from "@/lib/news";
 import { getSchoolCommuteTraffic } from "@/lib/traffic";
 import { syncMontessoriMenu } from "@/lib/schoolMenu";
 import { generateBriefing } from "@/lib/briefing";
-import { connection } from "next/server";
 import { getActiveMemberId } from "@/lib/session";
 import { DashboardClient } from "@/components/DashboardClient";
 
-export const instant = false;
-
 export default async function HomePage() {
-  await connection();
   // Sincronizaciones no bloqueantes en segundo plano
   syncFrequentStaples().catch(() => {});
 
