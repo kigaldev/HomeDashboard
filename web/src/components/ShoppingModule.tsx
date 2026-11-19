@@ -11,16 +11,63 @@ import {
   applyBasketOptimizationAction,
   deleteShoppingAction,
   clearCheckedShoppingAction,
-  generateSaturdayShoppingAction,
   addStapleAction,
   deleteStapleAction,
   toggleStapleAction,
 } from "@/app/actions";
-import type { ShoppingItem, Store, Staple, Member } from "@/lib/repo";
+import type { ShoppingItem, Store, Staple, Member, PantryItem } from "@/lib/repo";
 import type { BasketOptimizationResult } from "@/lib/pricesProvider";
 import { TicketManagerModal } from "./TicketManagerModal";
 import { ManualExpenseModal } from "./ManualExpenseModal";
 import { IconCamera, IconChevronDown, IconChevronRight } from "./Icons";
+
+function normalizeStr(str: string): string {
+  return (str || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanBaseName(str: string): string {
+  return normalizeStr(str)
+    .replace(/\(.*?\)/g, "")
+    .replace(/\[.*?\]/g, "")
+    .replace(/\b\d+(\s*(g|kg|l|ml|uds?|pack|piezas?|docena|bote|caja|bolsa|paquete|litros?|gramos?|kilos?))\b/gi, "")
+    .replace(/[-–—/]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getPantryStock(shoppingName: string, pantryList: PantryItem[] = []): number | null {
+  if (!shoppingName || !pantryList || pantryList.length === 0) return null;
+  const cleanShop = cleanBaseName(shoppingName);
+  const rawCleanShop = normalizeStr(shoppingName);
+
+  for (const p of pantryList) {
+    const rawP = normalizeStr(p.name);
+    const cleanP = cleanBaseName(p.name);
+
+    if (rawCleanShop === rawP || cleanShop === cleanP) {
+      return p.quantity_level !== undefined ? p.quantity_level : (p.status === "out" ? 0 : p.status === "low" ? 25 : 75);
+    }
+
+    if (cleanShop.length >= 3 && cleanP.length >= 3) {
+      const shopStem = cleanShop.replace(/e?s$/, "");
+      const pStem = cleanP.replace(/e?s$/, "");
+      if (shopStem === pStem || cleanShop.includes(cleanP) || cleanP.includes(cleanShop)) {
+        return p.quantity_level !== undefined ? p.quantity_level : (p.status === "out" ? 0 : p.status === "low" ? 25 : 75);
+      }
+    }
+  }
+
+  if (/urgente|agotad[oa]|sin stock|falta\b/i.test(shoppingName)) {
+    return 0;
+  }
+
+  return null;
+}
 
 export function ShoppingModule({
   items = [],
@@ -28,16 +75,17 @@ export function ShoppingModule({
   staples = [],
   members = [],
   currentMemberId = null,
+  pantry = [],
 }: {
   items: ShoppingItem[];
   stores: Store[];
   staples: Staple[];
   members?: Member[];
   currentMemberId?: number | null;
+  pantry?: PantryItem[];
 }) {
-  const [selectedStore, setSelectedStore] = useState<number | "all">("all");
+  const [selectedStore, setSelectedStore] = useState<number | "all" | "urgent">("all");
   const [viewMode, setViewMode] = useState<"store_chips" | "grouped">("store_chips");
-  const [showCompleted, setShowCompleted] = useState(false);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [isManualExpenseOpen, setIsManualExpenseOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
@@ -50,7 +98,6 @@ export function ShoppingModule({
 
   // Estados colapsables para ahorrar espacio vertical (plegados por defecto)
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showStoreFilters, setShowStoreFilters] = useState(false);
   const [showStaples, setShowStaples] = useState(false);
   const [showPendingList, setShowPendingList] = useState(true);
 
@@ -71,11 +118,36 @@ export function ShoppingModule({
   const memberMap = new Map((members || []).map((m) => [m.id, m]));
   const stapleNamesSet = new Set(staples.map((st) => st.name.trim().toLowerCase()));
 
-  // Filtrado de items pendientes según la tienda seleccionada
+  // Determinar urgencia (<30% de stock en despensa)
+  const isItemUrgent = (item: ShoppingItem): { urgent: boolean; stock: number | null } => {
+    const stock = getPantryStock(item.name, pantry);
+    if (stock !== null && stock < 30) {
+      return { urgent: true, stock };
+    }
+    if (/urgente|agotad[oa]|sin stock/i.test(item.name)) {
+      return { urgent: true, stock: stock ?? 0 };
+    }
+    return { urgent: false, stock };
+  };
+
+  const urgentCount = pendingItems.filter((i) => isItemUrgent(i).urgent).length;
+
+  // Filtrado de items pendientes según la tienda o urgencia seleccionada
   const filteredPendingItems =
-    selectedStore === "all"
+    selectedStore === "urgent"
+      ? pendingItems.filter((i) => isItemUrgent(i).urgent)
+      : selectedStore === "all"
       ? pendingItems
       : pendingItems.filter((i) => i.store_id === selectedStore);
+
+  // Ordenar para dar prioridad a los productos urgentes (<30% stock)
+  const sortedPendingItems = [...filteredPendingItems].sort((a, b) => {
+    const aUrgent = isItemUrgent(a).urgent;
+    const bUrgent = isItemUrgent(b).urgent;
+    if (aUrgent && !bUrgent) return -1;
+    if (!aUrgent && bUrgent) return 1;
+    return 0;
+  });
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,7 +155,7 @@ export function ShoppingModule({
     const fd = new FormData();
     fd.append("name", newItemName);
     // Si hay una tienda seleccionada en los filtros o en el selector, usarla
-    const targetStore = newItemStore || (selectedStore !== "all" ? String(selectedStore) : "");
+    const targetStore = newItemStore || (selectedStore !== "all" && selectedStore !== "urgent" ? String(selectedStore) : "");
     if (targetStore) fd.append("storeId", targetStore);
     if (currentMemberId) fd.append("by", currentMemberId.toString());
     startTransition(async () => {
@@ -184,6 +256,7 @@ function getShoppingItemEmoji(name: string, staplesList: Staple[] = []): string 
     const author = item.added_by ? memberMap.get(item.added_by) : null;
     const isStaple = stapleNamesSet.has(item.name.trim().toLowerCase());
     const emoji = getShoppingItemEmoji(item.name, staples);
+    const { urgent: isUrgent, stock: urgentStock } = isItemUrgent(item);
 
     return (
       <div
@@ -199,15 +272,24 @@ function getShoppingItemEmoji(name: string, staplesList: Staple[] = []): string 
             ? "rgba(255, 255, 255, 0.02)"
             : item.in_cart
             ? "rgba(52, 199, 89, 0.12)"
+            : isUrgent
+            ? "rgba(255, 59, 48, 0.07)"
             : "var(--liquid-glass-bg-subtle, rgba(255, 255, 255, 0.04))",
           borderRadius: "var(--radius-lg)",
           border: item.checked
             ? "1px solid rgba(255, 255, 255, 0.06)"
             : item.in_cart
             ? "1.5px solid rgba(52, 199, 89, 0.5)"
+            : isUrgent
+            ? "1px solid rgba(255, 59, 48, 0.35)"
             : "1px solid var(--liquid-glass-border, rgba(255, 255, 255, 0.1))",
+          borderLeft: isUrgent && !item.checked
+            ? "3.5px solid var(--apple-red, #ff3b30)"
+            : undefined,
           boxShadow: item.in_cart
             ? "0 4px 14px rgba(52, 199, 89, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.1)"
+            : isUrgent
+            ? "0 2px 10px rgba(255, 59, 48, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.06)"
             : "0 2px 8px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.06)",
           opacity: item.checked ? 0.45 : 1,
           transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -305,8 +387,29 @@ function getShoppingItemEmoji(name: string, staplesList: Staple[] = []): string 
               )}
             </div>
 
-            {/* Badges de soporte: Cantidad, Tienda, Autor */}
+            {/* Badges de soporte: Cantidad, Tienda, Autor, Urgencia */}
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginTop: "0.2rem", flexWrap: "wrap" }}>
+              {isUrgent && !item.checked && (
+                <span
+                  style={{
+                    fontSize: "0.72rem",
+                    padding: "0.12rem 0.5rem",
+                    borderRadius: "var(--radius-full)",
+                    background: "rgba(255, 59, 48, 0.16)",
+                    color: "var(--apple-red, #ff3b30)",
+                    fontWeight: 700,
+                    border: "1px solid rgba(255, 59, 48, 0.4)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                  }}
+                  title="Producto prioritario: menos del 30% de stock en despensa"
+                >
+                  <span>🚨</span>
+                  <span>{urgentStock !== null ? `Stock ${urgentStock}%` : "Urgente"}</span>
+                </span>
+              )}
+
               {item.quantity && item.quantity !== "1" && (
                 <span
                   style={{
@@ -490,27 +593,6 @@ function getShoppingItemEmoji(name: string, staplesList: Staple[] = []): string 
             >
               <span>{isOptimizing ? "⏳" : "⚡"}</span>
               <span>{isOptimizing ? "Calculando..." : "Optimizar Súper"}</span>
-            </button>
-
-            <button
-              onClick={() =>
-                startTransition(async () => {
-                  await generateSaturdayShoppingAction();
-                })
-              }
-              disabled={isPending}
-              className="btn-primary touch-target"
-              style={{
-                fontSize: "0.78rem",
-                padding: "0.38rem 0.7rem",
-                background: "var(--apple-green)",
-                boxShadow: "0 2px 8px rgba(52, 199, 89, 0.3)",
-                borderRadius: "var(--radius-full)",
-              }}
-              title="Añade ingredientes de las cenas y básicos gastados para la compra del sábado"
-            >
-              <span>🧺</span>
-              <span>Compra Sábado</span>
             </button>
 
             <button
@@ -1011,138 +1093,6 @@ function getShoppingItemEmoji(name: string, staplesList: Staple[] = []): string 
           </div>
         )}
       </div>
-
-      {/* ── Filtros por Supermercado (Colapsable / Compacto con Chevron) ── */}
-      <div style={{ marginBottom: "0.85rem" }}>
-        <button
-          type="button"
-          onClick={() => setShowStoreFilters(!showStoreFilters)}
-          aria-expanded={showStoreFilters}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0.65rem 0.95rem",
-            borderRadius: "var(--radius-md)",
-            background: "var(--apple-surface-secondary)",
-            border: "1px solid var(--apple-border)",
-            color: "var(--apple-text)",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-            <span style={{ fontSize: "1rem" }}>🏷️</span>
-            <span style={{ fontSize: "0.86rem", fontWeight: 700 }}>
-              Tiendas & Filtros
-            </span>
-            <span
-              style={{
-                fontSize: "0.72rem",
-                padding: "0.15rem 0.55rem",
-                borderRadius: "var(--radius-full)",
-                background:
-                  selectedStore === "all"
-                    ? "var(--apple-surface)"
-                    : `${storeMap.get(selectedStore as number)?.color}22`,
-                color:
-                  selectedStore === "all"
-                    ? "var(--apple-text-secondary)"
-                    : storeMap.get(selectedStore as number)?.color,
-                fontWeight: 600,
-                border: "1px solid var(--apple-border)",
-              }}
-            >
-              {selectedStore === "all" ? "Todos los súper" : storeMap.get(selectedStore as number)?.name}
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              color: "var(--apple-text-secondary)",
-            }}
-          >
-            {showStoreFilters ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
-          </div>
-        </button>
-
-        {showStoreFilters && (
-          <div
-            style={{
-              marginTop: "0.5rem",
-              display: "flex",
-              gap: "0.4rem",
-              overflowX: "auto",
-              scrollbarWidth: "none",
-              paddingBottom: "0.25rem",
-            }}
-          >
-            {/* Chip Todos */}
-            <button
-              type="button"
-              onClick={() => setSelectedStore("all")}
-              style={{
-                fontSize: "0.78rem",
-                fontWeight: 600,
-                padding: "0.4rem 0.85rem",
-                borderRadius: "var(--radius-full)",
-                background: selectedStore === "all" ? "var(--apple-text)" : "var(--apple-surface-secondary)",
-                color: selectedStore === "all" ? "var(--apple-bg)" : "var(--apple-text-secondary)",
-                border: "1px solid var(--apple-border)",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              Todos ({pendingCount})
-            </button>
-
-            {/* Chips de cada Supermercado */}
-            {stores.map((s) => {
-              const count = pendingItems.filter((i) => i.store_id === s.id).length;
-              const isSelected = selectedStore === s.id;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setSelectedStore(s.id)}
-                  style={{
-                    fontSize: "0.78rem",
-                    fontWeight: 600,
-                    padding: "0.4rem 0.85rem",
-                    borderRadius: "var(--radius-full)",
-                    background: isSelected ? `${s.color}20` : "var(--apple-surface-secondary)",
-                    color: isSelected ? s.color : "var(--apple-text-secondary)",
-                    border: isSelected ? `1.5px solid ${s.color}` : "1px solid var(--apple-border)",
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.35rem",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      background: s.color,
-                    }}
-                  />
-                  <span>{s.name}</span>
-                  <span style={{ opacity: 0.85, fontSize: "0.72rem" }}>({count})</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
       </div> {/* Fin de Tarjeta 1: Herramientas y Gestión */}
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -1194,16 +1144,37 @@ function getShoppingItemEmoji(name: string, staplesList: Staple[] = []): string 
                     fontSize: "0.74rem",
                     padding: "0.18rem 0.6rem",
                     borderRadius: "var(--radius-full)",
-                    background: filteredPendingItems.length > 0 ? "var(--apple-green-subtle)" : "rgba(255, 255, 255, 0.08)",
-                    color: filteredPendingItems.length > 0 ? "var(--apple-green)" : "var(--apple-text-secondary)",
+                    background: sortedPendingItems.length > 0 ? "var(--apple-green-subtle)" : "rgba(255, 255, 255, 0.08)",
+                    color: sortedPendingItems.length > 0 ? "var(--apple-green)" : "var(--apple-text-secondary)",
                     fontWeight: 700,
                   }}
                 >
-                  {filteredPendingItems.length} {filteredPendingItems.length === 1 ? "pendiente" : "pendientes"}
+                  {sortedPendingItems.length} {sortedPendingItems.length === 1 ? "pendiente" : "pendientes"}
                 </span>
+                {urgentCount > 0 && selectedStore !== "urgent" && (
+                  <span
+                    style={{
+                      fontSize: "0.7rem",
+                      padding: "0.15rem 0.5rem",
+                      borderRadius: "var(--radius-full)",
+                      background: "rgba(255, 59, 48, 0.15)",
+                      color: "var(--apple-red, #ff3b30)",
+                      fontWeight: 700,
+                      border: "1px solid rgba(255, 59, 48, 0.35)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.2rem",
+                    }}
+                  >
+                    <span>🚨</span>
+                    <span>{urgentCount} urgente{urgentCount > 1 ? "s" : ""}</span>
+                  </span>
+                )}
               </div>
               <p style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", margin: 0, marginTop: "0.12rem" }}>
-                {selectedStore === "all"
+                {selectedStore === "urgent"
+                  ? "🚨 Mostrando productos prioritarios con menos de 30% de stock en despensa"
+                  : selectedStore === "all"
                   ? "Todos los supermercados · Pulsa 🛒 a la derecha para meter al carro"
                   : `Filtrado por: ${storeMap.get(selectedStore as number)?.name || "Tienda"}`}
               </p>
@@ -1238,7 +1209,7 @@ function getShoppingItemEmoji(name: string, staplesList: Staple[] = []): string 
               background: "rgba(255, 255, 255, 0.04)",
               borderRadius: "var(--radius-md)",
               padding: "0.65rem 0.85rem",
-              marginBottom: "1rem",
+              marginBottom: "0.85rem",
               border: "1px solid var(--apple-border)",
             }}
           >
@@ -1272,10 +1243,125 @@ function getShoppingItemEmoji(name: string, staplesList: Staple[] = []): string 
           </div>
         )}
 
+        {/* ── Tiendas & Filtros (Integrado dentro de Lista de la compra) ── */}
+        <div
+          style={{
+            display: "flex",
+            gap: "0.4rem",
+            overflowX: "auto",
+            scrollbarWidth: "none",
+            paddingBottom: "0.35rem",
+            marginBottom: "0.95rem",
+            alignItems: "center",
+          }}
+        >
+          {/* Filtro Urgente en Rojo */}
+          <button
+            type="button"
+            onClick={() => setSelectedStore(selectedStore === "urgent" ? "all" : "urgent")}
+            style={{
+              fontSize: "0.78rem",
+              fontWeight: 700,
+              padding: "0.4rem 0.85rem",
+              borderRadius: "var(--radius-full)",
+              background: selectedStore === "urgent" ? "var(--apple-red, #ff3b30)" : "rgba(255, 59, 48, 0.12)",
+              color: selectedStore === "urgent" ? "#fff" : "var(--apple-red, #ff3b30)",
+              border: selectedStore === "urgent" ? "1.5px solid var(--apple-red, #ff3b30)" : "1.5px solid rgba(255, 59, 48, 0.35)",
+              boxShadow: selectedStore === "urgent" ? "0 2px 10px rgba(255, 59, 48, 0.35)" : "none",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            title="Filtrar productos con menos de 30% de stock en despensa"
+          >
+            <span>🚨</span>
+            <span>Urgentes (&lt;30%)</span>
+            <span
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.1rem 0.45rem",
+                borderRadius: "var(--radius-full)",
+                background: selectedStore === "urgent" ? "rgba(0,0,0,0.25)" : "rgba(255, 59, 48, 0.2)",
+                fontWeight: 800,
+              }}
+            >
+              {urgentCount}
+            </span>
+          </button>
+
+          {/* Chip Todos */}
+          <button
+            type="button"
+            onClick={() => setSelectedStore("all")}
+            style={{
+              fontSize: "0.78rem",
+              fontWeight: 600,
+              padding: "0.4rem 0.85rem",
+              borderRadius: "var(--radius-full)",
+              background: selectedStore === "all" ? "var(--apple-text)" : "var(--apple-surface-secondary)",
+              color: selectedStore === "all" ? "var(--apple-bg)" : "var(--apple-text-secondary)",
+              border: "1px solid var(--apple-border)",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            Todos ({pendingCount})
+          </button>
+
+          {/* Separador vertical */}
+          <span style={{ width: "1px", height: "18px", background: "var(--apple-border)", flexShrink: 0, margin: "0 0.15rem" }} />
+
+          {/* Chips de cada Supermercado */}
+          {stores.map((s) => {
+            const count = pendingItems.filter((i) => i.store_id === s.id).length;
+            const isSelected = selectedStore === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSelectedStore(s.id)}
+                style={{
+                  fontSize: "0.78rem",
+                  fontWeight: 600,
+                  padding: "0.4rem 0.85rem",
+                  borderRadius: "var(--radius-full)",
+                  background: isSelected ? `${s.color}20` : "var(--apple-surface-secondary)",
+                  color: isSelected ? s.color : "var(--apple-text-secondary)",
+                  border: isSelected ? `1.5px solid ${s.color}` : "1px solid var(--apple-border)",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: s.color,
+                  }}
+                />
+                <span>{s.name}</span>
+                <span style={{ opacity: 0.85, fontSize: "0.72rem" }}>({count})</span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Listado de Productos Pendientes */}
         {showPendingList && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-            {filteredPendingItems.length === 0 ? (
+            {sortedPendingItems.length === 0 ? (
               <div
                 style={{
                   padding: "2rem 1rem",
@@ -1285,66 +1371,24 @@ function getShoppingItemEmoji(name: string, staplesList: Staple[] = []): string 
                   border: "1px dashed var(--apple-border)",
                 }}
               >
-                <div style={{ fontSize: "2rem", marginBottom: "0.35rem" }}>🎉</div>
+                <div style={{ fontSize: "2rem", marginBottom: "0.35rem" }}>
+                  {selectedStore === "urgent" ? "🛡️" : "🎉"}
+                </div>
                 <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--apple-text)" }}>
-                  {selectedStore === "all" ? "¡No hay nada pendiente para comprar!" : "No hay pendientes en esta tienda"}
+                  {selectedStore === "urgent"
+                    ? "¡No hay productos con stock crítico (<30%)!"
+                    : selectedStore === "all"
+                    ? "¡No hay nada pendiente para comprar!"
+                    : "No hay pendientes en esta tienda"}
                 </div>
                 <div style={{ fontSize: "0.78rem", color: "var(--apple-text-secondary)", marginTop: "0.2rem" }}>
-                  Añade productos desde las herramientas superiores o con Pepe en Telegram.
+                  {selectedStore === "urgent"
+                    ? "Todos tus productos de la compra tienen suficiente stock en la despensa."
+                    : "Añade productos desde las herramientas superiores o con Pepe en Telegram."}
                 </div>
               </div>
             ) : (
-              filteredPendingItems.map(renderItemCard)
-            )}
-          </div>
-        )}
-
-        {/* ── Sección de Productos Comprados (Colapsable y Limpiable al pie) ── */}
-        {checkedCount > 0 && (
-          <div
-            style={{
-              borderTop: "1px solid var(--apple-border)",
-              paddingTop: "0.9rem",
-              marginTop: "1.1rem",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-              <button
-                type="button"
-                onClick={() => setShowCompleted(!showCompleted)}
-                className="btn-ghost"
-                style={{
-                  fontSize: "0.82rem",
-                  fontWeight: 600,
-                  color: "var(--apple-text-secondary)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                }}
-              >
-                <span>{showCompleted ? "▼" : "▶"}</span>
-                <span>Comprados ({checkedCount})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => startTransition(() => clearCheckedShoppingAction())}
-                disabled={isPending}
-                className="btn-ghost"
-                style={{
-                  fontSize: "0.76rem",
-                  color: "var(--apple-red)",
-                  padding: "0.2rem 0.55rem",
-                }}
-              >
-                Limpiar comprados
-              </button>
-            </div>
-
-            {showCompleted && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginTop: "0.55rem" }}>
-                {checkedItems.map(renderItemCard)}
-              </div>
+              sortedPendingItems.map(renderItemCard)
             )}
           </div>
         )}

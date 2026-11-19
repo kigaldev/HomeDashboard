@@ -525,6 +525,7 @@ export function DashboardClient({
               staples={staples}
               members={members}
               currentMemberId={currentMemberId}
+              pantry={pantry}
             />
           </div>
         </div>
